@@ -397,7 +397,8 @@ function install_schema(){
   if (!column_exists('events','invoice_address'))     pdo()->exec("ALTER TABLE events ADD invoice_address VARCHAR(255) NULL");
   if (!column_exists('events','license_expires_at'))  pdo()->exec("ALTER TABLE events ADD license_expires_at DATETIME NULL");
 
-  try { pdo()->exec("CREATE UNIQUE INDEX uniq_events_couple_username ON events(couple_username)"); } catch(Throwable $e){}
+  try { pdo()->exec("ALTER TABLE events DROP INDEX uniq_events_couple_username"); } catch(Throwable $e){}
+  try { pdo()->exec("CREATE INDEX idx_events_couple_username ON events(couple_username)"); } catch(Throwable $e){}
   // purchases.paid_at yoksa ekle
 try {
   $col = pdo()->query("SHOW COLUMNS FROM purchases LIKE 'paid_at'")->fetch();

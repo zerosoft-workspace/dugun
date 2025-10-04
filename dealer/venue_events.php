@@ -67,13 +67,6 @@ if ($action === 'create_event') {
     $slug = $base.'-'.$i++;
   }
 
-  $same = pdo()->prepare("SELECT id FROM events WHERE couple_username=? LIMIT 1");
-  $same->execute([$email]);
-  if ($same->fetch()) {
-    flash('err', 'Bu e-posta farklı bir etkinlik için kullanılıyor.');
-    redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
-  }
-
   $key  = bin2hex(random_bytes(16));
   $plain_pass = substr(bin2hex(random_bytes(8)),0,12);
   $hash = password_hash($plain_pass, PASSWORD_DEFAULT);

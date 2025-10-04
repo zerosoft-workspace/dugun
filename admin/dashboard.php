@@ -77,14 +77,6 @@ if (($_POST['do'] ?? '') === 'create_event') {
     if(!$chk->fetch()) break; $slug=$base.'-'.$i++;
   }
 
-  // aynı e-posta başka etkinlikte kullanılmış mı? (isteğe bağlı engel)
-  $same = pdo()->prepare("SELECT id FROM events WHERE couple_username=? LIMIT 1");
-  $same->execute([$email]);
-  if($same->fetch()){
-    flash('err','Bu e-posta başka bir etkinlik için tanımlı. Lütfen farklı bir e-posta kullanın.');
-    redirect($_SERVER['PHP_SELF'].'#ev');
-  }
-
   $key   = bin2hex(random_bytes(16));
   $pcol  = defined('THEME_PRIMARY_DEFAULT') ? THEME_PRIMARY_DEFAULT : '#0ea5b5';
   $acol  = defined('THEME_ACCENT_DEFAULT')  ? THEME_ACCENT_DEFAULT  : '#e0f7fb';
