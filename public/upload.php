@@ -6,6 +6,8 @@ require_once __DIR__.'/../includes/dealers.php';
 require_once __DIR__.'/../includes/guests.php';
 require_once __DIR__.'/../includes/mailer.php';
 
+install_schema();
+
 if (!function_exists('csrf_token')) {
   function csrf_token(){ if(empty($_SESSION['csrf'])) $_SESSION['csrf']=bin2hex(random_bytes(16)); return $_SESSION['csrf']; }
 }
@@ -422,15 +424,20 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if((int)$targetProfile['id'] === (int)$guestProfile['id']){
       json_response(['success'=>false,'error'=>'Kendinize mesaj gönderemezsiniz.'], 409);
     }
-    $row = guest_private_message_to_profile(
-      $event_id,
-      $guestProfile,
-      $targetProfile,
-      $messageBody,
-      $uploadContext > 0 ? $uploadContext : null
-    );
+    try {
+      $row = guest_private_message_to_profile(
+        $event_id,
+        $guestProfile,
+        $targetProfile,
+        $messageBody,
+        $uploadContext > 0 ? $uploadContext : null
+      );
+    } catch (Throwable $e) {
+      error_log('guest_private_message_to_profile failed: '.$e->getMessage());
+      $row = null;
+    }
     if(!$row){
-      json_response(['success'=>false,'error'=>'Mesaj gönderilemedi.'], 500);
+      json_response(['success'=>false,'error'=>'Mesaj gönderilirken bir hata oluştu.'], 500);
     }
     $recipientEmail = $targetProfile['email'] ?? null;
     if($recipientEmail){
@@ -1120,6 +1127,28 @@ const csrfToken='<?=h(csrf_token())?>';
 const shareButtons=document.querySelectorAll('.share-btn');
 const toast=document.getElementById('shareToast');
 let toastTimer;
+
+let audioCtx=null;
+function playMessageSound(){
+  try{
+    const Ctx=window.AudioContext||window.webkitAudioContext;
+    if(!Ctx) return;
+    if(!audioCtx){ audioCtx=new Ctx(); }
+    if(audioCtx.state==='suspended'){ audioCtx.resume().catch(()=>{}); }
+    const now=audioCtx.currentTime;
+    const osc=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    osc.type='sine';
+    osc.frequency.setValueAtTime(880, now);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.22, now+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now+0.5);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now+0.5);
+  }catch(e){/* sessizce yoksay */}
+}
+
 function showToast(message){
   if(!toast) return;
   toast.textContent=message;
@@ -1261,37 +1290,49 @@ function buildConversationBubble(entry){
   bubble.appendChild(body);
   return bubble;
 }
-function renderConversation(entries){
-  if(!conversationStream) return;
-  conversationStream.innerHTML='';
-  if(!entries || !entries.length){
-    setConversationState('Henüz mesaj yok. İlk mesajı siz gönderebilirsiniz.', 'empty');
-    return;
-  }
-  entries.forEach(entry=>{
-    conversationStream.appendChild(buildConversationBubble(entry));
-  });
-  conversationStream.scrollTop = conversationStream.scrollHeight;
-}
-function appendConversationEntry(entry){
-  if(!conversationStream) return;
-  const placeholder=conversationStream.querySelector('.bubble-placeholder');
-  if(placeholder){
+  function renderConversation(entries, options={}){
+    if(!conversationStream) return;
+    const notify=!!options.notify;
+    const prevLatest=conversationLatestId;
+    let highest=conversationLatestId;
+    let newFromOthers=0;
     conversationStream.innerHTML='';
+    if(!entries || !entries.length){
+      conversationLatestId=highest;
+      setConversationState('Henüz mesaj yok. İlk mesajı siz gönderebilirsiniz.', 'empty');
+      return;
+    }
+    entries.forEach(entry=>{
+      conversationStream.appendChild(buildConversationBubble(entry));
+      const entryId=parseInt(entry.id ?? '0',10);
+      if(entryId && entryId>highest){ highest=entryId; }
+      if(notify && entryId>prevLatest && !entry.isMine){ newFromOthers++; }
+    });
+    conversationLatestId=highest;
+    conversationStream.scrollTop = conversationStream.scrollHeight;
+    if(notify && newFromOthers>0){ playMessageSound(); }
   }
-  conversationStream.appendChild(buildConversationBubble(entry));
-  conversationStream.scrollTop = conversationStream.scrollHeight;
-}
-async function requestAction(action, params={}){
-  const fd=new FormData();
-  fd.append('csrf', csrfToken);
-  fd.append('do', action);
-  Object.entries(params).forEach(([key,value])=>{
-    if(value===undefined || value===null) return;
-    fd.append(key, value);
-  });
-  return postFormData(fd);
-}
+  function appendConversationEntry(entry){
+    if(!conversationStream) return;
+    const placeholder=conversationStream.querySelector('.bubble-placeholder');
+    if(placeholder){
+      conversationStream.innerHTML='';
+    }
+    conversationStream.appendChild(buildConversationBubble(entry));
+    const entryId=parseInt(entry.id ?? '0',10);
+    if(entryId && entryId>conversationLatestId){ conversationLatestId=entryId; }
+    conversationStream.scrollTop = conversationStream.scrollHeight;
+  }
+  async function requestAction(action, params={}){
+    const fd=new FormData();
+    fd.append('csrf', csrfToken);
+    fd.append('do', action);
+    Object.entries(params).forEach(([key,value])=>{
+      if(value===undefined || value===null) return;
+      fd.append(key, value);
+    });
+    return postFormData(fd);
+  }
 const messageModalEl=document.getElementById('messageModal');
 const conversationStream=document.getElementById('conversationStream');
 const messageModalLabel=document.getElementById('messageModalLabel');
@@ -1300,17 +1341,49 @@ const conversationForm=document.getElementById('conversationForm');
 const conversationTextarea=conversationForm ? conversationForm.querySelector('textarea') : null;
 const messageModal=messageModalEl ? new bootstrap.Modal(messageModalEl) : null;
 let activeRecipient=null;
+let conversationLatestId=0;
+let conversationPollTimer=null;
+let conversationLoading=false;
 
-async function loadConversation(recipientId){
-  if(!conversationStream) return;
-  setConversationState('Mesajlar yükleniyor...');
-  try{
-    const data=await requestAction('conversation',{target_profile_id:recipientId});
-    renderConversation(data.messages || []);
-  }catch(err){
-    setConversationState(err.message || 'Mesajlar getirilemedi.', 'error');
+  async function loadConversation(recipientId, options={}){
+    if(!conversationStream) return;
+    const notify=!!options.notify;
+    const showLoader=!!options.showLoader;
+    if(conversationLoading){ return; }
+    if(showLoader || !conversationStream.childElementCount){
+      setConversationState('Mesajlar yükleniyor...');
+    }
+    conversationLoading=true;
+    try{
+      const data=await requestAction('conversation',{target_profile_id:recipientId});
+      renderConversation(data.messages || [], {notify});
+    }catch(err){
+      if(showLoader){
+        setConversationState(err.message || 'Mesajlar getirilemedi.', 'error');
+      }else{
+        showToast(err.message || 'Mesajlar getirilemedi.');
+      }
+    }finally{
+      conversationLoading=false;
+    }
   }
-}
+
+  function startConversationPolling(){
+    stopConversationPolling();
+    if(!activeRecipient) return;
+    conversationPollTimer=setInterval(()=>{
+      if(!activeRecipient) return;
+      loadConversation(activeRecipient.id,{notify:true});
+    }, 6000);
+  }
+
+  function stopConversationPolling(){
+    if(conversationPollTimer){
+      clearInterval(conversationPollTimer);
+      conversationPollTimer=null;
+    }
+    conversationLoading=false;
+  }
 
 document.querySelectorAll('.message-open').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -1328,9 +1401,11 @@ document.querySelectorAll('.message-open').forEach(btn=>{
     if(messageModalLabel){ messageModalLabel.textContent=activeRecipient.name; }
     if(messageModalBadge){ messageModalBadge.textContent='Misafir Mesajı'; }
     if(conversationTextarea){ conversationTextarea.value=''; }
+    conversationLatestId=0;
     setConversationState('Mesajlar yükleniyor...');
     messageModal.show();
-    loadConversation(profileId);
+    loadConversation(profileId,{showLoader:true});
+    startConversationPolling();
   });
 });
 
@@ -1362,7 +1437,9 @@ conversationForm?.addEventListener('submit',async e=>{
 });
 
 messageModalEl?.addEventListener('hidden.bs.modal',()=>{
+  stopConversationPolling();
   activeRecipient=null;
+  conversationLatestId=0;
   setConversationState('Bir misafir seçerek sohbeti başlatabilirsiniz.', 'empty');
 });
 document.querySelectorAll('.ajax-host-note').forEach(form=>{
