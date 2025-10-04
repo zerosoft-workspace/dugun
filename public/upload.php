@@ -355,6 +355,111 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     header('Location:'.$redirect.'#media-'.$uploadId); exit;
   }
 
+  if($action === 'conversation'){
+    $targetId = (int)($_POST['target_profile_id'] ?? 0);
+    if(!$guestProfile || (int)$guestProfile['is_verified']!==1){
+      json_response(['success'=>false,'error'=>'Mesajlaşma için e-postanızı doğrulayın.'], 403);
+    }
+    if($targetId <= 0){
+      json_response(['success'=>false,'error'=>'Geçerli bir misafir seçin.'], 422);
+    }
+    $targetProfile = guest_profile_find_by_id($targetId);
+    if(!$targetProfile || (int)$targetProfile['event_id'] !== $event_id){
+      json_response(['success'=>false,'error'=>'Misafir bulunamadı.'], 404);
+    }
+    if((int)$targetProfile['id'] === (int)$guestProfile['id']){
+      json_response(['success'=>false,'error'=>'Kendinize mesaj gönderemezsiniz.'], 409);
+    }
+    $raw = guest_private_conversation($event_id, (int)$guestProfile['id'], (int)$targetProfile['id']);
+    $messages = [];
+    foreach($raw as $row){
+      $isMine = (int)$row['sender_profile_id'] === (int)$guestProfile['id'];
+      $senderName = $isMine ? 'Siz' : ($row['sender_display_name'] ?: 'Misafir');
+      $messages[] = [
+        'id' => (int)$row['id'],
+        'body' => $row['body'],
+        'body_html' => nl2br(h($row['body'] ?? '')),
+        'meta' => $senderName.' • '.relative_time($row['created_at']),
+        'isMine' => $isMine,
+        'created_at' => $row['created_at'],
+      ];
+    }
+    json_response([
+      'success' => true,
+      'messages' => $messages,
+      'target' => [
+        'id' => (int)$targetProfile['id'],
+        'name' => $targetProfile['display_name'] ?: ($targetProfile['name'] ?? 'Misafir')
+      ]
+    ]);
+  }
+
+  if($action === 'message_profile'){
+    $targetId = (int)($_POST['target_profile_id'] ?? 0);
+    $messageBody = trim($_POST['message_body'] ?? '');
+    $uploadContext = (int)($_POST['context_upload_id'] ?? 0);
+    if(!$guestProfile || (int)$guestProfile['is_verified']!==1){
+      json_response(['success'=>false,'error'=>'Mesaj gönderebilmek için e-postanızı doğrulayın.'], 403);
+    }
+    if($targetId <= 0){
+      json_response(['success'=>false,'error'=>'Geçerli bir misafir seçin.'], 422);
+    }
+    if($messageBody === ''){
+      json_response(['success'=>false,'error'=>'Mesaj boş olamaz.'], 422);
+    }
+    $targetProfile = guest_profile_find_by_id($targetId);
+    if(!$targetProfile || (int)$targetProfile['event_id'] !== $event_id){
+      json_response(['success'=>false,'error'=>'Misafir bulunamadı.'], 404);
+    }
+    if((int)$targetProfile['id'] === (int)$guestProfile['id']){
+      json_response(['success'=>false,'error'=>'Kendinize mesaj gönderemezsiniz.'], 409);
+    }
+    $row = guest_private_message_to_profile(
+      $event_id,
+      $guestProfile,
+      $targetProfile,
+      $messageBody,
+      $uploadContext > 0 ? $uploadContext : null
+    );
+    if(!$row){
+      json_response(['success'=>false,'error'=>'Mesaj gönderilemedi.'], 500);
+    }
+    $recipientEmail = $targetProfile['email'] ?? null;
+    if($recipientEmail){
+      $recipientEmail = trim($recipientEmail);
+      if($recipientEmail !== '' && filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)){
+        $recipientName = $targetProfile['display_name'] ?: ($targetProfile['name'] ?? 'Misafir');
+        $senderName = $guestProfile['display_name'] ?: ($guestProfile['name'] ?? 'Misafir');
+        $galleryUrl = public_upload_url($event_id);
+        if($uploadContext > 0){
+          $galleryUrl .= '#media-'.$uploadContext;
+        }
+        $html = '<div style="font-family:Inter,Arial,sans-serif;background:#f8fafc;padding:24px">'
+              .'<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;padding:32px;box-shadow:0 18px 45px rgba(15,23,42,0.08);">'
+              .'<h2 style="margin-top:0;color:#0ea5b5;font-size:22px;">BİKARE topluluğundan yeni mesaj</h2>'
+              .'<p style="color:#475569;font-size:15px;line-height:1.6;">Merhaba '.h($recipientName).', '.h($senderName).' sana özel bir mesaj gönderdi:</p>'
+              .'<blockquote style="margin:18px 0;padding:18px;border-left:4px solid #0ea5b5;background:#f1fcfd;border-radius:14px;color:#0f172a;line-height:1.6;">'.nl2br(h($messageBody)).'</blockquote>'
+              .'<p style="color:#475569;font-size:14px;line-height:1.6;">Etkinlik sayfasına geri dönmek istersen aşağıdaki bağlantıya tıklayabilirsin.</p>'
+              .'<p style="text-align:center;margin:24px 0"><a href="'.h($galleryUrl).'" style="background:#0ea5b5;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600;display:inline-block;">Misafir Alanını Aç</a></p>'
+              .'</div></div>';
+        send_smtp_mail($recipientEmail, 'BİKARE misafirinden yeni mesaj', $html);
+      }
+    }
+    $entry = [
+      'id' => (int)$row['id'],
+      'body' => $row['body'],
+      'body_html' => nl2br(h($row['body'] ?? '')),
+      'meta' => 'Siz • '.relative_time($row['created_at']),
+      'isMine' => true,
+      'created_at' => $row['created_at']
+    ];
+    json_response([
+      'success' => true,
+      'message' => 'Mesajınız ilgili misafire iletildi.',
+      'entry' => $entry
+    ]);
+  }
+
   if($action === 'note_host'){
     $body = trim($_POST['host_message'] ?? '');
     if(!$guestProfile || (int)$guestProfile['is_verified']!==1){
@@ -426,6 +531,10 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 
 $guestProfile = guest_profile_current($event_id);
 $profileVerified = $guestProfile && (int)$guestProfile['is_verified']===1;
+$guestDirectory = [];
+if ($guestProfile && $profileVerified) {
+  $guestDirectory = guest_event_profile_directory($event_id, (int)$guestProfile['id']);
+}
 
 $uploads=[]; $uploadLikes=[]; $uploadLikedByMe=[]; $uploadComments=[]; $commentCounts=[];
 if($CAN_VIEW){
@@ -494,11 +603,13 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .dropzone.drag{ border-color:var(--zs); background:rgba(14,165,181,.08); }
 .form-text{ color:var(--muted); }
 .gallery-card{ padding:28px; }
-.gallery-masonry{ column-count:1; column-gap:24px; }
-@media(min-width:768px){ .gallery-masonry{ column-count:2; } }
-@media(min-width:1200px){ .gallery-masonry{ column-count:3; } }
-.gallery-item{ break-inside:avoid; margin-bottom:24px; border-radius:20px; overflow:hidden; background:#fff; border:1px solid rgba(148,163,184,.2); box-shadow:0 12px 30px rgba(15,23,42,.08); position:relative; }
-.gallery-media img,.gallery-media video{ width:100%; display:block; object-fit:cover; }
+.gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:24px; }
+@media(min-width:768px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); } }
+@media(min-width:1400px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); } }
+.gallery-item{ display:flex; flex-direction:column; border-radius:22px; overflow:hidden; background:#fff; border:1px solid rgba(148,163,184,.18); box-shadow:0 16px 32px rgba(15,23,42,.08); transition:transform .2s ease, box-shadow .2s ease; }
+.gallery-item:hover{ transform:translateY(-4px); box-shadow:0 20px 44px rgba(15,23,42,.12); }
+.gallery-media{ position:relative; width:100%; aspect-ratio:4/5; background:#020617; }
+.gallery-media img,.gallery-media video{ width:100%; height:100%; display:block; object-fit:cover; }
 .gallery-header{ display:flex; align-items:center; gap:12px; padding:18px 20px 12px; }
 .avatar{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; letter-spacing:.5px; }
 .gallery-actions{ display:flex; align-items:center; justify-content:space-between; padding:12px 20px 4px; gap:12px; }
@@ -512,12 +623,26 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .comment strong{ display:block; font-size:13px; color:var(--ink); }
 .comment p{ margin:4px 0 0; font-size:13px; color:var(--muted); }
 .comment-form textarea{ resize:vertical; border-radius:16px; }
-.message-panel{ border:1px dashed rgba(148,163,184,.45); border-radius:16px; padding:16px; background:rgba(241,245,249,.6); }
-.message-panel[hidden]{ display:none !important; }
 .note-card textarea{ min-height:140px; }
 .form-feedback{ color:var(--zs); font-weight:600; }
 .form-feedback.error{ color:#ef4444; }
 .badge-soft{ background:rgba(14,165,181,.12); color:var(--zs); border-radius:999px; padding:4px 12px; font-size:12px; font-weight:600; }
+.guest-directory{ max-height:360px; overflow:auto; display:flex; flex-direction:column; gap:10px; }
+.guest-card{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 16px; border-radius:18px; border:1px solid rgba(148,163,184,.25); background:rgba(248,250,252,.8); transition:background .2s ease, transform .2s ease; text-align:left; }
+.guest-card:hover{ background:#fff; transform:translateY(-2px); box-shadow:0 14px 28px rgba(15,23,42,.08); }
+.guest-card .guest-info{ display:flex; align-items:center; gap:12px; }
+.guest-card .guest-meta{ font-size:12px; color:var(--muted); }
+.guest-card button{ border:none; background:var(--zs); color:#fff; border-radius:999px; padding:6px 14px; font-weight:600; }
+.message-pill{ display:flex; align-items:center; gap:8px; font-size:12px; color:var(--muted); }
+.conversation-stream{ max-height:420px; overflow:auto; display:flex; flex-direction:column; gap:14px; padding-right:6px; }
+.conversation-bubble{ max-width:78%; padding:14px 18px; border-radius:20px; background:#f1f5f9; color:var(--ink); position:relative; box-shadow:0 12px 24px rgba(15,23,42,.08); }
+.conversation-bubble.mine{ margin-left:auto; background:var(--zs); color:#fff; box-shadow:0 18px 36px rgba(14,165,181,.22); }
+.conversation-bubble .meta{ font-size:11px; opacity:.8; margin-bottom:4px; }
+.conversation-bubble.mine .meta{ color:rgba(255,255,255,.8); }
+.conversation-footer{ display:flex; gap:12px; align-items:flex-end; padding-top:16px; }
+.conversation-footer textarea{ flex:1; border-radius:18px; resize:none; min-height:80px; }
+.conversation-footer button{ border:none; background:var(--zs); color:#fff; border-radius:16px; padding:10px 18px; font-weight:600; }
+.bubble-loading{ text-align:center; font-size:13px; color:var(--muted); padding:14px 0; }
 .profile-card{ padding:28px; }
 .profile-card h5{ font-weight:700; }
 .chat-card{ padding:28px; }
@@ -651,7 +776,7 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
         <?php elseif(!$uploads): ?>
           <div class="smallmuted">Henüz yükleme yapılmadı. İlk paylaşımı siz yapın!</div>
         <?php else: ?>
-          <div class="gallery-masonry">
+          <div class="gallery-grid">
             <?php foreach($uploads as $u):
               $path = '/'.$u['file_path'];
               $isImg=is_image_mime($u['mime']); $isVid=is_video_mime($u['mime']);
@@ -716,30 +841,11 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
                   </form>
                   <?php
                     $isOwnUpload = $u['profile_id'] && isset($guestProfile['id']) && (int)$u['profile_id'] === (int)$guestProfile['id'];
-                    $canMessageGuest = false;
-                    if(!$isOwnUpload) {
-                      if($u['profile_id']) {
-                        $canMessageGuest = true;
-                      } elseif(!empty($u['guest_email'])) {
-                        $canMessageGuest = true;
-                      }
-                    }
+                    $canMessageGuest = !$isOwnUpload && (int)$u['profile_id'] > 0;
+                    $targetName = $u['profile_display_name'] ?: ($u['guest_name'] ?: 'Misafir');
                   ?>
                   <?php if($canMessageGuest): ?>
-                    <button type="button" class="icon-btn message-toggle mt-3" data-target="message-panel-<?=$u['id']?>">📨 Mesaj Gönder</button>
-                    <div class="message-panel mt-3" id="message-panel-<?=$u['id']?>" hidden>
-                      <form method="post" class="vstack gap-2 ajax-guest-message" data-upload="<?=$u['id']?>">
-                        <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
-                        <input type="hidden" name="do" value="message_guest">
-                        <input type="hidden" name="upload_id" value="<?=$u['id']?>">
-                        <textarea class="form-control" name="message_body" rows="2" placeholder="Misafire özel mesajınızı yazın" required></textarea>
-                        <div class="d-flex justify-content-between align-items-center">
-                          <small class="text-muted">Mesajınız doğrudan ilgili misafire iletilecek.</small>
-                          <button class="btn btn-sm btn-zs">Gönder</button>
-                        </div>
-                        <div class="form-feedback small" data-role="feedback" hidden></div>
-                      </form>
-                    </div>
+                    <button type="button" class="icon-btn message-open mt-3" data-target-profile="<?=$u['profile_id']?>" data-target-name="<?=h($targetName)?>" data-upload-id="<?=$u['id']?>">💬 Mesaj Gönder</button>
                   <?php elseif($isOwnUpload): ?>
                     <div class="comment mt-3 smallmuted">Bu içerik size ait. Sohbet alanından diğer misafirlerle iletişim kurabilirsiniz.</div>
                   <?php else: ?>
@@ -784,6 +890,50 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
           </form>
         <?php else: ?>
           <div class="smallmuted">E-posta adresinizle içerik yüklediğinizde profilinizi düzenleyebilir ve topluluk özelliklerini kullanabilirsiniz.</div>
+        <?php endif; ?>
+      </div>
+
+      <div class="card-lite message-card" id="messages">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="m-0">Mesaj Kutusu</h5>
+          <?php if($guestDirectory): ?><span class="badge-soft"><?=count($guestDirectory)?> kişi</span><?php endif; ?>
+        </div>
+        <?php if(!$guestProfile): ?>
+          <div class="smallmuted">Misafirlere mesaj gönderebilmek için önce adınızı ve e-postanızı paylaşarak bir içerik yükleyin.</div>
+        <?php elseif(!$profileVerified): ?>
+          <div class="smallmuted">E-postanızı doğruladıktan sonra diğer misafirlerle birebir mesajlaşabilirsiniz.</div>
+        <?php elseif(!$guestDirectory): ?>
+          <div class="smallmuted">Şu anda mesajlaşabileceğiniz başka bir misafir yok. İlk sohbeti başlatmak için arkadaşlarınızı davet edin!</div>
+        <?php else: ?>
+          <div class="guest-directory">
+            <?php foreach($guestDirectory as $gd):
+              $seed = guest_profile_avatar_seed([
+                'avatar_token' => $gd['avatar_token'],
+                'email' => $gd['email'],
+                'id' => $gd['id']
+              ]);
+              [$bg,$fg] = avatar_colors($seed);
+              $display = $gd['display_name'];
+              $lastSeen = $gd['last_seen_at'] ?: $gd['last_login_at'];
+              $statusText = $lastSeen ? ('Son aktif '.relative_time($lastSeen)) : 'Yeni katıldı';
+              if($gd['is_verified']) {
+                $statusText = 'Doğrulandı • '.$statusText;
+              }
+            ?>
+              <button type="button" class="guest-card message-open" data-target-profile="<?=$gd['id']?>" data-target-name="<?=h($display)?>" data-upload-id="">
+                <div class="guest-info">
+                  <div class="avatar" style="width:42px;height:42px;background:<?=$bg?>;color:<?=$fg?>;">
+                    <?=h(avatar_initial($display))?>
+                  </div>
+                  <div>
+                    <div class="fw-semibold"><?=h($display)?></div>
+                    <div class="guest-meta"><?=h($statusText)?></div>
+                  </div>
+                </div>
+                <span class="message-pill"><span>💬</span>Mesaj</span>
+              </button>
+            <?php endforeach; ?>
+          </div>
         <?php endif; ?>
       </div>
 
@@ -858,6 +1008,31 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 </div>
 <div class="share-toast" id="shareToast">Bağlantı kopyalandı!</div>
 
+<div class="modal fade" id="messageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content" style="border-radius:24px; border:none; box-shadow:0 28px 60px rgba(15,23,42,.18);">
+      <div class="modal-header" style="border-bottom:none; padding:24px 28px 12px;">
+        <div>
+          <div class="hero-badge" id="messageModalBadge" style="font-size:12px;">Misafir Mesajı</div>
+          <h5 class="modal-title mt-2" id="messageModalLabel">Mesajlaşma</h5>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body" style="padding:0 28px 28px;">
+        <div class="conversation-stream" id="conversationStream">
+          <div class="bubble-loading">Bir misafir seçerek sohbeti başlatabilirsiniz.</div>
+        </div>
+        <form class="conversation-footer" id="conversationForm" autocomplete="off">
+          <textarea class="form-control" name="message_body" placeholder="Kutlama mesajınızı yazın" required></textarea>
+          <button type="submit">Gönder</button>
+        </form>
+        <div class="smallmuted mt-2" id="conversationHint">Mesajlarınız alıcıya e-posta olarak da iletilir.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
   const stage=document.getElementById('pvStage'), box=document.getElementById('scaleBox');
@@ -876,6 +1051,7 @@ function renderList(files){ if(!files||!files.length){ lst.innerHTML=''; return;
 function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
 fm?.addEventListener('submit',e=>{ const name=fm.querySelector('[name=guest_name]').value.trim(); if(!name){e.preventDefault(); alert('Lütfen adınızı yazın.');} const fs=fi?.files||[]; if(!fs.length){e.preventDefault(); alert('Lütfen dosya seçin.');} });
 
+const csrfToken='<?=h(csrf_token())?>';
 const shareButtons=document.querySelectorAll('.share-btn');
 const toast=document.getElementById('shareToast');
 let toastTimer;
@@ -898,18 +1074,11 @@ shareButtons.forEach(btn=>btn.addEventListener('click',async()=>{
     showToast('Bağlantı kopyalanamadı.');
   }
 }));
-document.querySelectorAll('.message-toggle').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    const targetId=btn.dataset.target;
-    if(!targetId) return;
-    const panel=document.getElementById(targetId);
-    if(!panel) return;
-    if(panel.hasAttribute('hidden')){ panel.removeAttribute('hidden'); } else { panel.setAttribute('hidden',''); }
-  });
-});
-async function sendAjax(form){
-  const fd=new FormData(form);
-  const response=await fetch(window.location.href.split('#')[0],{
+function postFormUrl(){
+  return window.location.href.split('#')[0];
+}
+async function postFormData(fd){
+  const response=await fetch(postFormUrl(),{
     method:'POST',
     body:fd,
     headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
@@ -924,6 +1093,10 @@ async function sendAjax(form){
     throw new Error(data.error || 'İşlem tamamlanamadı.');
   }
   return data;
+}
+async function sendAjax(form){
+  const fd=new FormData(form);
+  return postFormData(fd);
 }
 document.querySelectorAll('.ajax-like').forEach(form=>{
   form.addEventListener('submit',async e=>{
@@ -985,29 +1158,132 @@ function handleFeedback(form, message, isError=false){
   feedback.hidden=false;
   feedback.classList.toggle('error',!!isError);
 }
-document.querySelectorAll('.ajax-guest-message').forEach(form=>{
-  form.addEventListener('submit',async e=>{
-    e.preventDefault();
-    if(form.dataset.loading==='1') return;
-    form.dataset.loading='1';
-    const submit=form.querySelector('button[type=submit]');
-    const textarea=form.querySelector('textarea');
-    const feedback=form.querySelector('[data-role=\"feedback\"]');
-    if(feedback){ feedback.hidden=true; feedback.classList.remove('error'); }
-    submit?.setAttribute('disabled','disabled');
-    try{
-      const data=await sendAjax(form);
-      if(textarea) textarea.value='';
-      handleFeedback(form, data.message || 'Mesajın gönderildi!');
-      showToast(data.message || 'Mesajın gönderildi!');
-    }catch(err){
-      handleFeedback(form, err.message || 'Mesaj gönderilemedi.', true);
-      showToast(err.message || 'Mesaj gönderilemedi.');
-    }finally{
-      submit?.removeAttribute('disabled');
-      delete form.dataset.loading;
-    }
+function setConversationState(message){
+  if(!conversationStream) return;
+  conversationStream.innerHTML=`<div class="bubble-loading">${esc(message)}</div>`;
+}
+function buildConversationBubble(entry){
+  const bubble=document.createElement('div');
+  bubble.className='conversation-bubble'+(entry.isMine?' mine':'');
+  if(entry.meta){
+    const meta=document.createElement('div');
+    meta.className='meta';
+    meta.textContent=entry.meta;
+    bubble.appendChild(meta);
+  }
+  const body=document.createElement('div');
+  body.className='body';
+  if(entry.body_html){
+    body.innerHTML=entry.body_html;
+  }else if(entry.body){
+    body.textContent=entry.body;
+  }
+  bubble.appendChild(body);
+  return bubble;
+}
+function renderConversation(entries){
+  if(!conversationStream) return;
+  conversationStream.innerHTML='';
+  if(!entries || !entries.length){
+    setConversationState('Henüz mesaj yok. İlk mesajı siz gönderebilirsiniz.');
+    return;
+  }
+  entries.forEach(entry=>{
+    conversationStream.appendChild(buildConversationBubble(entry));
   });
+  conversationStream.scrollTop = conversationStream.scrollHeight;
+}
+function appendConversationEntry(entry){
+  if(!conversationStream) return;
+  const placeholder=conversationStream.querySelector('.bubble-loading');
+  if(placeholder){
+    conversationStream.innerHTML='';
+  }
+  conversationStream.appendChild(buildConversationBubble(entry));
+  conversationStream.scrollTop = conversationStream.scrollHeight;
+}
+async function requestAction(action, params={}){
+  const fd=new FormData();
+  fd.append('csrf', csrfToken);
+  fd.append('do', action);
+  Object.entries(params).forEach(([key,value])=>{
+    if(value===undefined || value===null) return;
+    fd.append(key, value);
+  });
+  return postFormData(fd);
+}
+const messageModalEl=document.getElementById('messageModal');
+const conversationStream=document.getElementById('conversationStream');
+const messageModalLabel=document.getElementById('messageModalLabel');
+const messageModalBadge=document.getElementById('messageModalBadge');
+const conversationForm=document.getElementById('conversationForm');
+const conversationTextarea=conversationForm ? conversationForm.querySelector('textarea') : null;
+const messageModal=messageModalEl ? new bootstrap.Modal(messageModalEl) : null;
+let activeRecipient=null;
+
+async function loadConversation(recipientId){
+  if(!conversationStream) return;
+  setConversationState('Mesajlar yükleniyor...');
+  try{
+    const data=await requestAction('conversation',{target_profile_id:recipientId});
+    renderConversation(data.messages || []);
+  }catch(err){
+    setConversationState(err.message || 'Mesajlar getirilemedi.');
+  }
+}
+
+document.querySelectorAll('.message-open').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    if(!messageModal) return;
+    const profileId=parseInt(btn.dataset.targetProfile || '0',10);
+    if(!profileId){
+      showToast('Mesajlaşma için uygun bir misafir bulunamadı.');
+      return;
+    }
+    activeRecipient={
+      id:profileId,
+      name:btn.dataset.targetName || 'Misafir',
+      uploadId:btn.dataset.uploadId || ''
+    };
+    if(messageModalLabel){ messageModalLabel.textContent=activeRecipient.name; }
+    if(messageModalBadge){ messageModalBadge.textContent='Misafir Mesajı'; }
+    if(conversationTextarea){ conversationTextarea.value=''; }
+    setConversationState('Mesajlar yükleniyor...');
+    messageModal.show();
+    loadConversation(profileId);
+  });
+});
+
+conversationForm?.addEventListener('submit',async e=>{
+  e.preventDefault();
+  if(!activeRecipient){
+    showToast('Önce mesajlaşacağınız misafiri seçin.');
+    return;
+  }
+  const message=conversationTextarea?.value.trim();
+  if(!message) return;
+  if(conversationForm.dataset.loading==='1') return;
+  conversationForm.dataset.loading='1';
+  const submit=conversationForm.querySelector('button[type=submit]');
+  submit?.setAttribute('disabled','disabled');
+  try{
+    const payload={ target_profile_id: activeRecipient.id, message_body: message };
+    if(activeRecipient.uploadId){ payload.context_upload_id = activeRecipient.uploadId; }
+    const data=await requestAction('message_profile', payload);
+    if(conversationTextarea) conversationTextarea.value='';
+    if(data.entry){ appendConversationEntry(data.entry); }
+    showToast(data.message || 'Mesajınız gönderildi.');
+  }catch(err){
+    showToast(err.message || 'Mesaj gönderilemedi.');
+  }finally{
+    submit?.removeAttribute('disabled');
+    delete conversationForm.dataset.loading;
+  }
+});
+
+messageModalEl?.addEventListener('hidden.bs.modal',()=>{
+  activeRecipient=null;
+  setConversationState('Bir misafir seçerek sohbeti başlatabilirsiniz.');
 });
 document.querySelectorAll('.ajax-host-note').forEach(form=>{
   form.addEventListener('submit',async e=>{

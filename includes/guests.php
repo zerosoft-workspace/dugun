@@ -107,6 +107,42 @@ function guest_profile_find_by_email(int $eventId, string $email): ?array {
   return $st->fetch() ?: null;
 }
 
+function guest_profile_find_by_id(int $profileId): ?array {
+  if ($profileId <= 0) {
+    return null;
+  }
+  $st = pdo()->prepare('SELECT * FROM guest_profiles WHERE id=? LIMIT 1');
+  $st->execute([$profileId]);
+  $row = $st->fetch();
+  return $row ?: null;
+}
+
+function guest_event_profile_directory(int $eventId, int $excludeProfileId = 0): array {
+  $st = pdo()->prepare('SELECT id, event_id, display_name, name, email, avatar_token, is_verified, last_seen_at, last_login_at
+                        FROM guest_profiles WHERE event_id=? ORDER BY display_name ASC, name ASC');
+  $st->execute([$eventId]);
+  $rows = $st->fetchAll();
+  $directory = [];
+  foreach ($rows as $row) {
+    if ($excludeProfileId > 0 && (int)$row['id'] === $excludeProfileId) {
+      continue;
+    }
+    $display = $row['display_name'] ?: ($row['name'] ?: 'Misafir');
+    $directory[] = [
+      'id' => (int)$row['id'],
+      'event_id' => (int)$row['event_id'],
+      'display_name' => $display,
+      'name' => $row['name'],
+      'email' => $row['email'],
+      'avatar_token' => $row['avatar_token'],
+      'is_verified' => (int)$row['is_verified'] === 1,
+      'last_seen_at' => $row['last_seen_at'],
+      'last_login_at' => $row['last_login_at'],
+    ];
+  }
+  return $directory;
+}
+
 function guest_profile_upsert(int $eventId, string $name, string $email, bool $marketingOptIn): ?array {
   $email = guest_profile_normalize_email($email);
   if ($email === '') return null;
@@ -379,6 +415,33 @@ function guest_private_message_send(int $eventId, array $senderProfile, array $r
     return $row ?: null;
   }
   return null;
+}
+
+function guest_private_conversation(int $eventId, int $profileId, int $otherProfileId, int $limit = 60): array {
+  $limit = max(20, min($limit, 200));
+  $st = pdo()->prepare('SELECT m.*, sp.display_name AS sender_display_name, sp.avatar_token AS sender_avatar_token,
+                               rp.display_name AS recipient_display_name, rp.avatar_token AS recipient_avatar_token
+                        FROM guest_private_messages m
+                        LEFT JOIN guest_profiles sp ON sp.id = m.sender_profile_id
+                        LEFT JOIN guest_profiles rp ON rp.id = m.recipient_profile_id
+                        WHERE m.event_id=? AND (
+                          (m.sender_profile_id=? AND m.recipient_profile_id=?) OR
+                          (m.sender_profile_id=? AND m.recipient_profile_id=?)
+                        )
+                        ORDER BY m.id DESC LIMIT '.$limit);
+  $st->execute([$eventId, $profileId, $otherProfileId, $otherProfileId, $profileId]);
+  $rows = array_reverse($st->fetchAll() ?: []);
+  return $rows;
+}
+
+function guest_private_message_to_profile(int $eventId, array $senderProfile, array $targetProfile, string $body, ?int $uploadId = null): ?array {
+  $recipient = [
+    'profile_id' => (int)$targetProfile['id'],
+    'upload_id' => $uploadId,
+    'email' => $targetProfile['email'] ?? null,
+    'name' => $targetProfile['display_name'] ?: ($targetProfile['name'] ?? 'Misafir')
+  ];
+  return guest_private_message_send($eventId, $senderProfile, $recipient, $body);
 }
 
 function guest_profile_update(int $profileId, string $displayName, string $bio, string $avatarToken, bool $marketingOptIn): void {
