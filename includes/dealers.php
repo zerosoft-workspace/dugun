@@ -36,6 +36,9 @@ const DEALER_WALLET_TYPE_ADJUSTMENT = 'adjustment';
 const DEALER_WALLET_TYPE_REFUND     = 'refund';
 const DEALER_WALLET_TYPE_TOPUP_REQ  = 'topup_request';
 
+const DEALER_PURCHASE_SOURCE_DEALER = 'dealer';
+const DEALER_PURCHASE_SOURCE_LEAD   = 'lead';
+
 function dealer_generate_identifier_candidate(): string {
   return 'B'.str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 }
@@ -159,6 +162,31 @@ function dealer_find_by_email(string $email): ?array {
   $st->execute([$email]);
   $row = $st->fetch();
   return $row ?: null;
+}
+
+function dealer_find_by_code(string $code): ?array {
+  $code = trim($code);
+  if ($code === '') {
+    return null;
+  }
+  $st = pdo()->prepare("SELECT * FROM dealers WHERE code=? LIMIT 1");
+  $st->execute([$code]);
+  $row = $st->fetch();
+  if ($row) {
+    return $row;
+  }
+  $alt = pdo()->prepare("SELECT dealer_id FROM dealer_codes WHERE code=? LIMIT 1");
+  $alt->execute([$code]);
+  $dealerId = $alt->fetchColumn();
+  if ($dealerId) {
+    $st2 = pdo()->prepare("SELECT * FROM dealers WHERE id=? LIMIT 1");
+    $st2->execute([(int)$dealerId]);
+    $row = $st2->fetch();
+    if ($row) {
+      return $row;
+    }
+  }
+  return null;
 }
 
 function dealer_status_badge(string $status): string {
@@ -289,6 +317,19 @@ function dealer_fetch_venues(int $dealer_id, bool $onlyActive = false): array {
   $st = pdo()->prepare($sql);
   $st->execute([$dealer_id]);
   return $st->fetchAll();
+}
+
+function dealer_primary_venue_id(int $dealer_id): ?int {
+  $st = pdo()->prepare("SELECT v.id FROM venues v INNER JOIN dealer_venues dv ON dv.venue_id=v.id WHERE dv.dealer_id=? AND v.is_active=1 ORDER BY v.name LIMIT 1");
+  $st->execute([$dealer_id]);
+  $id = $st->fetchColumn();
+  if ($id) {
+    return (int)$id;
+  }
+  $fallback = pdo()->prepare("SELECT v.id FROM venues v INNER JOIN dealer_venues dv ON dv.venue_id=v.id WHERE dv.dealer_id=? ORDER BY v.name LIMIT 1");
+  $fallback->execute([$dealer_id]);
+  $alt = $fallback->fetchColumn();
+  return $alt ? (int)$alt : null;
 }
 
 function dealer_event_belongs_to_dealer(int $dealer_id, int $event_id): bool {
@@ -460,6 +501,12 @@ function dealer_wallet_transactions(int $dealer_id, int $limit = 20): array {
   return $rows;
 }
 
+function dealer_total_cashback(int $dealer_id): int {
+  $st = pdo()->prepare("SELECT COALESCE(SUM(amount_cents),0) FROM dealer_wallet_transactions WHERE dealer_id=? AND type=?");
+  $st->execute([$dealer_id, DEALER_WALLET_TYPE_CASHBACK]);
+  return (int)$st->fetchColumn();
+}
+
 function dealer_wallet_type_label(string $type): string {
   return match ($type) {
     DEALER_WALLET_TYPE_TOPUP      => 'Bakiye Yükleme',
@@ -502,12 +549,27 @@ function dealer_packages_all(bool $onlyActive = false): array {
     $row['duration_days'] = $row['duration_days'] !== null ? (int)$row['duration_days'] : null;
     $row['cashback_rate'] = (float)$row['cashback_rate'];
     $row['is_active'] = (int)$row['is_active'];
+    $row['is_public'] = (int)($row['is_public'] ?? 0);
   }
   return $rows;
 }
 
 function dealer_packages_available(): array {
   return dealer_packages_all(true);
+}
+
+function dealer_packages_public(): array {
+  $sql = "SELECT * FROM dealer_packages WHERE is_active=1 AND is_public=1 ORDER BY price_cents ASC, id ASC";
+  $rows = pdo()->query($sql)->fetchAll();
+  foreach ($rows as &$row) {
+    $row['price_cents'] = (int)$row['price_cents'];
+    $row['event_quota'] = $row['event_quota'] !== null ? (int)$row['event_quota'] : null;
+    $row['duration_days'] = $row['duration_days'] !== null ? (int)$row['duration_days'] : null;
+    $row['cashback_rate'] = (float)$row['cashback_rate'];
+    $row['is_active'] = (int)$row['is_active'];
+    $row['is_public'] = (int)($row['is_public'] ?? 0);
+  }
+  return $rows;
 }
 
 function dealer_package_get(int $package_id): ?array {
@@ -520,6 +582,7 @@ function dealer_package_get(int $package_id): ?array {
   $row['duration_days'] = $row['duration_days'] !== null ? (int)$row['duration_days'] : null;
   $row['cashback_rate'] = (float)$row['cashback_rate'];
   $row['is_active'] = (int)$row['is_active'];
+  $row['is_public'] = (int)($row['is_public'] ?? 0);
   return $row;
 }
 
@@ -541,6 +604,7 @@ function dealer_purchase_get(int $purchase_id): ?array {
   $row['dealer_id'] = (int)$row['dealer_id'];
   $row['package_id'] = (int)$row['package_id'];
   $row['lead_event_id'] = $row['lead_event_id'] !== null ? (int)$row['lead_event_id'] : null;
+  $row['source'] = $row['source'] ?? DEALER_PURCHASE_SOURCE_DEALER;
   return $row;
 }
 
@@ -568,6 +632,7 @@ function dealer_fetch_purchases(int $dealer_id, ?string $status = null): array {
     $row['dealer_id'] = (int)$row['dealer_id'];
     $row['package_id'] = (int)$row['package_id'];
     $row['lead_event_id'] = $row['lead_event_id'] !== null ? (int)$row['lead_event_id'] : null;
+    $row['source'] = $row['source'] ?? DEALER_PURCHASE_SOURCE_DEALER;
   }
   return $rows;
 }
@@ -617,6 +682,9 @@ function dealer_event_quota_summary(int $dealer_id): array {
     'cashback_awaiting_event' => 0,
   ];
   foreach ($active as &$purchase) {
+    if (($purchase['source'] ?? DEALER_PURCHASE_SOURCE_DEALER) !== DEALER_PURCHASE_SOURCE_DEALER) {
+      continue;
+    }
     $quota = $purchase['event_quota'];
     $used  = $purchase['events_used'];
     if (!empty($purchase['expires_at'])) {
@@ -709,9 +777,9 @@ function dealer_purchase_package(int $dealer_id, int $package_id): array {
     if ($eventQuota !== null && $eventQuota <= 0) {
       $eventQuota = null;
     }
-    $cashbackRate = (float)$package['cashback_rate'];
-    $cashbackStatus = ($cashbackRate > 0 && $eventQuota === 1) ? DEALER_CASHBACK_AWAITING : DEALER_CASHBACK_NONE;
-    $pdo->prepare("INSERT INTO dealer_package_purchases (dealer_id,package_id,status,price_cents,event_quota,events_used,duration_days,starts_at,expires_at,cashback_rate,cashback_status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    $cashbackRate = 0.0;
+    $cashbackStatus = DEALER_CASHBACK_NONE;
+    $pdo->prepare("INSERT INTO dealer_package_purchases (dealer_id,package_id,status,price_cents,event_quota,events_used,duration_days,starts_at,expires_at,cashback_rate,cashback_status,source,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         ->execute([
           $dealer_id,
           $package_id,
@@ -724,6 +792,7 @@ function dealer_purchase_package(int $dealer_id, int $package_id): array {
           $expiresAt,
           $cashbackRate,
           $cashbackStatus,
+          DEALER_PURCHASE_SOURCE_DEALER,
           $now,
           $now,
         ]);
@@ -817,8 +886,8 @@ function dealer_cashback_candidates(int $dealer_id, ?string $status = DEALER_CAS
        . " FROM dealer_package_purchases pp"
        . " INNER JOIN dealer_packages pkg ON pkg.id=pp.package_id"
        . " LEFT JOIN events e ON e.id=pp.lead_event_id"
-       . " WHERE pp.dealer_id=?";
-  $params = [$dealer_id];
+       . " WHERE pp.dealer_id=? AND pp.source=?";
+  $params = [$dealer_id, DEALER_PURCHASE_SOURCE_DEALER];
   if ($status !== null) {
     $sql .= " AND pp.cashback_status=?";
     $params[] = $status;

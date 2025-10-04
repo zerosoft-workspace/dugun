@@ -214,10 +214,11 @@ $pendingTopups = array_filter($topups, fn($row) => $row['status'] === DEALER_TOP
     </section>
 
     <section class="card-lite p-4 p-lg-5 mb-4">
-      <div class="d-flex justify-content-between align-items-center mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="section-title mb-0">Paket Seçenekleri</h5>
         <span class="muted">Bakiyeniz: <?=h(format_currency($balance))?></span>
       </div>
+      <p class="text-muted small mb-4">Paket satın alımları cashback oluşturmaz. Web sitesinden gelen müşteri yönlendirmelerinizde bayi kodunuzla <strong>%20 cashback</strong> kazanırsınız.</p>
       <?php if (!$packages): ?>
         <p class="text-muted mb-0">Henüz tanımlanmış paket yok. Lütfen yönetici ile iletişime geçin.</p>
       <?php else: ?>
@@ -227,7 +228,7 @@ $pendingTopups = array_filter($topups, fn($row) => $row['status'] === DEALER_TOP
               $canBuy = $balance >= $package['price_cents'];
               $quotaText = $package['event_quota'] === null ? 'Sınırsız etkinlik' : ($package['event_quota'].' etkinlik hakkı');
               $durationText = $package['duration_days'] ? ($package['duration_days'].' gün geçerli') : 'Süre sınırı yok';
-              $cashbackText = $package['cashback_rate'] > 0 ? ('Tekli satışlarda %'.number_format($package['cashback_rate'] * 100, 0).' cashback') : null;
+              $cashbackText = $package['cashback_rate'] > 0 ? ('Web referans kodunuzla %'.number_format($package['cashback_rate'] * 100, 0).' cashback') : null;
             ?>
             <div class="package-card">
               <div>
@@ -279,6 +280,9 @@ $pendingTopups = array_filter($topups, fn($row) => $row['status'] === DEALER_TOP
                   <td>
                     <div class="fw-semibold"><?=h($purchase['package_name'])?></div>
                     <?php if (!empty($purchase['package_description'])): ?><div class="small text-muted"><?=h($purchase['package_description'])?></div><?php endif; ?>
+                    <?php if (($purchase['source'] ?? null) === DEALER_PURCHASE_SOURCE_LEAD): ?>
+                      <span class="badge bg-info-subtle text-info-emphasis mt-1">Web satış</span>
+                    <?php endif; ?>
                   </td>
                   <td><?=h($statusLabel)?></td>
                   <td><?=h(format_currency($purchase['price_cents']))?></td>

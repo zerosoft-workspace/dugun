@@ -16,6 +16,7 @@ if (!$dealer) {
 }
 
 dealer_refresh_session((int)$dealer['id']);
+$refCode = $dealer['code'] ?: dealer_ensure_identifier((int)$dealer['id']);
 
 $venues  = dealer_fetch_venues((int)$dealer['id']);
 $events  = dealer_allowed_events((int)$dealer['id']);
@@ -24,6 +25,7 @@ $creationStatus = dealer_event_creation_status($dealer);
 $canCreate = $creationStatus['allowed'];
 $quotaSummary = $creationStatus['summary'];
 $balance = dealer_get_balance((int)$dealer['id']);
+$totalCashback = dealer_total_cashback((int)$dealer['id']);
 $activeNav = 'dashboard';
 
 $totalVenues  = count($venues);
@@ -124,6 +126,7 @@ $nextEvent = $upcoming[0] ?? null;
             <p>Bayi panelinizde atanmış salonlarınızı yönetin, etkinliklerinizi takip edin ve <?=h(APP_NAME)?> ekibinin sunduğu kampanyalardan haberdar olun.</p>
             <div class="d-flex flex-wrap hero-actions mt-3">
               <span class="badge-soft">Lisans Bitiş: <?=h(dealer_license_label($dealer))?></span>
+              <span class="badge-soft">Referans Kodu: <?=h($refCode)?></span>
               <?php if ($warning): ?>
                 <span class="badge bg-warning-subtle text-warning-emphasis fw-semibold"><?=h($warning)?></span>
               <?php else: ?>
@@ -147,6 +150,11 @@ $nextEvent = $upcoming[0] ?? null;
               <h6>Bakiye</h6>
               <strong><?=h(format_currency($balance))?></strong>
               <span>Bakiye hareketlerini takip edin</span>
+            </div>
+            <div class="stat-card">
+              <h6>Web Cashback</h6>
+              <strong><?=h(format_currency($totalCashback))?></strong>
+              <span>Referans satışlarından toplam kazanç</span>
             </div>
             <?php
               $quotaLabel = $quotaSummary['has_unlimited'] ? 'Sınırsız' : (string)$quotaSummary['remaining_events'];
@@ -177,12 +185,13 @@ $nextEvent = $upcoming[0] ?? null;
       </div>
     <?php endif; ?>
 
-    <?php if ($quotaSummary['cashback_waiting'] > 0): ?>
-      <div class="alert alert-info d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
-        <div><strong><?=$quotaSummary['cashback_waiting']?></strong> paket için cashback ödemesi bekliyor (<?=h(format_currency($quotaSummary['cashback_pending_amount']))?>).</div>
-        <a class="btn btn-sm btn-outline-brand" href="billing.php#wallet">Hareketleri Gör</a>
+    <div class="alert alert-info d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+      <div>
+        Web üzerinden gelen referans satışlarınız otomatik olarak bakiyenize <strong>%20 cashback</strong> olarak işlenir.
+        <?php if ($totalCashback > 0): ?>Bugüne kadar <strong><?=h(format_currency($totalCashback))?></strong> kazandınız.<?php endif; ?>
       </div>
-    <?php endif; ?>
+      <a class="btn btn-sm btn-outline-brand" href="billing.php#wallet">Hareketleri Gör</a>
+    </div>
 
     <div class="card-lite p-4 mb-4">
       <div class="d-flex justify-content-between align-items-center mb-3">

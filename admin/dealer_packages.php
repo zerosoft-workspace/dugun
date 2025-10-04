@@ -24,6 +24,7 @@ if ($action === 'save') {
   $cashbackInput = trim($_POST['cashback_rate'] ?? '0');
   $description = trim($_POST['description'] ?? '');
   $isActive = isset($_POST['is_active']) ? 1 : 0;
+  $isPublic = isset($_POST['is_public']) ? 1 : 0;
 
   if ($name === '') {
     flash('err', 'Paket adı zorunludur.');
@@ -57,13 +58,13 @@ if ($action === 'save') {
 
   $now = now();
   if ($packageId > 0) {
-    $st = pdo()->prepare("UPDATE dealer_packages SET name=?, description=?, price_cents=?, event_quota=?, duration_days=?, cashback_rate=?, is_active=?, updated_at=? WHERE id=?");
-    $st->execute([$name, $description ?: null, $priceCents, $eventQuota, $durationDays, $cashbackRate, $isActive, $now, $packageId]);
+    $st = pdo()->prepare("UPDATE dealer_packages SET name=?, description=?, price_cents=?, event_quota=?, duration_days=?, cashback_rate=?, is_active=?, is_public=?, updated_at=? WHERE id=?");
+    $st->execute([$name, $description ?: null, $priceCents, $eventQuota, $durationDays, $cashbackRate, $isActive, $isPublic, $now, $packageId]);
     flash('ok', 'Paket güncellendi.');
     redirect($_SERVER['PHP_SELF'].'?id='.$packageId);
   } else {
-    $st = pdo()->prepare("INSERT INTO dealer_packages (name, description, price_cents, event_quota, duration_days, cashback_rate, is_active, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)");
-    $st->execute([$name, $description ?: null, $priceCents, $eventQuota, $durationDays, $cashbackRate, $isActive, $now, $now]);
+    $st = pdo()->prepare("INSERT INTO dealer_packages (name, description, price_cents, event_quota, duration_days, cashback_rate, is_active, is_public, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)");
+    $st->execute([$name, $description ?: null, $priceCents, $eventQuota, $durationDays, $cashbackRate, $isActive, $isPublic, $now, $now]);
     flash('ok', 'Yeni paket oluşturuldu.');
     redirect($_SERVER['PHP_SELF']);
   }
@@ -145,6 +146,10 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
               <input class="form-check-input" type="checkbox" name="is_active" id="is_active" <?= !$editPackage || !empty($editPackage['is_active']) ? 'checked' : '' ?>>
               <label class="form-check-label" for="is_active">Paket satışta</label>
             </div>
+            <div class="col-12 form-check ms-2">
+              <input class="form-check-input" type="checkbox" name="is_public" id="is_public" <?= $editPackage && empty($editPackage['is_public']) ? '' : 'checked' ?>>
+              <label class="form-check-label" for="is_public">Web sitesinde göster</label>
+            </div>
             <div class="col-12 d-grid">
               <button class="btn btn-brand" type="submit"><?= $editPackage ? 'Paketi Güncelle' : 'Paketi Kaydet' ?></button>
             </div>
@@ -156,10 +161,10 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
           <h5 class="mb-3">Paket Listesi</h5>
           <div class="table-responsive">
             <table class="table align-middle mb-0">
-              <thead><tr><th>Ad</th><th>Fiyat</th><th>Etkinlik</th><th>Süre</th><th>Cashback</th><th>Durum</th><th></th></tr></thead>
+              <thead><tr><th>Ad</th><th>Fiyat</th><th>Etkinlik</th><th>Süre</th><th>Cashback</th><th>Web</th><th>Durum</th><th></th></tr></thead>
               <tbody>
                 <?php if (!$packages): ?>
-                  <tr><td colspan="7" class="text-center text-muted">Tanımlı paket bulunmuyor.</td></tr>
+                  <tr><td colspan="8" class="text-center text-muted">Tanımlı paket bulunmuyor.</td></tr>
                 <?php else: ?>
                   <?php foreach ($packages as $pkg): ?>
                     <?php
@@ -168,6 +173,7 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
                       $quotaLabel = $pkg['event_quota'] === null ? 'Sınırsız' : $pkg['event_quota'];
                       $durationLabel = $pkg['duration_days'] === null ? 'Süre yok' : $pkg['duration_days'].' gün';
                       $cashbackLabel = $pkg['cashback_rate'] > 0 ? number_format($pkg['cashback_rate'] * 100, 1).'%' : '—';
+                      $publicLabel = $pkg['is_public'] ? 'Evet' : 'Hayır';
                     ?>
                     <tr>
                       <td>
@@ -178,6 +184,7 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
                       <td><?=h($quotaLabel)?></td>
                       <td><?=h($durationLabel)?></td>
                       <td><?=h($cashbackLabel)?></td>
+                      <td><?=h($publicLabel)?></td>
                       <td><span class="badge-status <?=$statusClass?>"><?=h($statusLabel)?></span></td>
                       <td class="text-end">
                         <a class="btn btn-sm btn-outline-primary" href="?id=<?= (int)$pkg['id'] ?>">Düzenle</a>

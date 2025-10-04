@@ -132,10 +132,19 @@ function install_schema(){
     duration_days INT NULL,
     cashback_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
+    is_public TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
-    INDEX idx_dealer_packages_active (is_active)
+    INDEX idx_dealer_packages_active (is_active),
+    INDEX idx_dealer_packages_public (is_public)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('dealer_packages', 'is_public')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_packages ADD is_public TINYINT(1) NOT NULL DEFAULT 0 AFTER is_active");
+      pdo()->exec("CREATE INDEX idx_dealer_packages_public ON dealer_packages(is_public)");
+    } catch (Throwable $e) {}
+  }
 
   $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_package_purchases(
@@ -155,6 +164,7 @@ function install_schema(){
     cashback_note VARCHAR(255) NULL,
     cashback_paid_at DATETIME NULL,
     lead_event_id INT NULL,
+    source VARCHAR(16) NOT NULL DEFAULT 'dealer',
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
     INDEX idx_package_dealer (dealer_id, status),
@@ -164,6 +174,12 @@ function install_schema(){
     FOREIGN KEY (package_id) REFERENCES dealer_packages(id) ON DELETE CASCADE,
     FOREIGN KEY (lead_event_id) REFERENCES events(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('dealer_package_purchases', 'source')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_package_purchases ADD source VARCHAR(16) NOT NULL DEFAULT 'dealer' AFTER lead_event_id");
+    } catch (Throwable $e) {}
+  }
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_wallet_transactions(
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -201,6 +217,30 @@ function install_schema(){
       pdo()->exec("ALTER TABLE dealer_topups ADD UNIQUE KEY uniq_topup_oid (merchant_oid)");
     } catch (Throwable $e) {}
   }
+
+  /* müşteri web siparişleri */
+  $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
+  pdo()->exec("CREATE TABLE IF NOT EXISTS site_orders(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    package_id INT NOT NULL,
+    dealer_id INT NULL,
+    event_id INT NULL,
+    customer_name VARCHAR(190) NOT NULL,
+    customer_email VARCHAR(190) NOT NULL,
+    customer_phone VARCHAR(64) NULL,
+    event_title VARCHAR(190) NOT NULL,
+    event_date DATE NULL,
+    referral_code VARCHAR(64) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    price_cents INT NOT NULL DEFAULT 0,
+    cashback_cents INT NOT NULL DEFAULT 0,
+    meta_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    FOREIGN KEY (package_id) REFERENCES dealer_packages(id) ON DELETE RESTRICT,
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* uploads */
   pdo()->exec("CREATE TABLE IF NOT EXISTS uploads(
