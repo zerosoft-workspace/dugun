@@ -611,17 +611,18 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .dropzone.drag{ border-color:var(--zs); background:rgba(14,165,181,.08); }
 .form-text{ color:var(--muted); }
 .gallery-card{ padding:28px; }
-.gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:28px; }
-@media(min-width:768px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(320px,1fr)); } }
-@media(min-width:1400px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(360px,1fr)); } }
-.gallery-item{ display:flex; flex-direction:column; border-radius:26px; overflow:hidden; background:#ffffff; border:1px solid rgba(14,165,181,.22); box-shadow:0 24px 48px rgba(14,165,181,.12); color:var(--ink); position:relative; transition:transform .25s ease, box-shadow .25s ease; }
+.gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); gap:32px; align-items:stretch; }
+@media(min-width:992px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(360px,1fr)); } }
+@media(min-width:1400px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(420px,1fr)); } }
+@media(min-width:1680px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(460px,1fr)); } }
+.gallery-item{ display:flex; flex-direction:column; border-radius:26px; overflow:hidden; background:#ffffff; border:1px solid rgba(14,165,181,.24); box-shadow:0 26px 52px rgba(14,165,181,.14); color:var(--ink); position:relative; transition:transform .25s ease, box-shadow .25s ease; height:100%; }
 .gallery-item:hover{ transform:translateY(-6px); box-shadow:0 28px 60px rgba(14,165,181,.18); }
-.gallery-media{ position:relative; width:100%; background:#f1fbfc; display:flex; align-items:center; justify-content:center; padding:10px; }
-.gallery-media img,.gallery-media video{ width:100%; height:auto; max-height:380px; display:block; object-fit:contain; border-radius:18px; box-shadow:0 16px 34px rgba(14,165,181,.15); }
+.gallery-media{ position:relative; width:100%; background:#f1fbfc; display:flex; align-items:center; justify-content:center; padding:16px 18px 0; }
+.gallery-media img,.gallery-media video{ width:100%; height:auto; max-height:360px; display:block; object-fit:contain; border-radius:22px; box-shadow:0 18px 36px rgba(14,165,181,.16); }
 .gallery-header{ display:flex; align-items:center; gap:14px; padding:18px 22px; background:#f3fbfc; border-bottom:1px solid rgba(14,165,181,.16); }
 .gallery-author{ font-weight:700; font-size:15px; color:#0f172a; letter-spacing:.02em; }
 .avatar{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; letter-spacing:.5px; box-shadow:0 8px 18px rgba(14,165,181,.18); border:2px solid rgba(14,165,181,.25); }
-.gallery-actions{ display:flex; align-items:center; justify-content:space-between; padding:14px 22px 12px; gap:18px; background:#f7fdfd; border-top:1px solid rgba(14,165,181,.16); }
+.gallery-actions{ display:flex; align-items:center; justify-content:space-between; padding:18px 24px 16px; gap:18px; background:#f7fdfd; border-top:1px solid rgba(14,165,181,.16); }
 .action-buttons{ display:flex; align-items:center; gap:12px; }
 .icon-btn{ border:none; background:rgba(14,165,181,.12); border-radius:999px; padding:9px 18px; display:flex; align-items:center; gap:8px; font-weight:600; color:#0b5f6c; cursor:pointer; transition:background .2s ease, color .2s ease; }
 .icon-btn span{ display:inline-flex; align-items:center; }
@@ -632,7 +633,8 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .gallery-actions .btn{ border-radius:999px; border:1px solid rgba(14,165,181,.35); color:#0a4d58; background:transparent; font-weight:600; }
 .gallery-actions .btn:hover{ background:#0ea5b5; color:#fff; }
 .gallery-meta{ font-size:13px; color:#537082; }
-.gallery-body{ padding:16px 22px 24px; background:#ffffff; color:var(--ink); }
+.gallery-body{ padding:20px 24px 24px; background:#ffffff; color:var(--ink); display:flex; flex-direction:column; gap:18px; flex:1; }
+.gallery-body .comment-section{ margin-top:auto; }
 .gallery-body p{ color:#365562; }
 .gallery-body .smallmuted{ color:#57758a; }
 .comment{ padding:12px 16px; border-radius:18px; background:rgba(14,165,181,.12); margin-top:0; color:#0a4550; }
@@ -670,10 +672,15 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .conversation-bubble.mine{ margin-left:auto; background:var(--zs); color:#fff; box-shadow:0 18px 36px rgba(14,165,181,.22); }
 .conversation-bubble .meta{ font-size:11px; opacity:.8; margin-bottom:4px; }
 .conversation-bubble.mine .meta{ color:rgba(255,255,255,.8); }
+.bubble-placeholder{ display:inline-flex; align-items:center; gap:12px; background:rgba(14,165,181,.12); color:#0b5f6c; padding:14px 18px; border-radius:18px; font-weight:600; }
+.bubble-placeholder::before{ content:""; width:16px; height:16px; border:3px solid rgba(14,165,181,.35); border-top-color:var(--zs); border-radius:50%; animation:spin 1s linear infinite; }
+.bubble-placeholder.error{ background:rgba(239,68,68,.12); color:#b91c1c; }
+.bubble-placeholder.error::before{ border-color:rgba(239,68,68,.3); border-top-color:#ef4444; }
+.bubble-placeholder.empty::before{ display:none; }
+@keyframes spin{ from{ transform:rotate(0deg);} to{ transform:rotate(360deg);} }
 .conversation-footer{ display:flex; gap:12px; align-items:flex-end; padding-top:16px; }
 .conversation-footer textarea{ flex:1; border-radius:18px; resize:none; min-height:80px; }
 .conversation-footer button{ border:none; background:var(--zs); color:#fff; border-radius:16px; padding:10px 18px; font-weight:600; }
-.bubble-loading{ text-align:center; font-size:13px; color:var(--muted); padding:14px 0; }
 .profile-card{ padding:28px; }
 .profile-card h5{ font-weight:700; }
 .chat-card{ padding:28px; }
@@ -1065,7 +1072,7 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
       </div>
       <div class="modal-body" style="padding:0 28px 28px;">
         <div class="conversation-stream" id="conversationStream">
-          <div class="bubble-loading">Bir misafir seçerek sohbeti başlatabilirsiniz.</div>
+          <div class="bubble-placeholder empty">Bir misafir seçerek sohbeti başlatabilirsiniz.</div>
         </div>
         <form class="conversation-footer" id="conversationForm" autocomplete="off">
           <textarea class="form-control" name="message_body" placeholder="Kutlama mesajınızı yazın" required></textarea>
@@ -1145,10 +1152,10 @@ async function postFormData(fd){
   let data=null;
   try{ data=await response.json(); }catch(err){}
   if(!response.ok || !data){
-    throw new Error(data && data.error ? data.error : 'İşlem tamamlanamadı.');
+    throw new Error(data && data.error ? data.error : 'Bir sorun oluştu. Lütfen tekrar deneyin.');
   }
   if(data.success===false){
-    throw new Error(data.error || 'İşlem tamamlanamadı.');
+    throw new Error(data.error || 'Bir sorun oluştu. Lütfen tekrar deneyin.');
   }
   return data;
 }
@@ -1177,7 +1184,7 @@ document.querySelectorAll('.ajax-like').forEach(form=>{
         if(count && typeof data.likes!=='undefined') count.textContent=data.likes;
       }
     }catch(err){
-      showToast(err.message || 'İşlem tamamlanamadı.');
+      showToast(err.message || 'Bir sorun oluştu. Lütfen tekrar deneyin.');
     }finally{
       btn?.removeAttribute('disabled');
       delete form.dataset.loading;
@@ -1224,9 +1231,16 @@ function handleFeedback(form, message, isError=false){
   feedback.hidden=false;
   feedback.classList.toggle('error',!!isError);
 }
-function setConversationState(message){
+function setConversationState(message, variant='info'){
   if(!conversationStream) return;
-  conversationStream.innerHTML=`<div class="bubble-loading">${esc(message)}</div>`;
+  const el=document.createElement('div');
+  const classes=['bubble-placeholder'];
+  if(variant==='error'){ classes.push('error'); }
+  if(variant==='empty'){ classes.push('empty'); }
+  el.className=classes.join(' ');
+  el.textContent=message;
+  conversationStream.innerHTML='';
+  conversationStream.appendChild(el);
 }
 function buildConversationBubble(entry){
   const bubble=document.createElement('div');
@@ -1251,7 +1265,7 @@ function renderConversation(entries){
   if(!conversationStream) return;
   conversationStream.innerHTML='';
   if(!entries || !entries.length){
-    setConversationState('Henüz mesaj yok. İlk mesajı siz gönderebilirsiniz.');
+    setConversationState('Henüz mesaj yok. İlk mesajı siz gönderebilirsiniz.', 'empty');
     return;
   }
   entries.forEach(entry=>{
@@ -1261,7 +1275,7 @@ function renderConversation(entries){
 }
 function appendConversationEntry(entry){
   if(!conversationStream) return;
-  const placeholder=conversationStream.querySelector('.bubble-loading');
+  const placeholder=conversationStream.querySelector('.bubble-placeholder');
   if(placeholder){
     conversationStream.innerHTML='';
   }
@@ -1294,7 +1308,7 @@ async function loadConversation(recipientId){
     const data=await requestAction('conversation',{target_profile_id:recipientId});
     renderConversation(data.messages || []);
   }catch(err){
-    setConversationState(err.message || 'Mesajlar getirilemedi.');
+    setConversationState(err.message || 'Mesajlar getirilemedi.', 'error');
   }
 }
 
@@ -1349,7 +1363,7 @@ conversationForm?.addEventListener('submit',async e=>{
 
 messageModalEl?.addEventListener('hidden.bs.modal',()=>{
   activeRecipient=null;
-  setConversationState('Bir misafir seçerek sohbeti başlatabilirsiniz.');
+  setConversationState('Bir misafir seçerek sohbeti başlatabilirsiniz.', 'empty');
 });
 document.querySelectorAll('.ajax-host-note').forEach(form=>{
   form.addEventListener('submit',async e=>{
