@@ -288,6 +288,105 @@ function install_schema(){
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+  /* guest profiles & sosyal etkileşim tabloları */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS guest_profiles(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    email VARCHAR(190) NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    display_name VARCHAR(190) NOT NULL,
+    bio TEXT NULL,
+    avatar_token VARCHAR(32) NULL,
+    is_verified TINYINT(1) NOT NULL DEFAULT 0,
+    verify_token VARCHAR(64) NULL,
+    verified_at DATETIME NULL,
+    marketing_opt_in TINYINT(1) NOT NULL DEFAULT 0,
+    marketing_opted_at DATETIME NULL,
+    last_verification_sent_at DATETIME NULL,
+    last_seen_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_guest_profile (event_id, email),
+    INDEX idx_guest_event (event_id),
+    INDEX idx_guest_verify (verify_token),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('guest_profiles', 'avatar_token')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD avatar_token VARCHAR(32) NULL AFTER bio"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'bio')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD bio TEXT NULL AFTER display_name"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'marketing_opt_in')) {
+    try {
+      pdo()->exec("ALTER TABLE guest_profiles ADD marketing_opt_in TINYINT(1) NOT NULL DEFAULT 0 AFTER verify_token");
+      pdo()->exec("ALTER TABLE guest_profiles ADD marketing_opted_at DATETIME NULL AFTER marketing_opt_in");
+    } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'last_verification_sent_at')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD last_verification_sent_at DATETIME NULL AFTER marketing_opted_at"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'last_seen_at')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD last_seen_at DATETIME NULL AFTER last_verification_sent_at"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'display_name')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD display_name VARCHAR(190) NOT NULL DEFAULT '' AFTER name"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'verified_at')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD verified_at DATETIME NULL AFTER verify_token"); } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('uploads', 'profile_id')) {
+    try { pdo()->exec("ALTER TABLE uploads ADD profile_id INT NULL AFTER guest_name"); } catch (Throwable $e) {}
+    try { pdo()->exec("ALTER TABLE uploads ADD CONSTRAINT fk_upload_profile FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('uploads', 'guest_email')) {
+    try { pdo()->exec("ALTER TABLE uploads ADD guest_email VARCHAR(190) NULL AFTER profile_id"); } catch (Throwable $e) {}
+  }
+  try {
+    pdo()->exec("CREATE INDEX idx_upload_profile ON uploads(profile_id)");
+  } catch (Throwable $e) {}
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS guest_upload_likes(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    upload_id BIGINT NOT NULL,
+    profile_id INT NOT NULL,
+    created_at DATETIME NOT NULL,
+    UNIQUE KEY uniq_upload_like (upload_id, profile_id),
+    INDEX idx_like_profile (profile_id),
+    FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS guest_upload_comments(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    upload_id BIGINT NOT NULL,
+    profile_id INT NULL,
+    guest_name VARCHAR(190) NULL,
+    guest_email VARCHAR(190) NULL,
+    body TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_comment_upload (upload_id, created_at),
+    INDEX idx_comment_profile (profile_id),
+    FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS guest_chat_messages(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    profile_id INT NULL,
+    message TEXT NOT NULL,
+    attachment_upload_id BIGINT NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_chat_event (event_id, created_at),
+    INDEX idx_chat_profile (profile_id),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL,
+    FOREIGN KEY (attachment_upload_id) REFERENCES uploads(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
   /* qr_codes */
   pdo()->exec("CREATE TABLE IF NOT EXISTS qr_codes(
     id INT AUTO_INCREMENT PRIMARY KEY,
