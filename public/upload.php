@@ -603,13 +603,13 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .dropzone.drag{ border-color:var(--zs); background:rgba(14,165,181,.08); }
 .form-text{ color:var(--muted); }
 .gallery-card{ padding:28px; }
-.gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:24px; }
-@media(min-width:768px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); } }
-@media(min-width:1400px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(300px,1fr)); } }
+.gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:24px; }
+@media(min-width:768px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); } }
+@media(min-width:1400px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); } }
 .gallery-item{ display:flex; flex-direction:column; border-radius:22px; overflow:hidden; background:#fff; border:1px solid rgba(148,163,184,.18); box-shadow:0 16px 32px rgba(15,23,42,.08); transition:transform .2s ease, box-shadow .2s ease; }
 .gallery-item:hover{ transform:translateY(-4px); box-shadow:0 20px 44px rgba(15,23,42,.12); }
-.gallery-media{ position:relative; width:100%; aspect-ratio:4/5; background:#020617; }
-.gallery-media img,.gallery-media video{ width:100%; height:100%; display:block; object-fit:cover; }
+.gallery-media{ position:relative; width:100%; background:#020617; display:flex; align-items:center; justify-content:center; padding:16px; min-height:160px; }
+.gallery-media img,.gallery-media video{ width:100%; height:auto; max-height:320px; display:block; object-fit:contain; border-radius:14px; box-shadow:0 6px 18px rgba(15,23,42,.22); }
 .gallery-header{ display:flex; align-items:center; gap:12px; padding:18px 20px 12px; }
 .avatar{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; letter-spacing:.5px; }
 .gallery-actions{ display:flex; align-items:center; justify-content:space-between; padding:12px 20px 4px; gap:12px; }
