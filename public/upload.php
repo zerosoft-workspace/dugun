@@ -4,6 +4,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealers.php';
 require_once __DIR__.'/../includes/guests.php';
+require_once __DIR__.'/../includes/mailer.php';
 
 if (!function_exists('csrf_token')) {
   function csrf_token(){ if(empty($_SESSION['csrf'])) $_SESSION['csrf']=bin2hex(random_bytes(16)); return $_SESSION['csrf']; }
@@ -40,6 +41,73 @@ function avatar_initial(string $name): string {
   $name = trim($name);
   if($name==='') return 'M';
   return mb_strtoupper(mb_substr($name,0,1,'UTF-8'),'UTF-8');
+}
+
+function is_ajax_request(): bool {
+  if (!empty($_POST['ajax']) && $_POST['ajax'] === '1') {
+    return true;
+  }
+  $xrw = strtolower($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '');
+  if ($xrw === 'xmlhttprequest') {
+    return true;
+  }
+  $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+  return stripos($accept, 'application/json') !== false;
+}
+
+function json_response($data, int $status = 200): void {
+  http_response_code($status);
+  header('Content-Type: application/json');
+  echo json_encode($data, JSON_UNESCAPED_UNICODE);
+  exit;
+}
+
+function render_comment_block(array $c): string {
+  $cName = $c['profile_display_name'] ?? '';
+  if ($cName === '' && !empty($c['guest_name'])) {
+    $cName = $c['guest_name'];
+  }
+  if ($cName === '') {
+    $cName = 'Misafir';
+  }
+  $body = nl2br(h($c['body'] ?? ''));
+  $time = relative_time($c['created_at'] ?? now());
+  return '<div class="comment">'
+        .'<strong>'.h($cName).'</strong>'
+        .'<div class="smallmuted">'.$time.'</div>'
+        .'<p>'.$body.'</p>'
+        .'</div>';
+}
+
+function event_host_email(array $event): string {
+  $email = $event['contact_email'] ?? '';
+  if (!$email && !empty($event['couple_username'])) {
+    $email = $event['couple_username'];
+  }
+  $email = trim((string)$email);
+  if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    return $email;
+  }
+  return '';
+}
+
+function respond_error(string $message, string $redirect, bool $wantsJson, string $anchor = '', int $status = 400): void {
+  if ($wantsJson) {
+    json_response(['success' => false, 'error' => $message], $status);
+  }
+  flash('err', $message);
+  header('Location:'.$redirect.$anchor);
+  exit;
+}
+
+function respond_success(string $message, string $redirect, bool $wantsJson, array $payload = [], string $anchor = ''): void {
+  if ($wantsJson) {
+    $payload = array_merge(['success' => true, 'message' => $message], $payload);
+    json_response($payload);
+  }
+  flash('ok', $message);
+  header('Location:'.$redirect.$anchor);
+  exit;
 }
 
 $event_id = (int)($_GET['event'] ?? 0);
@@ -84,7 +152,9 @@ if ($guestProfile && (int)$guestProfile['is_verified'] === 1) {
 if($_SERVER['REQUEST_METHOD']==='POST'){
   csrf_or_die();
   $action = $_POST['do'] ?? '';
+  $wantsJson = is_ajax_request();
   $redirect = BASE_URL.'/public/upload.php?event='.$event_id.'&t='.rawurlencode($token);
+
   if($action === 'upload'){
     $errors=[]; $okCount=0; $verificationFlash=null;
     $p_token = trim($_POST['t']??'');
@@ -178,36 +248,146 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     if($errors){ flash('err',implode('<br>',array_map('h',$errors))); header('Location:'.$redirect); exit; }
     header('Location:'.$redirect); exit;
   }
+
   if($action === 'like' || $action === 'unlike'){
     $uploadId = (int)($_POST['upload_id'] ?? 0);
     if(!$guestProfile || (int)$guestProfile['is_verified']!==1){
-      flash('err','Beğenmek için e-postanızı doğrulayın.');
-      header('Location:'.$redirect); exit;
+      respond_error('Beğenmek için e-postanızı doğrulayın.', $redirect, $wantsJson);
     }
     $st = pdo()->prepare('SELECT id FROM uploads WHERE id=? AND event_id=? LIMIT 1');
     $st->execute([$uploadId,$event_id]);
-    if(!$st->fetch()){ flash('err','Kayıt bulunamadı.'); header('Location:'.$redirect); exit; }
-    if($action==='like'){ guest_upload_like($uploadId, (int)$guestProfile['id']); }
-    else{ guest_upload_unlike($uploadId, (int)$guestProfile['id']); }
+    if(!$st->fetch()){
+      respond_error('Kayıt bulunamadı.', $redirect, $wantsJson);
+    }
+    if($action==='like'){
+      guest_upload_like($uploadId, (int)$guestProfile['id']);
+    } else {
+      guest_upload_unlike($uploadId, (int)$guestProfile['id']);
+    }
     guest_profile_touch((int)$guestProfile['id']);
+    $likes = guest_upload_like_count($uploadId);
+    $isLiked = guest_upload_is_liked($uploadId, (int)$guestProfile['id']);
+    if($wantsJson){
+      json_response(['success'=>true,'liked'=>$isLiked,'likes'=>$likes]);
+    }
     header('Location:'.$redirect.'#media-'.$uploadId); exit;
   }
+
   if($action === 'comment'){
     $uploadId = (int)($_POST['upload_id'] ?? 0);
     $body = trim($_POST['comment_body'] ?? '');
     if(!$guestProfile || (int)$guestProfile['is_verified']!==1){
-      flash('err','Yorum yapmak için e-postanızı doğrulayın.');
-      header('Location:'.$redirect); exit;
+      respond_error('Yorum yapmak için e-postanızı doğrulayın.', $redirect, $wantsJson, '#media-'.$uploadId);
     }
     $st = pdo()->prepare('SELECT id FROM uploads WHERE id=? AND event_id=? LIMIT 1');
     $st->execute([$uploadId,$event_id]);
-    if(!$st->fetch()){ flash('err','Kayıt bulunamadı.'); header('Location:'.$redirect); exit; }
-    if($body===''){ flash('err','Yorum metni boş olamaz.'); header('Location:'.$redirect.'#media-'.$uploadId); exit; }
-    guest_upload_comment_add($uploadId, $guestProfile, $body);
+    if(!$st->fetch()){
+      respond_error('Kayıt bulunamadı.', $redirect, $wantsJson, '#media-'.$uploadId);
+    }
+    if($body===''){
+      respond_error('Yorum metni boş olamaz.', $redirect, $wantsJson, '#media-'.$uploadId);
+    }
+    $commentRow = guest_upload_comment_add($uploadId, $guestProfile, $body);
     guest_profile_touch((int)$guestProfile['id']);
+    $count = guest_upload_comment_count($uploadId);
+    if($wantsJson){
+      $html = $commentRow ? render_comment_block($commentRow) : '';
+      json_response(['success'=>true,'html'=>$html,'count'=>$count]);
+    }
     flash('ok','Yorumunuz paylaşıldı.');
     header('Location:'.$redirect.'#media-'.$uploadId); exit;
   }
+
+  if($action === 'message_guest'){
+    $uploadId = (int)($_POST['upload_id'] ?? 0);
+    $messageBody = trim($_POST['message_body'] ?? '');
+    if(!$guestProfile || (int)$guestProfile['is_verified']!==1){
+      respond_error('Mesaj gönderebilmek için e-postanızı doğrulayın.', $redirect, $wantsJson, '#media-'.$uploadId);
+    }
+    if($messageBody===''){
+      respond_error('Mesaj boş olamaz.', $redirect, $wantsJson, '#media-'.$uploadId);
+    }
+    $st = pdo()->prepare('SELECT u.*, gp.display_name AS profile_display_name, gp.email AS profile_email FROM uploads u LEFT JOIN guest_profiles gp ON gp.id=u.profile_id WHERE u.id=? AND u.event_id=? LIMIT 1');
+    $st->execute([$uploadId,$event_id]);
+    $target = $st->fetch();
+    if(!$target){
+      respond_error('Kayıt bulunamadı.', $redirect, $wantsJson, '#media-'.$uploadId);
+    }
+    if($target['profile_id'] && isset($guestProfile['id']) && (int)$target['profile_id'] === (int)$guestProfile['id']){
+      respond_error('Kendi içeriğinize mesaj gönderemezsiniz.', $redirect, $wantsJson, '#media-'.$uploadId);
+    }
+    $recipientEmail = $target['profile_email'] ?? $target['guest_email'] ?? null;
+    if($recipientEmail){
+      $recipientEmail = trim($recipientEmail);
+      if($recipientEmail === '' || !filter_var($recipientEmail, FILTER_VALIDATE_EMAIL)){
+        $recipientEmail = null;
+      }
+    }
+    if(!$target['profile_id'] && !$recipientEmail){
+      respond_error('Bu misafir henüz iletişim bilgisi paylaşmadı.', $redirect, $wantsJson, '#media-'.$uploadId, 409);
+    }
+    $recipientName = $target['profile_display_name'] ?: ($target['guest_name'] ?: 'Misafir');
+    $recipient = [
+      'profile_id' => $target['profile_id'] ? (int)$target['profile_id'] : null,
+      'upload_id' => $uploadId,
+      'email' => $recipientEmail,
+      'name' => $recipientName
+    ];
+    guest_private_message_send($event_id, $guestProfile, $recipient, $messageBody);
+    if($recipientEmail){
+      $senderName = $guestProfile['display_name'] ?: ($guestProfile['name'] ?? 'Misafir');
+      $galleryUrl = public_upload_url($event_id).'#media-'.$uploadId;
+      $html = '<div style="font-family:Inter,Arial,sans-serif;background:#f8fafc;padding:24px">'
+            .'<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;padding:32px;box-shadow:0 18px 45px rgba(15,23,42,0.08);">'
+            .'<h2 style="margin-top:0;color:#0ea5b5;font-size:22px;">BİKARE topluluğundan yeni mesaj</h2>'
+            .'<p style="color:#475569;font-size:15px;line-height:1.6;">Merhaba '.h($recipientName).', '.h($senderName).' sana özel bir mesaj gönderdi:</p>'
+            .'<blockquote style="margin:18px 0;padding:18px;border-left:4px solid #0ea5b5;background:#f1fcfd;border-radius:14px;color:#0f172a;line-height:1.6;">'.nl2br(h($messageBody)).'</blockquote>'
+            .'<p style="color:#475569;font-size:14px;line-height:1.6;">Etkinlik sayfasına geri dönmek istersen aşağıdaki bağlantıya tıklayabilirsin.</p>'
+            .'<p style="text-align:center;margin:24px 0"><a href="'.h($galleryUrl).'" style="background:#0ea5b5;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600;display:inline-block;">Misafir Alanını Aç</a></p>'
+            .'</div></div>';
+      send_smtp_mail($recipientEmail, 'BİKARE misafirinden yeni mesaj', $html);
+    }
+    $successMsg = 'Mesajınız ilgili misafire iletildi.';
+    if($wantsJson){
+      json_response(['success'=>true,'message'=>$successMsg]);
+    }
+    flash('ok',$successMsg);
+    header('Location:'.$redirect.'#media-'.$uploadId); exit;
+  }
+
+  if($action === 'note_host'){
+    $body = trim($_POST['host_message'] ?? '');
+    if(!$guestProfile || (int)$guestProfile['is_verified']!==1){
+      respond_error('Özel not göndermek için e-postanızı doğrulayın.', $redirect, $wantsJson, '#host-note');
+    }
+    if($body===''){
+      respond_error('Mesaj boş olamaz.', $redirect, $wantsJson, '#host-note');
+    }
+    guest_event_note_add($event_id, $guestProfile, $body);
+    guest_profile_touch((int)$guestProfile['id']);
+    $hostEmail = event_host_email($ev);
+    if($hostEmail){
+      $senderName = $guestProfile['display_name'] ?: ($guestProfile['name'] ?? 'Misafir');
+      $senderEmail = $guestProfile['email'] ?? '';
+      $galleryUrl = public_upload_url($event_id);
+      $html = '<div style="font-family:Inter,Arial,sans-serif;background:#f8fafc;padding:24px">'
+            .'<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:18px;padding:32px;box-shadow:0 18px 45px rgba(15,23,42,0.08);">'
+            .'<h2 style="margin-top:0;color:#0ea5b5;font-size:22px;">Misafirlerinizden yeni bir not</h2>'
+            .'<p style="color:#475569;font-size:15px;line-height:1.6;">'.h($senderName).' etkinliğiniz için güzel bir mesaj bıraktı:</p>'
+            .'<blockquote style="margin:18px 0;padding:18px;border-left:4px solid #0ea5b5;background:#f1fcfd;border-radius:14px;color:#0f172a;line-height:1.6;">'.nl2br(h($body)).'</blockquote>'
+            .($senderEmail ? '<p style="color:#94a3b8;font-size:13px;">Gönderen e-posta: '.h($senderEmail).'</p>' : '')
+            .'<p style="text-align:center;margin:24px 0"><a href="'.h($galleryUrl).'" style="background:#0ea5b5;color:#fff;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:600;display:inline-block;">Etkinlik Alanını Aç</a></p>'
+            .'</div></div>';
+      send_smtp_mail($hostEmail, 'BİKARE etkinliğiniz için yeni bir misafir notu', $html);
+    }
+    $successMsg = 'Mesajınız etkinlik sahibine gönderildi.';
+    if($wantsJson){
+      json_response(['success'=>true,'message'=>$successMsg]);
+    }
+    flash('ok',$successMsg);
+    header('Location:'.$redirect.'#host-note'); exit;
+  }
+
   if($action === 'chat'){
     if(!$guestProfile || (int)$guestProfile['is_verified']!==1){
       flash('err','Sohbete katılmak için e-postanızı doğrulayın.');
@@ -242,6 +422,7 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
     header('Location:'.$redirect); exit;
   }
 }
+
 
 $guestProfile = guest_profile_current($event_id);
 $profileVerified = $guestProfile && (int)$guestProfile['is_verified']===1;
@@ -331,6 +512,11 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .comment strong{ display:block; font-size:13px; color:var(--ink); }
 .comment p{ margin:4px 0 0; font-size:13px; color:var(--muted); }
 .comment-form textarea{ resize:vertical; border-radius:16px; }
+.message-panel{ border:1px dashed rgba(148,163,184,.45); border-radius:16px; padding:16px; background:rgba(241,245,249,.6); }
+.message-panel[hidden]{ display:none !important; }
+.note-card textarea{ min-height:140px; }
+.form-feedback{ color:var(--zs); font-weight:600; }
+.form-feedback.error{ color:#ef4444; }
 .badge-soft{ background:rgba(14,165,181,.12); color:var(--zs); border-radius:999px; padding:4px 12px; font-size:12px; font-weight:600; }
 .profile-card{ padding:28px; }
 .profile-card h5{ font-weight:700; }
@@ -498,13 +684,13 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
               </div>
               <div class="gallery-actions">
                 <div class="action-buttons">
-                  <form method="post" class="d-inline">
+                  <form method="post" class="d-inline ajax-like" data-upload="<?=$u['id']?>">
                     <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
                     <input type="hidden" name="do" value="<?= $liked ? 'unlike' : 'like' ?>">
                     <input type="hidden" name="upload_id" value="<?=$u['id']?>">
-                    <button type="submit" class="icon-btn <?= $liked?'active':'' ?>" <?= !$profileVerified?'disabled title="Beğenmek için e-posta doğrulaması gerekir"':'' ?>>
-                      <span><?= $liked ? '❤️' : '🤍' ?></span>
-                      <span><?= $likes ?></span>
+                    <button type="submit" class="icon-btn like-button <?= $liked?'active':'' ?>" data-liked="<?= $liked ? '1' : '0' ?>" <?= !$profileVerified?'disabled title="Beğenmek için e-posta doğrulaması gerekir"':'' ?>>
+                      <span class="like-icon"><?= $liked ? '❤️' : '🤍' ?></span>
+                      <span class="like-count"><?= $likes ?></span>
                     </button>
                   </form>
                   <button class="icon-btn share-btn" type="button" data-share="<?=h(BASE_URL.$path)?>"><span>🔗</span>Paylaş</button>
@@ -514,34 +700,55 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
                 <?php endif; ?>
               </div>
               <div class="gallery-body">
-                <div class="smallmuted">Yorumlar (<?=$commentCount?>)</div>
-                <?php foreach($comments as $c):
-                  $cName = $c['profile_display_name'] ?: ($c['guest_name'] ?: 'Misafir');
-                  $cSeed = guest_profile_avatar_seed([
-                    'avatar_token'=>$c['profile_avatar_token'],
-                    'email'=>$c['guest_email'] ?? ('comment'.($c['id'] ?? '0').'@guest'),
-                    'id'=> $c['profile_id'] ? (int)$c['profile_id'] : (int)($c['id'] ?? 0)
-                  ]);
-                  [$cbg,$cfg] = avatar_colors($cSeed);
-                ?>
-                  <div class="comment">
-                    <strong><?=h($cName)?></strong>
-                    <div class="smallmuted"><?=relative_time($c['created_at'])?></div>
-                    <p><?=nl2br(h($c['body']))?></p>
-                  </div>
-                <?php endforeach; ?>
+                <div class="smallmuted">Yorumlar (<span class="comment-count" data-upload="<?=$u['id']?>"><?=$commentCount?></span>)</div>
+                <div class="comment-list" data-upload="<?=$u['id']?>">
+                  <?php foreach($comments as $c): ?>
+                    <?=render_comment_block($c)?>
+                  <?php endforeach; ?>
+                </div>
                 <?php if($profileVerified): ?>
-                <form method="post" class="comment-form mt-3">
-                  <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
-                  <input type="hidden" name="do" value="comment">
-                  <input type="hidden" name="upload_id" value="<?=$u['id']?>">
-                  <textarea class="form-control" name="comment_body" rows="2" placeholder="Güzel bir not bırak..." required></textarea>
-                  <div class="text-end mt-2"><button class="btn btn-sm btn-zs">Yorumu Gönder</button></div>
-                </form>
+                  <form method="post" class="comment-form mt-3 ajax-comment" data-upload="<?=$u['id']?>">
+                    <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                    <input type="hidden" name="do" value="comment">
+                    <input type="hidden" name="upload_id" value="<?=$u['id']?>">
+                    <textarea class="form-control" name="comment_body" rows="2" placeholder="Güzel bir not bırak..." required></textarea>
+                    <div class="text-end mt-2"><button class="btn btn-sm btn-zs">Yorumu Gönder</button></div>
+                  </form>
+                  <?php
+                    $isOwnUpload = $u['profile_id'] && isset($guestProfile['id']) && (int)$u['profile_id'] === (int)$guestProfile['id'];
+                    $canMessageGuest = false;
+                    if(!$isOwnUpload) {
+                      if($u['profile_id']) {
+                        $canMessageGuest = true;
+                      } elseif(!empty($u['guest_email'])) {
+                        $canMessageGuest = true;
+                      }
+                    }
+                  ?>
+                  <?php if($canMessageGuest): ?>
+                    <button type="button" class="icon-btn message-toggle mt-3" data-target="message-panel-<?=$u['id']?>">📨 Mesaj Gönder</button>
+                    <div class="message-panel mt-3" id="message-panel-<?=$u['id']?>" hidden>
+                      <form method="post" class="vstack gap-2 ajax-guest-message" data-upload="<?=$u['id']?>">
+                        <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                        <input type="hidden" name="do" value="message_guest">
+                        <input type="hidden" name="upload_id" value="<?=$u['id']?>">
+                        <textarea class="form-control" name="message_body" rows="2" placeholder="Misafire özel mesajınızı yazın" required></textarea>
+                        <div class="d-flex justify-content-between align-items-center">
+                          <small class="text-muted">Mesajınız doğrudan ilgili misafire iletilecek.</small>
+                          <button class="btn btn-sm btn-zs">Gönder</button>
+                        </div>
+                        <div class="form-feedback small" data-role="feedback" hidden></div>
+                      </form>
+                    </div>
+                  <?php elseif($isOwnUpload): ?>
+                    <div class="comment mt-3 smallmuted">Bu içerik size ait. Sohbet alanından diğer misafirlerle iletişim kurabilirsiniz.</div>
+                  <?php else: ?>
+                    <div class="comment mt-3 smallmuted">Bu misafir henüz iletişim bilgisi paylaşmadı.</div>
+                  <?php endif; ?>
                 <?php elseif($guestProfile && !$profileVerified): ?>
                   <div class="comment mt-3">Yorum yapabilmek için e-posta adresinizi doğrulayın.</div>
                 <?php else: ?>
-                  <div class="comment mt-3">Yorum yapmak için önce e-postanızı paylaşarak içerik yükleyin.</div>
+                  <div class="comment mt-3">Yorum yapmak için önce e-posta adresinizi paylaşarak içerik yükleyin.</div>
                 <?php endif; ?>
               </div>
             </div>
@@ -549,6 +756,7 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
           </div>
         <?php endif; ?>
       </div>
+
     </div>
     <div class="vstack gap-4">
       <div class="card-lite profile-card" id="profile">
@@ -625,6 +833,26 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
           <div class="smallmuted">Sohbete katılmak için önce e-posta adresinizle içerik yükleyin.</div>
         <?php endif; ?>
       </div>
+
+      <div class="card-lite note-card" id="host-note">
+        <h5 class="mb-3">Etkinlik Sahibine Mesaj</h5>
+        <?php if($profileVerified): ?>
+          <form method="post" class="vstack gap-3 ajax-host-note">
+            <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+            <input type="hidden" name="do" value="note_host">
+            <textarea class="form-control" name="host_message" rows="3" placeholder="Çifte iletmek istediğiniz iyi dilekleri yazın" required></textarea>
+            <div class="d-flex justify-content-between align-items-center">
+              <small class="text-muted">Mesajınız etkinlik sahibine iletilecek.</small>
+              <button class="btn btn-sm btn-zs">Gönder</button>
+            </div>
+            <div class="form-feedback small" data-role="feedback" hidden></div>
+          </form>
+        <?php elseif($guestProfile && !$profileVerified): ?>
+          <div class="smallmuted">Özel not gönderebilmek için e-posta adresinizi doğrulayın.</div>
+        <?php else: ?>
+          <div class="smallmuted">Özel not göndermek için önce e-posta adresinizle içerik yükleyin.</div>
+        <?php endif; ?>
+      </div>
     </div>
   </div>
 </div>
@@ -650,10 +878,159 @@ fm?.addEventListener('submit',e=>{ const name=fm.querySelector('[name=guest_name
 
 const shareButtons=document.querySelectorAll('.share-btn');
 const toast=document.getElementById('shareToast');
+let toastTimer;
+function showToast(message){
+  if(!toast) return;
+  toast.textContent=message;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>toast.classList.remove('show'),2200);
+}
 shareButtons.forEach(btn=>btn.addEventListener('click',async()=>{
   const url=btn.dataset.share;
-  if(navigator.share){ try{ await navigator.share({url:url}); return;}catch(err){} }
-  try{ await navigator.clipboard.writeText(url); toast?.classList.add('show'); setTimeout(()=>toast?.classList.remove('show'),2000);}catch(err){ alert('Bağlantı kopyalanamadı: '+err); }
+  if(navigator.share){
+    try{ await navigator.share({url}); return; }catch(err){}
+  }
+  try{
+    await navigator.clipboard.writeText(url);
+    showToast('Bağlantı kopyalandı!');
+  }catch(err){
+    showToast('Bağlantı kopyalanamadı.');
+  }
 }));
-</script>
+document.querySelectorAll('.message-toggle').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    const targetId=btn.dataset.target;
+    if(!targetId) return;
+    const panel=document.getElementById(targetId);
+    if(!panel) return;
+    if(panel.hasAttribute('hidden')){ panel.removeAttribute('hidden'); } else { panel.setAttribute('hidden',''); }
+  });
+});
+async function sendAjax(form){
+  const fd=new FormData(form);
+  const response=await fetch(window.location.href.split('#')[0],{
+    method:'POST',
+    body:fd,
+    headers:{'X-Requested-With':'XMLHttpRequest','Accept':'application/json'},
+    credentials:'same-origin'
+  });
+  let data=null;
+  try{ data=await response.json(); }catch(err){}
+  if(!response.ok || !data){
+    throw new Error(data && data.error ? data.error : 'İşlem tamamlanamadı.');
+  }
+  if(data.success===false){
+    throw new Error(data.error || 'İşlem tamamlanamadı.');
+  }
+  return data;
+}
+document.querySelectorAll('.ajax-like').forEach(form=>{
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    if(form.dataset.loading==='1') return;
+    form.dataset.loading='1';
+    const btn=form.querySelector('.like-button');
+    btn?.setAttribute('disabled','disabled');
+    try{
+      const data=await sendAjax(form);
+      const liked=!!data.liked;
+      const doInput=form.querySelector('input[name=do]');
+      if(doInput) doInput.value=liked?'unlike':'like';
+      if(btn){
+        btn.classList.toggle('active',liked);
+        btn.dataset.liked=liked?'1':'0';
+        const icon=btn.querySelector('.like-icon');
+        const count=btn.querySelector('.like-count');
+        if(icon) icon.textContent=liked?'❤️':'🤍';
+        if(count && typeof data.likes!=='undefined') count.textContent=data.likes;
+      }
+    }catch(err){
+      showToast(err.message || 'İşlem tamamlanamadı.');
+    }finally{
+      btn?.removeAttribute('disabled');
+      delete form.dataset.loading;
+    }
+  });
+});
+document.querySelectorAll('.ajax-comment').forEach(form=>{
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    if(form.dataset.loading==='1') return;
+    form.dataset.loading='1';
+    const submit=form.querySelector('button[type=submit]');
+    submit?.setAttribute('disabled','disabled');
+    try{
+      const data=await sendAjax(form);
+      const container=form.closest('.gallery-body');
+      const list=container?.querySelector('.comment-list');
+      if(list && data.html){ list.insertAdjacentHTML('beforeend', data.html); }
+      const countEl=container?.querySelector('.comment-count');
+      if(countEl && typeof data.count!=='undefined'){ countEl.textContent=data.count; }
+      const textarea=form.querySelector('textarea');
+      if(textarea) textarea.value='';
+      showToast('Yorumun paylaşıldı!');
+    }catch(err){
+      showToast(err.message || 'Yorum gönderilemedi.');
+    }finally{
+      submit?.removeAttribute('disabled');
+      delete form.dataset.loading;
+    }
+  });
+});
+function handleFeedback(form, message, isError=false){
+  const feedback=form.querySelector('[data-role=\"feedback\"]');
+  if(!feedback) return;
+  feedback.textContent=message;
+  feedback.hidden=false;
+  feedback.classList.toggle('error',!!isError);
+}
+document.querySelectorAll('.ajax-guest-message').forEach(form=>{
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    if(form.dataset.loading==='1') return;
+    form.dataset.loading='1';
+    const submit=form.querySelector('button[type=submit]');
+    const textarea=form.querySelector('textarea');
+    const feedback=form.querySelector('[data-role=\"feedback\"]');
+    if(feedback){ feedback.hidden=true; feedback.classList.remove('error'); }
+    submit?.setAttribute('disabled','disabled');
+    try{
+      const data=await sendAjax(form);
+      if(textarea) textarea.value='';
+      handleFeedback(form, data.message || 'Mesajın gönderildi!');
+      showToast(data.message || 'Mesajın gönderildi!');
+    }catch(err){
+      handleFeedback(form, err.message || 'Mesaj gönderilemedi.', true);
+      showToast(err.message || 'Mesaj gönderilemedi.');
+    }finally{
+      submit?.removeAttribute('disabled');
+      delete form.dataset.loading;
+    }
+  });
+});
+document.querySelectorAll('.ajax-host-note').forEach(form=>{
+  form.addEventListener('submit',async e=>{
+    e.preventDefault();
+    if(form.dataset.loading==='1') return;
+    form.dataset.loading='1';
+    const submit=form.querySelector('button[type=submit]');
+    const textarea=form.querySelector('textarea');
+    const feedback=form.querySelector('[data-role=\"feedback\"]');
+    if(feedback){ feedback.hidden=true; feedback.classList.remove('error'); }
+    submit?.setAttribute('disabled','disabled');
+    try{
+      const data=await sendAjax(form);
+      if(textarea) textarea.value='';
+      handleFeedback(form, data.message || 'Mesajınız gönderildi.');
+      showToast(data.message || 'Mesajınız gönderildi.');
+    }catch(err){
+      handleFeedback(form, err.message || 'Mesaj gönderilemedi.', true);
+      showToast(err.message || 'Mesaj gönderilemedi.');
+    }finally{
+      submit?.removeAttribute('disabled');
+      delete form.dataset.loading;
+    }
+  });
+});</script>
 </body></html>

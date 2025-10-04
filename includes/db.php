@@ -442,6 +442,38 @@ function install_schema(){
     FOREIGN KEY (attachment_upload_id) REFERENCES uploads(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+  pdo()->exec("CREATE TABLE IF NOT EXISTS guest_event_notes(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    profile_id INT NULL,
+    guest_name VARCHAR(190) NULL,
+    guest_email VARCHAR(190) NULL,
+    message TEXT NOT NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_guest_event_notes (event_id, created_at),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS guest_private_messages(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    sender_profile_id INT NOT NULL,
+    recipient_profile_id INT NULL,
+    recipient_upload_id BIGINT NULL,
+    recipient_email VARCHAR(190) NULL,
+    recipient_name VARCHAR(190) NULL,
+    body TEXT NOT NULL,
+    is_for_host TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    INDEX idx_guest_pm_event (event_id, created_at),
+    INDEX idx_guest_pm_recipient (recipient_profile_id),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_profile_id) REFERENCES guest_profiles(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipient_profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL,
+    FOREIGN KEY (recipient_upload_id) REFERENCES uploads(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
   /* qr_codes */
   pdo()->exec("CREATE TABLE IF NOT EXISTS qr_codes(
     id INT AUTO_INCREMENT PRIMARY KEY,

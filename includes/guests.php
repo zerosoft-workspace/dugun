@@ -261,9 +261,9 @@ function guest_upload_unlike(int $uploadId, int $profileId): void {
   $st->execute([$uploadId, $profileId]);
 }
 
-function guest_upload_comment_add(int $uploadId, ?array $profile, string $body): void {
+function guest_upload_comment_add(int $uploadId, ?array $profile, string $body): ?array {
   $body = trim($body);
-  if ($body === '') return;
+  if ($body === '') return null;
   $body = mb_substr($body, 0, 1000, 'UTF-8');
   $now = now();
   $pdo = pdo();
@@ -277,6 +277,37 @@ function guest_upload_comment_add(int $uploadId, ?array $profile, string $body):
         $body,
         $now
       ]);
+  $commentId = (int)$pdo->lastInsertId();
+  if ($commentId > 0) {
+    $st = $pdo->prepare('SELECT c.*, gp.display_name AS profile_display_name, gp.avatar_token AS profile_avatar_token
+                          FROM guest_upload_comments c
+                          LEFT JOIN guest_profiles gp ON gp.id=c.profile_id
+                          WHERE c.id=? LIMIT 1');
+    $st->execute([$commentId]);
+    $row = $st->fetch();
+    if ($row) {
+      return $row;
+    }
+  }
+  return null;
+}
+
+function guest_upload_like_count(int $uploadId): int {
+  $st = pdo()->prepare('SELECT COUNT(*) FROM guest_upload_likes WHERE upload_id=?');
+  $st->execute([$uploadId]);
+  return (int)$st->fetchColumn();
+}
+
+function guest_upload_is_liked(int $uploadId, int $profileId): bool {
+  $st = pdo()->prepare('SELECT 1 FROM guest_upload_likes WHERE upload_id=? AND profile_id=? LIMIT 1');
+  $st->execute([$uploadId, $profileId]);
+  return (bool)$st->fetchColumn();
+}
+
+function guest_upload_comment_count(int $uploadId): int {
+  $st = pdo()->prepare('SELECT COUNT(*) FROM guest_upload_comments WHERE upload_id=?');
+  $st->execute([$uploadId]);
+  return (int)$st->fetchColumn();
 }
 
 function guest_chat_add_message(int $eventId, array $profile, string $message, ?int $attachmentUploadId = null): void {
@@ -288,6 +319,66 @@ function guest_chat_add_message(int $eventId, array $profile, string $message, ?
                   VALUES (?,?,?,?,?)')
       ->execute([$eventId, (int)$profile['id'], $message, $attachmentUploadId, $now]);
   guest_profile_touch((int)$profile['id']);
+}
+
+function guest_event_note_add(int $eventId, array $profile, string $message): ?array {
+  $message = trim($message);
+  if ($message === '') {
+    return null;
+  }
+  $message = mb_substr($message, 0, 2000, 'UTF-8');
+  $pdo = pdo();
+  $now = now();
+  $pdo->prepare('INSERT INTO guest_event_notes (event_id, profile_id, guest_name, guest_email, message, created_at)
+                 VALUES (?,?,?,?,?,?)')
+      ->execute([
+        $eventId,
+        (int)$profile['id'],
+        $profile['display_name'] ?: ($profile['name'] ?? 'Misafir'),
+        $profile['email'] ?? null,
+        $message,
+        $now
+      ]);
+  $id = (int)$pdo->lastInsertId();
+  if ($id > 0) {
+    $st = $pdo->prepare('SELECT * FROM guest_event_notes WHERE id=? LIMIT 1');
+    $st->execute([$id]);
+    $row = $st->fetch();
+    return $row ?: null;
+  }
+  return null;
+}
+
+function guest_private_message_send(int $eventId, array $senderProfile, array $recipient, string $body): ?array {
+  $body = trim($body);
+  if ($body === '') {
+    return null;
+  }
+  $body = mb_substr($body, 0, 2000, 'UTF-8');
+  $pdo = pdo();
+  $now = now();
+  $pdo->prepare('INSERT INTO guest_private_messages (event_id, sender_profile_id, recipient_profile_id, recipient_upload_id, recipient_email, recipient_name, body, is_for_host, created_at)
+                 VALUES (?,?,?,?,?,?,?,?,?)')
+      ->execute([
+        $eventId,
+        (int)$senderProfile['id'],
+        $recipient['profile_id'] ?? null,
+        $recipient['upload_id'] ?? null,
+        $recipient['email'] ?? null,
+        $recipient['name'] ?? null,
+        $body,
+        !empty($recipient['is_host']) ? 1 : 0,
+        $now
+      ]);
+  $id = (int)$pdo->lastInsertId();
+  guest_profile_touch((int)$senderProfile['id']);
+  if ($id > 0) {
+    $st = $pdo->prepare('SELECT * FROM guest_private_messages WHERE id=? LIMIT 1');
+    $st->execute([$id]);
+    $row = $st->fetch();
+    return $row ?: null;
+  }
+  return null;
 }
 
 function guest_profile_update(int $profileId, string $displayName, string $bio, string $avatarToken, bool $marketingOptIn): void {
