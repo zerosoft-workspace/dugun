@@ -74,6 +74,12 @@ $pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'
 
 $token_ok = token_valid($event_id, $token);
 $guestProfile = guest_profile_current($event_id);
+if ($guestProfile && (int)$guestProfile['is_verified'] === 1) {
+  if ($token === '' || !$token_ok) {
+    $token = make_token($event_id, current_slot());
+    $token_ok = true;
+  }
+}
 
 if($_SERVER['REQUEST_METHOD']==='POST'){
   csrf_or_die();

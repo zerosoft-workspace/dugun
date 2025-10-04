@@ -297,6 +297,11 @@ function install_schema(){
     display_name VARCHAR(190) NOT NULL,
     bio TEXT NULL,
     avatar_token VARCHAR(32) NULL,
+    password_hash VARCHAR(255) NULL,
+    password_set_at DATETIME NULL,
+    password_token VARCHAR(64) NULL,
+    password_token_expires_at DATETIME NULL,
+    last_login_at DATETIME NULL,
     is_verified TINYINT(1) NOT NULL DEFAULT 0,
     verify_token VARCHAR(64) NULL,
     verified_at DATETIME NULL,
@@ -309,6 +314,7 @@ function install_schema(){
     UNIQUE KEY uniq_guest_profile (event_id, email),
     INDEX idx_guest_event (event_id),
     INDEX idx_guest_verify (verify_token),
+    INDEX idx_guest_password_token (password_token),
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
@@ -336,6 +342,24 @@ function install_schema(){
   if (!column_exists('guest_profiles', 'verified_at')) {
     try { pdo()->exec("ALTER TABLE guest_profiles ADD verified_at DATETIME NULL AFTER verify_token"); } catch (Throwable $e) {}
   }
+  if (!column_exists('guest_profiles', 'password_hash')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD password_hash VARCHAR(255) NULL AFTER avatar_token"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'password_set_at')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD password_set_at DATETIME NULL AFTER password_hash"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'password_token')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD password_token VARCHAR(64) NULL AFTER password_set_at"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'password_token_expires_at')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD password_token_expires_at DATETIME NULL AFTER password_token"); } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'last_login_at')) {
+    try { pdo()->exec("ALTER TABLE guest_profiles ADD last_login_at DATETIME NULL AFTER password_token_expires_at"); } catch (Throwable $e) {}
+  }
+  try {
+    pdo()->exec("ALTER TABLE guest_profiles ADD INDEX idx_guest_password_token (password_token)");
+  } catch (Throwable $e) {}
 
   if (!column_exists('uploads', 'profile_id')) {
     try { pdo()->exec("ALTER TABLE uploads ADD profile_id INT NULL AFTER guest_name"); } catch (Throwable $e) {}

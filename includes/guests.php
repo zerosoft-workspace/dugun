@@ -34,10 +34,70 @@ function guest_profile_clear_session(int $eventId): void {
   }
 }
 
+function guest_profile_record_login(int $profileId): void {
+  $now = now();
+  pdo()->prepare('UPDATE guest_profiles SET last_login_at=?, updated_at=? WHERE id=?')
+      ->execute([$now, $now, $profileId]);
+}
+
 function guest_profile_touch(int $profileId): void {
   $st = pdo()->prepare("UPDATE guest_profiles SET last_seen_at=?, updated_at=? WHERE id=?");
   $now = now();
   $st->execute([$now, $now, $profileId]);
+}
+
+function guest_profile_issue_password_token(int $profileId, int $ttlSeconds = 86400): string {
+  $token = bin2hex(random_bytes(20));
+  $expires = date('Y-m-d H:i:s', time() + max(300, $ttlSeconds));
+  pdo()->prepare('UPDATE guest_profiles SET password_token=?, password_token_expires_at=?, updated_at=? WHERE id=?')
+      ->execute([$token, $expires, now(), $profileId]);
+  return $token;
+}
+
+function guest_profile_find_by_password_token(string $token): ?array {
+  $token = trim($token);
+  if ($token === '') return null;
+  $st = pdo()->prepare('SELECT * FROM guest_profiles WHERE password_token=? AND (password_token_expires_at IS NULL OR password_token_expires_at >= ?) LIMIT 1');
+  $st->execute([$token, now()]);
+  $row = $st->fetch();
+  return $row ?: null;
+}
+
+function guest_profile_set_password(int $profileId, string $password): void {
+  $hash = password_hash($password, PASSWORD_DEFAULT);
+  $now = now();
+  pdo()->prepare('UPDATE guest_profiles SET password_hash=?, password_set_at=?, password_token=NULL, password_token_expires_at=NULL, updated_at=? WHERE id=?')
+      ->execute([$hash, $now, $now, $profileId]);
+}
+
+function guest_profile_authenticate(string $email, string $password): array {
+  $email = guest_profile_normalize_email($email);
+  if ($email === '' || trim($password) === '') {
+    return [];
+  }
+  $st = pdo()->prepare('SELECT gp.*, e.title AS event_title, e.event_date, e.id AS evt_id FROM guest_profiles gp JOIN events e ON e.id = gp.event_id WHERE gp.email=? AND gp.is_verified=1 AND gp.password_hash IS NOT NULL AND e.is_active=1');
+  $st->execute([$email]);
+  $matches = [];
+  while ($row = $st->fetch()) {
+    if (!password_verify($password, $row['password_hash'])) {
+      continue;
+    }
+    if (password_needs_rehash($row['password_hash'], PASSWORD_DEFAULT)) {
+      $rehash = password_hash($password, PASSWORD_DEFAULT);
+      pdo()->prepare('UPDATE guest_profiles SET password_hash=?, password_set_at=?, updated_at=? WHERE id=?')
+          ->execute([$rehash, now(), now(), (int)$row['id']]);
+      $row['password_hash'] = $rehash;
+    }
+    $matches[] = [
+      'profile' => $row,
+      'event' => [
+        'id' => (int)$row['evt_id'],
+        'title' => $row['event_title'],
+        'event_date' => $row['event_date'],
+      ],
+    ];
+  }
+  return $matches;
 }
 
 function guest_profile_find_by_email(int $eventId, string $email): ?array {
@@ -125,7 +185,7 @@ function guest_profile_send_verification(array $profile, array $event): bool {
         .'<div style="max-width:520px;margin:0 auto;background:#fff;border-radius:18px;padding:32px;box-shadow:0 18px 45px rgba(15,23,42,0.08);">'
         .'<h2 style="margin-top:0;color:#0ea5b5;font-size:24px;">BİKARE Misafir Profilinizi Doğrulayın</h2>'
         .'<p style="color:#475569;font-size:15px;line-height:1.6;">Merhaba '.h($profile['display_name'] ?: $profile['name']).',</p>'
-        .'<p style="color:#475569;font-size:15px;line-height:1.6;">'.h($event['title']).' etkinliğinin dijital albümüne katıldığınız için teşekkür ederiz. Profilinizi doğruladığınızda fotoğrafları beğenebilir, yorum yazabilir ve misafir sohbetine katılabilirsiniz.</p>'
+        .'<p style="color:#475569;font-size:15px;line-height:1.6;">'.h($event['title']).' etkinliğinin dijital albümüne katıldığınız için teşekkür ederiz. Profilinizi doğruladığınızda fotoğrafları beğenebilir, yorum yazabilir, misafir sohbetine katılabilir ve şifrenizi belirleyerek panelinize dilediğiniz zaman giriş yapabilirsiniz.</p>'
         .'<p style="text-align:center;margin:32px 0">'
         .'<a href="'.h($verifyUrl).'" style="background:#0ea5b5;color:#fff;text-decoration:none;padding:14px 26px;border-radius:999px;font-weight:600;display:inline-block;">Profilimi Doğrula</a>'
         .'</p>'
@@ -144,18 +204,44 @@ function guest_profile_send_verification(array $profile, array $event): bool {
 function guest_profile_verify_token(string $token): ?array {
   $token = trim($token);
   if ($token === '') return null;
-  $st = pdo()->prepare('SELECT * FROM guest_profiles WHERE verify_token=? LIMIT 1');
-  $st->execute([$token]);
-  $profile = $st->fetch();
-  if (!$profile) return null;
-  $now = now();
-  pdo()->prepare('UPDATE guest_profiles SET is_verified=1, verified_at=?, verify_token=NULL, updated_at=? WHERE id=?')
-      ->execute([$now, $now, (int)$profile['id']]);
+  $pdo = pdo();
+  $pdo->beginTransaction();
+  $passwordToken = null;
+  try {
+    $st = $pdo->prepare('SELECT * FROM guest_profiles WHERE verify_token=? FOR UPDATE');
+    $st->execute([$token]);
+    $profile = $st->fetch();
+    if (!$profile) {
+      $pdo->rollBack();
+      return null;
+    }
+    $alreadyVerified = (int)$profile['is_verified'] === 1;
+    $now = now();
+    if (!$alreadyVerified) {
+      $pdo->prepare('UPDATE guest_profiles SET is_verified=1, verified_at=?, updated_at=? WHERE id=?')
+          ->execute([$now, $now, (int)$profile['id']]);
+    }
+    $pdo->prepare('UPDATE guest_profiles SET verify_token=NULL, updated_at=? WHERE id=?')
+        ->execute([$now, (int)$profile['id']]);
+    $passwordToken = guest_profile_issue_password_token((int)$profile['id']);
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    throw $e;
+  }
+
   $fresh = guest_profile_current_after_verify((int)$profile['id']);
   if ($fresh) {
     guest_profile_touch((int)$fresh['id']);
   }
-  return $fresh;
+
+  return [
+    'profile' => $fresh,
+    'password_token' => $passwordToken ?? null,
+    'just_verified' => !$alreadyVerified,
+  ];
 }
 
 function guest_profile_current_after_verify(int $profileId): ?array {
@@ -250,4 +336,25 @@ function guest_profile_avatar_seed(array $profile): string {
     $token = substr(hash('sha256', $profile['email'].$profile['id']), 0, 6);
   }
   return $token;
+}
+
+function guest_profile_send_panel_access(array $profile, array $event): void {
+  if (empty($profile['email'])) {
+    return;
+  }
+  $loginUrl = BASE_URL.'/public/guest_login.php?email='.rawurlencode($profile['email']);
+  $galleryUrl = public_upload_url((int)$event['id']);
+  $html = '<div style="font-family:Inter,Arial,sans-serif;background:#f8fafc;padding:24px">'
+        .'<div style="max-width:540px;margin:0 auto;background:#ffffff;border-radius:18px;padding:36px;box-shadow:0 22px 48px rgba(14,165,181,0.18);">'
+        .'<h2 style="margin-top:0;color:#0ea5b5;font-size:24px;">Misafir paneliniz hazır</h2>'
+        .'<p style="color:#475569;font-size:15px;line-height:1.6;">Merhaba '.h($profile['display_name'] ?: $profile['name']).', doğrulama işleminiz tamamlandı.</p>'
+        .'<p style="color:#475569;font-size:15px;line-height:1.6;">Şifrenizi belirledikten sonra aşağıdaki bağlantılardan '.h($event['title']).' etkinliğinin BİKARE misafir alanına her zaman ulaşabilirsiniz.</p>'
+        .'<div style="margin:28px 0;display:flex;flex-direction:column;gap:12px;">'
+        .'<a href="'.h($loginUrl).'" style="background:#0ea5b5;color:#fff;text-decoration:none;padding:14px 24px;border-radius:999px;font-weight:600;text-align:center;">Misafir Paneline Giriş</a>'
+        .'<a href="'.h($galleryUrl).'" style="background:#f1fcfd;color:#0ea5b5;text-decoration:none;padding:14px 24px;border-radius:999px;font-weight:600;text-align:center;">Galeri Bağlantısını Aç</a>'
+        .'</div>'
+        .'<p style="color:#94a3b8;font-size:13px;">Bu e-postayı güvenle saklayabilirsiniz. Şifrenizi unuttuğunuzda doğrulama sayfasından yeniden talep edebilirsiniz.</p>'
+        .'</div></div>';
+  require_once __DIR__.'/mailer.php';
+  send_smtp_mail($profile['email'], 'BİKARE misafir panel bağlantınız', $html);
 }

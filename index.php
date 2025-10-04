@@ -63,6 +63,8 @@ unset($_SESSION['lead_success']);
   .input-rounded{border-radius:16px;border:1px solid #d7e4eb;padding:12px 16px;}
   .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:18px;padding:14px 32px;font-weight:700;}
   .btn-brand:hover{background:var(--brand-dark);color:#fff;}
+  .btn-guest{border-radius:999px;border:1px solid rgba(14,165,181,0.3);color:var(--brand);font-weight:600;padding:10px 22px;background:rgba(14,165,181,0.08);}
+  .btn-guest:hover{color:#fff;background:var(--brand);border-color:var(--brand);}
   .muted{color:var(--muted);}
   footer{background:#0f172a;color:#e2e8f0;padding:36px 0;}
   footer a{color:#94a3b8;text-decoration:none;}
@@ -72,9 +74,14 @@ unset($_SESSION['lead_success']);
 </style>
 </head><body>
 <nav class="navbar navbar-expand-lg bg-white border-bottom shadow-sm py-3">
-  <div class="container">
-    <a class="navbar-brand fw-bold" href="#"><?=h(APP_NAME)?></a>
-    <span class="badge text-bg-info-subtle text-info-emphasis rounded-pill">Dijital Etkinlik Deneyimi</span>
+  <div class="container d-flex align-items-center justify-content-between gap-3">
+    <div class="d-flex align-items-center gap-3">
+      <a class="navbar-brand fw-bold" href="#"><?=h(APP_NAME)?></a>
+      <span class="badge text-bg-info-subtle text-info-emphasis rounded-pill">Dijital Etkinlik Deneyimi</span>
+    </div>
+    <div>
+      <a class="btn btn-guest" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
+    </div>
   </div>
 </nav>
 
