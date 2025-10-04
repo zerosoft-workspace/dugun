@@ -7,7 +7,6 @@ require_once __DIR__.'/../includes/auth.php';
 
 require_admin();
 install_schema();
-
 $me = admin_user();
 
 /* Salon doğrulaması */
