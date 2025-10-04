@@ -435,7 +435,6 @@ $venueAssignments = dealer_fetch_venue_assignments();
       <?php else: ?>
         <?php
           $licenseValue = $selectedDealer['license_expires_at'] ? date('Y-m-d\TH:i', strtotime($selectedDealer['license_expires_at'])) : '';
-          $codes = $selectedCodes;
           $statusLabel = dealer_status_badge($selectedDealer['status']);
           $statusClass = dealer_status_class($selectedDealer['status']);
         ?>
