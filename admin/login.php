@@ -81,77 +81,113 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#64748b; }
-    body{ min-height:100vh; margin:0; background:linear-gradient(135deg,rgba(14,165,181,.18),rgba(14,165,181,.04)); font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; display:flex; align-items:center; justify-content:center; padding:2rem; color:var(--ink); }
-    .auth-card{ width:100%; max-width:460px; background:#fff; border-radius:22px; border:1px solid rgba(148,163,184,.18); box-shadow:0 32px 60px -30px rgba(15,23,42,.4); padding:2.8rem 2.4rem; }
-    .brand{ font-weight:800; font-size:1.4rem; letter-spacing:.3px; }
-    .subtitle{ color:var(--muted); font-size:.95rem; }
-    .btn-brand{ background:var(--brand); color:#fff; border:none; border-radius:12px; padding:.7rem 1.1rem; font-weight:600; }
-    .btn-brand:hover{ background:var(--brand-dark); color:#fff; }
-    label{ font-weight:600; color:var(--muted); }
-    .form-control{ border-radius:12px; border:1px solid rgba(148,163,184,.35); padding:.65rem .85rem; }
-    .form-control:focus{ border-color:var(--brand); box-shadow:0 0 0 .2rem rgba(14,165,181,.15); }
-    .alert{ border-radius:12px; }
-    .first-run-badge{ display:inline-flex; align-items:center; gap:.4rem; background:rgba(14,165,181,.12); color:var(--brand-dark); padding:.35rem .85rem; border-radius:999px; font-weight:600; font-size:.82rem; }
+    *{box-sizing:border-box;}
+    body{min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center;padding:2.5rem;background:radial-gradient(circle at top,#ecfeff 0%,#f8fafc 55%,#eef2ff 100%);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    .auth-shell{width:100%;max-width:1040px;background:#fff;border-radius:28px;box-shadow:0 40px 120px -45px rgba(15,23,42,.45);display:flex;overflow:hidden;border:1px solid rgba(148,163,184,.18);}
+    .auth-visual{flex:1;position:relative;padding:3rem 3.2rem;background:linear-gradient(135deg,rgba(14,165,181,.92),rgba(14,165,181,.72)),url('https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=format&fit=crop&w=1200&q=80') center/cover;color:#fff;display:flex;flex-direction:column;justify-content:space-between;min-height:100%;}
+    .auth-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(15,23,42,.05),rgba(15,23,42,.35));mix-blend-mode:multiply;}
+    .auth-visual > *{position:relative;z-index:1;}
+    .visual-badge{display:inline-flex;align-items:center;gap:.55rem;background:rgba(255,255,255,.16);border-radius:999px;padding:.45rem 1.1rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:.78rem;}
+    .visual-title{font-size:2rem;font-weight:800;line-height:1.2;margin-top:1.5rem;margin-bottom:1rem;}
+    .visual-text{font-size:1rem;line-height:1.6;color:rgba(255,255,255,.85);max-width:420px;}
+    .visual-list{list-style:none;padding:0;margin:1.5rem 0 0;display:flex;flex-direction:column;gap:.85rem;}
+    .visual-list li{display:flex;align-items:flex-start;gap:.7rem;font-weight:600;color:rgba(255,255,255,.9);}
+    .visual-list span{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.18);font-size:.9rem;}
+    .visual-footer{font-size:.82rem;color:rgba(255,255,255,.75);margin-top:2.5rem;max-width:320px;}
+    .auth-form{flex:1;padding:3rem 3.2rem;display:flex;flex-direction:column;justify-content:center;gap:1.75rem;}
+    .brand{font-weight:800;font-size:1.6rem;color:var(--ink);letter-spacing:.2px;}
+    .brand span{display:block;font-size:.92rem;font-weight:600;color:var(--muted);margin-top:.35rem;}
+    .alert{border-radius:14px;font-weight:500;}
+    form .form-label{font-weight:600;color:var(--muted);}
+    .form-control{border-radius:14px;border:1px solid rgba(148,163,184,.35);padding:.7rem 1rem;font-size:1rem;}
+    .form-control:focus{border-color:var(--brand);box-shadow:0 0 0 .25rem rgba(14,165,181,.18);}
+    .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:14px;padding:.8rem 1rem;font-weight:700;font-size:1rem;transition:background .2s ease,transform .2s ease;}
+    .btn-brand:hover{background:var(--brand-dark);transform:translateY(-1px);color:#fff;}
+    .form-note{font-size:.9rem;color:var(--muted);line-height:1.5;}
+    .back-link{font-weight:600;text-decoration:none;color:var(--brand);}
+    .back-link:hover{text-decoration:underline;color:var(--brand-dark);}
+    .first-run-badge{display:inline-flex;align-items:center;gap:.45rem;background:rgba(14,165,181,.12);color:var(--brand-dark);padding:.4rem .9rem;border-radius:999px;font-weight:600;font-size:.85rem;}
+    @media (max-width: 992px){body{padding:1.5rem;} .auth-shell{flex-direction:column;} .auth-visual{min-height:260px;padding:2.6rem;} .auth-form{padding:2.4rem;} }
+    @media (max-width: 576px){.auth-form{padding:2rem;} .visual-title{font-size:1.6rem;} }
   </style>
 </head>
 <body>
-  <div class="auth-card">
-    <div class="mb-4 text-center">
-      <?php if ($mode === 'setup'): ?>
-        <span class="first-run-badge">🚀 İlk Kurulum</span>
+  <div class="auth-shell">
+    <aside class="auth-visual">
+      <div>
+        <span class="visual-badge">BİKARE Studio</span>
+        <h1 class="visual-title">Etkinlik yönetiminin kalbi burada.</h1>
+        <p class="visual-text">BİKARE ile kampanyaları planlayın, bayilerinizi yönetin ve çiftleriniz için unutulmaz dijital deneyimler hazırlayın. Yönetici paneli tüm operasyonu tek ekranda toplar.</p>
+        <ul class="visual-list">
+          <li><span>✓</span>Gerçek zamanlı etkinlik performansı ve raporlar</li>
+          <li><span>✓</span>Bayi ve salon ağınızı tek noktadan yönetin</li>
+          <li><span>✓</span>Misafir deneyimini marka standartlarında yönlendirin</li>
+        </ul>
+      </div>
+      <p class="visual-footer">BİKARE, Zerosoft güvencesiyle etkinlik teknolojisini yeniden tanımlar.</p>
+    </aside>
+    <section class="auth-form">
+      <div>
+        <?php if ($mode === 'setup'): ?>
+          <span class="first-run-badge">🚀 İlk Kurulum</span>
+        <?php endif; ?>
+        <div class="brand"><?=h(APP_NAME)?> <span>Yönetim Paneli</span></div>
+      </div>
+
+      <?php if ($m = flash('ok')): ?>
+        <div class="alert alert-success mb-0"><?=$m?></div>
       <?php endif; ?>
-      <div class="brand mt-2"><?=h(APP_NAME)?></div>
-      <div class="subtitle">Yönetim Paneli</div>
-    </div>
+      <?php if ($err): ?>
+        <div class="alert alert-danger mb-0"><?=$err?></div>
+      <?php endif; ?>
 
-    <?php if ($m = flash('ok')): ?>
-      <div class="alert alert-success"><?=$m?></div>
-    <?php endif; ?>
-    <?php if ($err): ?>
-      <div class="alert alert-danger"><?=$err?></div>
-    <?php endif; ?>
+      <?php if ($mode === 'setup'): ?>
+        <div>
+          <p class="form-note">İlk süperadmin hesabınızı oluşturun. Bu hesap, ekibinizi davet etmek ve tüm organizasyonel ayarları yapmak için kullanılacaktır.</p>
+          <form method="post" class="vstack gap-3">
+            <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+            <div>
+              <label class="form-label">Ad Soyad</label>
+              <input class="form-control" type="text" name="name" required autofocus placeholder="Örn. Ayşe Yılmaz">
+            </div>
+            <div>
+              <label class="form-label">E-posta</label>
+              <input class="form-control" type="email" name="email" required placeholder="ornek@firma.com">
+            </div>
+            <div>
+              <label class="form-label">Şifre</label>
+              <input class="form-control" type="password" name="password" required placeholder="En az 8 karakter">
+            </div>
+            <div>
+              <label class="form-label">Şifre (Tekrar)</label>
+              <input class="form-control" type="password" name="password_confirm" required>
+            </div>
+            <button class="btn-brand mt-2 w-100">İlk Süperadmini Oluştur</button>
+          </form>
+        </div>
+      <?php else: ?>
+        <div>
+          <p class="form-note">Yönetici hesabınızla giriş yapın ve paneldeki canlı etkinlikleri, bayi bakiyelerini ve kampanyaları takip etmeye devam edin.</p>
+          <form method="post" class="vstack gap-3">
+            <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+            <input type="hidden" name="next" value="<?=h($next)?>">
+            <div>
+              <label class="form-label">E-posta</label>
+              <input class="form-control" type="email" name="email" required autofocus placeholder="ornek@firma.com">
+            </div>
+            <div>
+              <label class="form-label">Şifre</label>
+              <input class="form-control" type="password" name="password" required placeholder="Şifrenizi yazın">
+            </div>
+            <button class="btn-brand mt-2 w-100">Giriş Yap</button>
+          </form>
+        </div>
+      <?php endif; ?>
 
-    <?php if ($mode === 'setup'): ?>
-      <form method="post" class="vstack gap-3">
-        <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-        <div>
-          <label class="form-label">Ad Soyad</label>
-          <input class="form-control" type="text" name="name" required autofocus placeholder="Örn. Ayşe Yılmaz">
-        </div>
-        <div>
-          <label class="form-label">E-posta</label>
-          <input class="form-control" type="email" name="email" required placeholder="ornek@firma.com">
-        </div>
-        <div>
-          <label class="form-label">Şifre</label>
-          <input class="form-control" type="password" name="password" required placeholder="En az 8 karakter">
-        </div>
-        <div>
-          <label class="form-label">Şifre (Tekrar)</label>
-          <input class="form-control" type="password" name="password_confirm" required>
-        </div>
-        <button class="btn btn-brand mt-2 w-100">İlk Süperadmini Oluştur</button>
-      </form>
-      <p class="subtitle text-center mt-3">Bu hesap süperadmin yetkisine sahip olacak ve diğer yöneticileri davet edebilecek.</p>
-    <?php else: ?>
-      <form method="post" class="vstack gap-3">
-        <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-        <input type="hidden" name="next" value="<?=h($next)?>">
-        <div>
-          <label class="form-label">E-posta</label>
-          <input class="form-control" type="email" name="email" required autofocus>
-        </div>
-        <div>
-          <label class="form-label">Şifre</label>
-          <input class="form-control" type="password" name="password" required>
-        </div>
-        <button class="btn btn-brand mt-2 w-100">Giriş Yap</button>
-      </form>
-    <?php endif; ?>
-
-    <div class="mt-4 text-center">
-      <a class="text-decoration-none" href="../index.php">← Ana sayfaya dön</a>
-    </div>
+      <div>
+        <a class="back-link" href="../index.php">← bikare.com.tr ana sayfasına dön</a>
+      </div>
+    </section>
   </div>
 </body>
 </html>
