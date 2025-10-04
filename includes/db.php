@@ -20,6 +20,12 @@ function column_exists(string $t, string $c): bool {
   $st=pdo()->prepare("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?");
   $st->execute([$t,$c]); return (bool)$st->fetchColumn();
 }
+
+function table_exists(string $t): bool {
+  $st = pdo()->prepare("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? LIMIT 1");
+  $st->execute([$t]);
+  return (bool)$st->fetchColumn();
+}
 function supports_json(): bool { try{pdo()->query("SELECT JSON_VALID('[]')");return true;}catch(Throwable){return false;} }
 
 function install_schema(){
@@ -46,7 +52,26 @@ function install_schema(){
     $currentVersion = null;
   }
 
-  if ($currentVersion === APP_SCHEMA_VERSION) {
+  $needsInstall = ($currentVersion !== APP_SCHEMA_VERSION);
+
+  if (!$needsInstall) {
+    $criticalTables = [
+      'guest_profiles',
+      'guest_upload_likes',
+      'guest_upload_comments',
+      'guest_chat_messages',
+      'guest_event_notes',
+      'guest_private_messages'
+    ];
+    foreach ($criticalTables as $table) {
+      if (!table_exists($table)) {
+        $needsInstall = true;
+        break;
+      }
+    }
+  }
+
+  if (!$needsInstall) {
     return;
   }
 
