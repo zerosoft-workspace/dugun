@@ -4,7 +4,7 @@ const DB_HOST   = 'srv1776.hstgr.io';
 const DB_NAME   = 'u111878875_foto';
 const DB_USER   = 'u111878875_foto';
 const DB_PASS   = 'Zero671901*';
-const BASE_URL  = 'https://drive.demozerosoft.com.tr'; // kök URL (sonda / yok)
+const BASE_URL  = ''; // kök URL (sonda / yok)
 const APP_NAME  = 'Wedding Share';
 const SECRET_KEY = 'CHANGE_THIS_LONG_RANDOM_SECRET_32+CHARS';
 
