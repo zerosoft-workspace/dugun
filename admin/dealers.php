@@ -25,6 +25,16 @@ if ($action) {
   csrf_or_die();
 }
 
+if ($action && in_array($action, ['wallet_adjust','cashback_pay','topup_complete','topup_cancel_admin'], true) && !is_superadmin()) {
+  flash('err', 'Bu işlem için yetkiniz yok.');
+  $redirectId = isset($_POST['dealer_id']) ? (int)$_POST['dealer_id'] : 0;
+  $target = $_SERVER['PHP_SELF'];
+  if ($redirectId) {
+    $target .= '?id='.$redirectId;
+  }
+  redirect($target);
+}
+
 if ($action === 'create') {
   $name  = trim($_POST['name'] ?? '');
   $email = trim($_POST['email'] ?? '');
@@ -148,6 +158,80 @@ if ($action === 'send_password') {
   redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
 }
 
+if ($action === 'wallet_adjust') {
+  $dealerId = (int)($_POST['dealer_id'] ?? 0);
+  $amountInput = $_POST['amount'] ?? '';
+  $direction = $_POST['direction'] ?? 'credit';
+  $description = trim($_POST['description'] ?? '');
+  $amountCents = money_to_cents($amountInput);
+  if ($dealerId <= 0 || $amountCents <= 0) {
+    flash('err', 'Geçerli bir tutar belirtin.');
+    redirect($_SERVER['PHP_SELF'].($dealerId ? '?id='.$dealerId : ''));
+  }
+  if ($direction === 'debit') {
+    $amountCents = -$amountCents;
+  }
+  try {
+    dealer_wallet_adjust($dealerId, $amountCents, DEALER_WALLET_TYPE_ADJUSTMENT, $description ?: 'Manuel düzenleme', [
+      'admin_id' => admin_user()['id'] ?? null,
+    ]);
+    flash('ok', 'Bayi bakiyesi güncellendi.');
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+  }
+  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#finance');
+}
+
+if ($action === 'cashback_pay') {
+  $dealerId = (int)($_POST['dealer_id'] ?? 0);
+  $purchaseId = (int)($_POST['purchase_id'] ?? 0);
+  $note = trim($_POST['note'] ?? '');
+  if ($dealerId <= 0 || $purchaseId <= 0) {
+    flash('err', 'Cashback kaydı bulunamadı.');
+    redirect($_SERVER['PHP_SELF'].($dealerId ? '?id='.$dealerId : ''));
+  }
+  try {
+    dealer_pay_cashback($purchaseId, $note, ['admin_id' => admin_user()['id'] ?? null]);
+    flash('ok', 'Cashback ödemesi tamamlandı.');
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+  }
+  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#finance');
+}
+
+if ($action === 'topup_complete') {
+  $dealerId = (int)($_POST['dealer_id'] ?? 0);
+  $topupId = (int)($_POST['topup_id'] ?? 0);
+  $reference = trim($_POST['reference'] ?? '');
+  if ($dealerId <= 0 || $topupId <= 0) {
+    flash('err', 'Yükleme kaydı bulunamadı.');
+    redirect($_SERVER['PHP_SELF']);
+  }
+  try {
+    dealer_mark_topup_completed($topupId, $reference ?: null);
+    flash('ok', 'Bakiye yükleme talebi onaylandı.');
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+  }
+  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#finance');
+}
+
+if ($action === 'topup_cancel_admin') {
+  $dealerId = (int)($_POST['dealer_id'] ?? 0);
+  $topupId = (int)($_POST['topup_id'] ?? 0);
+  if ($dealerId <= 0 || $topupId <= 0) {
+    flash('err', 'Yükleme kaydı bulunamadı.');
+    redirect($_SERVER['PHP_SELF']);
+  }
+  try {
+    dealer_cancel_topup($topupId);
+    flash('ok', 'Yükleme talebi iptal edildi.');
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+  }
+  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#finance');
+}
+
 $dealers = pdo()->query("SELECT * FROM dealers ORDER BY name")->fetchAll();
 $selectedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $selectedDealer = $selectedId ? dealer_get($selectedId) : null;
@@ -155,6 +239,22 @@ $assignedVenues = $selectedDealer ? dealer_fetch_venues($selectedId) : [];
 $assignedVenueIds = array_map(fn($v) => (int)$v['id'], $assignedVenues);
 $allVenues = pdo()->query("SELECT * FROM venues ORDER BY name")->fetchAll();
 $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
+if ($selectedDealer) {
+  dealer_refresh_purchase_states($selectedId);
+  $walletBalance = dealer_get_balance($selectedId);
+  $walletTransactions = dealer_wallet_transactions($selectedId, 10);
+  $quotaSummary = dealer_event_quota_summary($selectedId);
+  $purchaseHistory = dealer_fetch_purchases($selectedId);
+  $cashbackPending = dealer_cashback_candidates($selectedId, DEALER_CASHBACK_PENDING);
+  $topupRequests = dealer_topups_for_dealer($selectedId);
+} else {
+  $walletBalance = 0;
+  $walletTransactions = [];
+  $quotaSummary = ['active' => [], 'has_credit' => false, 'remaining_events' => 0, 'has_unlimited' => false, 'cashback_waiting' => 0, 'cashback_pending_amount' => 0, 'cashback_awaiting_event' => 0];
+  $purchaseHistory = [];
+  $cashbackPending = [];
+  $topupRequests = [];
+}
 $venueAssignments = dealer_fetch_venue_assignments();
 ?>
 <!doctype html>
@@ -347,6 +447,172 @@ $venueAssignments = dealer_fetch_venue_assignments();
               <button class="btn btn-brand" type="submit">Bilgileri Güncelle</button>
             </div>
           </form>
+        </div>
+
+        <div class="card-lite p-4 mb-4" id="finance">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+            <div>
+              <h5 class="mb-1">Finansal Durum</h5>
+              <p class="text-muted mb-0">Bakiye hareketlerini, paket haklarını ve cashback ödemelerini yönetin.</p>
+            </div>
+            <div class="text-end">
+              <span class="badge-soft">Bakiye: <?=h(format_currency($walletBalance))?></span>
+            </div>
+          </div>
+          <?php if (is_superadmin()): ?>
+            <form method="post" class="row g-2 align-items-end mb-4">
+              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+              <input type="hidden" name="do" value="wallet_adjust">
+              <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
+              <div class="col-sm-4 col-md-3">
+                <label class="form-label">Tutar (TL)</label>
+                <input class="form-control" name="amount" placeholder="Örn. 500" required>
+              </div>
+              <div class="col-sm-3 col-md-2">
+                <label class="form-label">İşlem</label>
+                <select class="form-select" name="direction">
+                  <option value="credit">Yükle</option>
+                  <option value="debit">Düş</option>
+                </select>
+              </div>
+              <div class="col-sm-5 col-md-4">
+                <label class="form-label">Açıklama</label>
+                <input class="form-control" name="description" placeholder="Opsiyonel not">
+              </div>
+              <div class="col-md-3 d-grid">
+                <button class="btn btn-outline-primary" type="submit">Bakiye Güncelle</button>
+              </div>
+            </form>
+          <?php endif; ?>
+          <div class="row g-4 mb-4">
+            <div class="col-lg-6">
+              <h6 class="fw-semibold mb-2">Aktif Paketler</h6>
+              <?php if (empty($quotaSummary['active'])): ?>
+                <p class="text-muted small mb-0">Aktif paket bulunmuyor.</p>
+              <?php else: ?>
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead><tr><th>Paket</th><th>Kalan</th><th>Bitiş</th><th>Cashback</th></tr></thead>
+                    <tbody>
+                      <?php foreach ($quotaSummary['active'] as $pkg): ?>
+                        <?php
+                          $quota = $pkg['event_quota'];
+                          $used = $pkg['events_used'];
+                          $remaining = $quota === null ? 'Sınırsız' : max(0, $quota - $used).' / '.$quota;
+                          $expiry = $pkg['expires_at'] ? date('d.m.Y', strtotime($pkg['expires_at'])) : 'Süresiz';
+                          $cashbackText = $pkg['cashback_status'] === DEALER_CASHBACK_PENDING ? format_currency($pkg['cashback_amount']) : ($pkg['cashback_rate'] > 0 ? number_format($pkg['cashback_rate'] * 100, 0).'%' : '—');
+                        ?>
+                        <tr>
+                          <td><?=h($pkg['package_name'])?></td>
+                          <td><?=h($remaining)?></td>
+                          <td><?=h($expiry)?></td>
+                          <td><?=h($cashbackText)?></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
+              <?php endif; ?>
+              <div class="text-muted small mt-2">
+                Kalan hak: <?=h($quotaSummary['has_unlimited'] ? 'Sınırsız' : (string)$quotaSummary['remaining_events'])?> · Cashback bekleyen paket: <?=h($quotaSummary['cashback_waiting'])?>
+              </div>
+            </div>
+            <div class="col-lg-6">
+              <h6 class="fw-semibold mb-2">Son Cari Hareketler</h6>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead><tr><th>Tarih</th><th>İşlem</th><th>Tutar</th><th>Bakiye</th></tr></thead>
+                  <tbody>
+                    <?php if (!$walletTransactions): ?>
+                      <tr><td colspan="4" class="text-center text-muted">Henüz hareket kaydı yok.</td></tr>
+                    <?php else: ?>
+                      <?php foreach ($walletTransactions as $mov): ?>
+                        <tr>
+                          <td><?=h(date('d.m.Y H:i', strtotime($mov['created_at'] ?? 'now')))?></td>
+                          <td>
+                            <div class="fw-semibold"><?=h(dealer_wallet_type_label($mov['type']))?></div>
+                            <?php if (!empty($mov['description'])): ?><div class="small text-muted"><?=h($mov['description'])?></div><?php endif; ?>
+                          </td>
+                          <td><?=h(format_currency($mov['amount_cents']))?></td>
+                          <td><?=h(format_currency($mov['balance_after']))?></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    <?php endif; ?>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+          <h6 class="fw-semibold mb-2">Bekleyen Cashback</h6>
+          <div class="table-responsive mb-4">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Paket</th><th>Etkinlik</th><th>Tutar</th><th></th></tr></thead>
+              <tbody>
+                <?php if (!$cashbackPending): ?>
+                  <tr><td colspan="4" class="text-center text-muted">Bekleyen cashback bulunmuyor.</td></tr>
+                <?php else: ?>
+                  <?php foreach ($cashbackPending as $cb): ?>
+                    <tr>
+                      <td><?=h($cb['package_name'])?></td>
+                      <td><?=h($cb['event_title'] ?? 'Etkinlik yok')?><?= !empty($cb['event_date']) ? ' • '.h(date('d.m.Y', strtotime($cb['event_date']))) : '' ?></td>
+                      <td><?=h(format_currency($cb['cashback_amount']))?></td>
+                      <td class="text-end">
+                        <form method="post" class="d-inline">
+                          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                          <input type="hidden" name="do" value="cashback_pay">
+                          <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
+                          <input type="hidden" name="purchase_id" value="<?= (int)$cb['id'] ?>">
+                          <button class="btn btn-sm btn-outline-primary" type="submit">Ödemeyi Onayla</button>
+                        </form>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
+          <h6 class="fw-semibold mb-2">Bakiye Yükleme Talepleri</h6>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead><tr><th>Tarih</th><th>Tutar</th><th>Durum</th><th></th></tr></thead>
+              <tbody>
+                <?php if (!$topupRequests): ?>
+                  <tr><td colspan="4" class="text-center text-muted">Bekleyen yükleme talebi yok.</td></tr>
+                <?php else: ?>
+                  <?php foreach ($topupRequests as $req): ?>
+                    <tr>
+                      <td><?=h(date('d.m.Y H:i', strtotime($req['created_at'] ?? 'now')))?></td>
+                      <td><?=h(format_currency($req['amount_cents']))?></td>
+                      <td><?=h(dealer_topup_status_label($req['status']))?></td>
+                      <td class="text-end">
+                        <?php if ($req['status'] === DEALER_TOPUP_STATUS_PENDING): ?>
+                          <div class="d-flex flex-column flex-lg-row gap-2 justify-content-end">
+                            <form method="post" class="d-flex gap-2">
+                              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                              <input type="hidden" name="do" value="topup_complete">
+                              <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
+                              <input type="hidden" name="topup_id" value="<?= (int)$req['id'] ?>">
+                              <input type="text" name="reference" class="form-control form-control-sm" placeholder="Referans (opsiyonel)">
+                              <button class="btn btn-sm btn-outline-primary" type="submit">Onayla</button>
+                            </form>
+                            <form method="post">
+                              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                              <input type="hidden" name="do" value="topup_cancel_admin">
+                              <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
+                              <input type="hidden" name="topup_id" value="<?= (int)$req['id'] ?>">
+                              <button class="btn btn-sm btn-outline-secondary" type="submit">İptal</button>
+                            </form>
+                          </div>
+                        <?php else: ?>
+                          <span class="text-muted small">—</span>
+                        <?php endif; ?>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="card-lite p-4 mb-4">

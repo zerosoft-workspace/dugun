@@ -29,13 +29,18 @@ if (!$venue) {
   redirect('dashboard.php');
 }
 
-$canManage = dealer_can_manage_events($dealer);
+$creationStatus = dealer_event_creation_status($dealer);
+$canManage = $creationStatus['allowed'];
+$quotaSummary = $creationStatus['summary'];
+$activeNav = 'venues';
 
 $action = $_POST['do'] ?? '';
 if ($action === 'create_event') {
   csrf_or_die();
-  if (!$canManage) {
-    flash('err', 'Lisans süreniz dolduğu için yeni etkinlik oluşturamazsınız.');
+  $creationStatus = dealer_event_creation_status($dealer);
+  if (!$creationStatus['allowed']) {
+    $reason = $creationStatus['reason'] ?? 'Yeni etkinlik oluşturma yetkiniz bulunmuyor.';
+    flash('err', $reason);
     redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
   }
 
@@ -227,7 +232,9 @@ $qrCodes = $qrCodes->fetchAll();
       </button>
       <div class="collapse navbar-collapse" id="dealerNav">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link" href="dashboard.php">Genel Bakış</a></li>
+          <li class="nav-item"><a class="nav-link<?= $activeNav === 'dashboard' ? ' active' : '' ?>" href="dashboard.php">Genel Bakış</a></li>
+          <li class="nav-item"><a class="nav-link<?= $activeNav === 'venues' ? ' active' : '' ?>" href="dashboard.php#venues">Salonlar</a></li>
+          <li class="nav-item"><a class="nav-link<?= $activeNav === 'billing' ? ' active' : '' ?>" href="billing.php">Bakiye & Paketler</a></li>
         </ul>
         <div class="d-flex align-items-center gap-3 mb-2 mb-lg-0">
           <span class="badge-soft"><?=h($dealer['name'])?></span>
@@ -254,10 +261,15 @@ $qrCodes = $qrCodes->fetchAll();
           <h5 class="mb-1">Yeni Etkinlik Oluştur</h5>
           <p class="text-muted mb-0">Çift e-postasını yazın, giriş bilgileri otomatik olarak gönderilsin.</p>
         </div>
-        <div class="text-end">
+        <div class="d-flex flex-column align-items-end gap-2">
           <span class="badge-soft">Lisans: <?= dealer_has_valid_license($dealer) ? 'Geçerli' : 'Süresi Doldu' ?></span>
+          <?php $remainingEvents = $quotaSummary['has_unlimited'] ? 'Sınırsız' : $quotaSummary['remaining_events']; ?>
+          <span class="badge-soft">Kalan Hak: <?=h($remainingEvents)?></span>
         </div>
       </div>
+      <?php if (!$canManage && !empty($creationStatus['reason'])): ?>
+        <div class="alert alert-warning"><?=h($creationStatus['reason'])?></div>
+      <?php endif; ?>
       <?php if (!$canManage): ?>
         <div class="alert alert-warning">Lisans süreniz geçersiz olduğu için yeni etkinlik oluşturamazsınız. Lütfen yönetici ile iletişime geçin.</div>
       <?php endif; ?>

@@ -56,6 +56,7 @@ function install_schema(){
     password_hash VARCHAR(255) NULL,
     approved_at DATETIME NULL,
     last_login_at DATETIME NULL,
+    balance_cents INT NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -119,6 +120,76 @@ function install_schema(){
     INDEX (dealer_id, type),
     FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
     FOREIGN KEY (target_event_id) REFERENCES events(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_packages(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(190) NOT NULL,
+    description TEXT NULL,
+    price_cents INT NOT NULL,
+    event_quota INT NULL,
+    duration_days INT NULL,
+    cashback_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_dealer_packages_active (is_active)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_package_purchases(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    package_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    price_cents INT NOT NULL,
+    event_quota INT NULL,
+    events_used INT NOT NULL DEFAULT 0,
+    duration_days INT NULL,
+    starts_at DATETIME NOT NULL,
+    expires_at DATETIME NULL,
+    cashback_rate DECIMAL(5,2) NOT NULL DEFAULT 0,
+    cashback_status VARCHAR(20) NOT NULL DEFAULT 'none',
+    cashback_amount INT NOT NULL DEFAULT 0,
+    cashback_note VARCHAR(255) NULL,
+    cashback_paid_at DATETIME NULL,
+    lead_event_id INT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_package_dealer (dealer_id, status),
+    INDEX idx_package_event (lead_event_id),
+    INDEX idx_package_expiry (expires_at),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (package_id) REFERENCES dealer_packages(id) ON DELETE CASCADE,
+    FOREIGN KEY (lead_event_id) REFERENCES events(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_wallet_transactions(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    type VARCHAR(32) NOT NULL,
+    amount_cents INT NOT NULL,
+    balance_after INT NOT NULL,
+    description VARCHAR(255) NULL,
+    meta_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_wallet_dealer (dealer_id, created_at),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_topups(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    amount_cents INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    paytr_token VARCHAR(64) NULL,
+    paytr_reference VARCHAR(64) NULL,
+    payload_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    completed_at DATETIME NULL,
+    INDEX idx_topups_status (dealer_id, status),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* uploads */
@@ -263,3 +334,7 @@ try {
     try{ if(column_exists($t,'updated_at')) pdo()->exec("ALTER TABLE $t MODIFY updated_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); }catch(Throwable $e){}
   }
 }
+  if (!column_exists('dealers', 'balance_cents')) {
+    pdo()->exec("ALTER TABLE dealers ADD balance_cents INT NOT NULL DEFAULT 0 AFTER last_login_at");
+  }
+

@@ -11,6 +11,38 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 function redirect($url, $code=302){ header("Location: $url", true, $code); exit; }
 function now(){ return date('Y-m-d H:i:s'); }
 
+function format_currency(int $cents, string $suffix = ' TL'): string {
+  $value = $cents / 100;
+  return number_format($value, 2, ',', '.').$suffix;
+}
+
+function money_to_cents(string $input): int {
+  $clean = trim($input);
+  if ($clean === '') return 0;
+  $clean = str_replace(['₺', 'TL', 'tl'], '', $clean);
+  $clean = trim($clean);
+  if ($clean === '') return 0;
+  $clean = str_replace(' ', '', $clean);
+  $comma = strrpos($clean, ',');
+  $dot   = strrpos($clean, '.');
+  if ($comma !== false && $dot !== false) {
+    if ($comma > $dot) {
+      $clean = str_replace('.', '', $clean);
+      $clean = str_replace(',', '.', $clean);
+    } else {
+      $clean = str_replace(',', '', $clean);
+    }
+  } elseif ($comma !== false) {
+    $clean = str_replace('.', '', $clean);
+    $clean = str_replace(',', '.', $clean);
+  }
+  if (!is_numeric($clean)) {
+    return 0;
+  }
+  $value = (float)$clean;
+  return (int)round($value * 100);
+}
+
 function slugify($s){
   $s = (string)$s;
   $s = trim($s);

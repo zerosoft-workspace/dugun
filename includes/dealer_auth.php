@@ -60,6 +60,6 @@ function dealer_refresh_session(int $dealer_id): void {
 }
 
 function dealer_can_manage_events(array $dealer): bool {
-  if ($dealer['status'] !== DEALER_STATUS_ACTIVE) return false;
-  return dealer_has_valid_license($dealer);
+  $status = dealer_event_creation_status($dealer);
+  return $status['allowed'];
 }
