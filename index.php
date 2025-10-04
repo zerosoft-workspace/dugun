@@ -66,6 +66,10 @@ unset($_SESSION['lead_success']);
   .btn-guest{border-radius:999px;border:1px solid rgba(14,165,181,0.3);color:var(--brand);font-weight:600;padding:10px 22px;background:rgba(14,165,181,0.08);}
   .btn-guest:hover{color:#fff;background:var(--brand);border-color:var(--brand);}
   .muted{color:var(--muted);}
+  .nav-link{font-weight:600;color:var(--muted)!important;}
+  .nav-link:hover,.nav-link:focus{color:var(--brand)!important;}
+  .cta-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .navbar-toggler{border:none;box-shadow:none;}
   footer{background:#0f172a;color:#e2e8f0;padding:36px 0;}
   footer a{color:#94a3b8;text-decoration:none;}
   footer a:hover{text-decoration:underline;}
@@ -73,14 +77,25 @@ unset($_SESSION['lead_success']);
   @media(max-width:768px){.form-section{padding:32px;}}
 </style>
 </head><body>
-<nav class="navbar navbar-expand-lg bg-white border-bottom shadow-sm py-3">
-  <div class="container d-flex align-items-center justify-content-between gap-3">
-    <div class="d-flex align-items-center gap-3">
-      <a class="navbar-brand fw-bold" href="#"><?=h(APP_NAME)?></a>
-      <span class="badge text-bg-info-subtle text-info-emphasis rounded-pill">Dijital Etkinlik Deneyimi</span>
-    </div>
-    <div>
-      <a class="btn btn-guest" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm py-3 sticky-top">
+  <div class="container">
+    <a class="navbar-brand fw-bold fs-3" href="#hero"><?=h(APP_NAME)?></a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Menüyü Aç">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="mainNav">
+      <ul class="navbar-nav ms-auto mb-3 mb-lg-0 align-items-lg-center gap-lg-3">
+        <li class="nav-item"><a class="nav-link" href="#hakkimizda">Hakkımızda</a></li>
+        <li class="nav-item"><a class="nav-link" href="#nasil">Nasıl Çalışıyoruz</a></li>
+        <li class="nav-item"><a class="nav-link" href="#paketler">Paketler</a></li>
+        <li class="nav-item"><a class="nav-link" href="#sss">SSS</a></li>
+        <li class="nav-item"><a class="nav-link" href="#iletisim">İletişim</a></li>
+      </ul>
+      <div class="cta-bar ms-lg-4">
+        <a class="btn btn-outline-secondary rounded-pill px-4" href="<?=BASE_URL?>/dealer/apply.php">Bayi Ol</a>
+        <a class="btn btn-guest" href="<?=BASE_URL?>/dealer/login.php">Bayi Girişi</a>
+        <a class="btn btn-brand" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
+      </div>
     </div>
   </div>
 </nav>
@@ -129,7 +144,34 @@ unset($_SESSION['lead_success']);
   <?php endif; ?>
   <?php flash_box(); ?>
 
-  <section class="mb-5">
+  <section id="hakkimizda" class="mb-5">
+    <div class="row align-items-center g-5">
+      <div class="col-lg-6">
+        <img class="img-fluid rounded-4 shadow-lg" src="https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80" alt="Mutlu çift">
+      </div>
+      <div class="col-lg-6">
+        <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">BİKARE Hakkında</span>
+        <h2 class="fw-bold mt-3">Her anınızı dijital sahneye taşıyan çözüm ortağınız</h2>
+        <p class="muted">Zerosoft olarak düğün, nişan, kurumsal davet ve tüm özel etkinliklerinizde misafirlerinizle aynı anda nefes alan bir platform geliştirdik. BİKARE; yüksek yükleme kapasitesi, güçlü misafir etkileşim araçları ve otomatik QR kod altyapısıyla sizi teknik detaylardan kurtarır.</p>
+        <div class="row g-3">
+          <div class="col-sm-6">
+            <div class="feature-card h-100">
+              <h5 class="fw-semibold">Profesyonel destek</h5>
+              <p class="muted small mb-0">Kurulumdan canlı yayına kadar deneyimli ekibimizle yanınızdayız.</p>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="feature-card h-100">
+              <h5 class="fw-semibold">Tamamen yerli altyapı</h5>
+              <p class="muted small mb-0">Verileriniz Türkiye lokasyonlu sunucularda güvenle saklanır.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="ozellikler" class="mb-5">
     <div class="row g-4">
       <div class="col-md-4">
         <div class="feature-card h-100">
@@ -155,7 +197,7 @@ unset($_SESSION['lead_success']);
     </div>
   </section>
 
-  <section class="mb-5">
+  <section id="nasil" class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-6">
         <h2 class="fw-bold mb-3">BİKARE nasıl çalışır?</h2>
@@ -210,6 +252,25 @@ unset($_SESSION['lead_success']);
     </div>
   </section>
 
+  <section id="bayi-avantaj" class="mb-5">
+    <div class="row g-4 align-items-center">
+      <div class="col-lg-6">
+        <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold">Bayi Ağı</span>
+        <h2 class="fw-bold mt-3">Etkinlik sektöründeki iş ortaklarımız için kazandıran sistem</h2>
+        <p class="muted">Bayi panelinizden bakiye yönetebilir, PayTR entegrasyonlu paketler satın alabilir, etkinliklerinizi tek ekrandan yönetebilirsiniz. Referans kodu ile gerçekleştirdiğiniz satışlardan onay sonrası cashback kazanırsınız.</p>
+        <ul class="muted">
+          <li>Salon bazlı etkinlik yönetimi ve QR kod üretimi</li>
+          <li>Detaylı raporlama, bakiye ve cashback geçmişi</li>
+          <li>PayTR ile güvenli tahsilat ve hızlı aktivasyon</li>
+        </ul>
+        <a class="btn btn-brand" href="<?=BASE_URL?>/dealer/apply.php">Bayi Ağına Katıl</a>
+      </div>
+      <div class="col-lg-6 text-center">
+        <img class="img-fluid rounded-4 shadow-lg" src="https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80" alt="Bayi paneli">
+      </div>
+    </div>
+  </section>
+
   <section class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-5">
@@ -238,6 +299,82 @@ unset($_SESSION['lead_success']);
           <p class="mb-3">"Kurumsal lansmanımızda katılımcıların videolarını toplamak bu kadar kolay olmamıştı. BİKARE ekibi her detayla ilgilendi."</p>
           <div class="fw-semibold">Berna U.</div>
           <div class="small text-muted">Etkinlik Ajansı Sahibi</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="sss" class="mb-5">
+    <div class="row g-4">
+      <div class="col-lg-5">
+        <h2 class="fw-bold">Sıkça sorulan sorular</h2>
+        <p class="muted">BİKARE ile ilgili merak ettiğiniz konuları sizin için derledik. Daha fazlası için bizimle iletişime geçebilirsiniz.</p>
+      </div>
+      <div class="col-lg-7">
+        <div class="accordion" id="faqAccordion">
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="faqOne">
+              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faqOneCollapse" aria-expanded="true" aria-controls="faqOneCollapse">Ödeme sonrasında panel ne kadar sürede hazır olur?</button>
+            </h2>
+            <div id="faqOneCollapse" class="accordion-collapse collapse show" aria-labelledby="faqOne" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">PayTR üzerinden ödemeniz tamamlandığında sistemimiz etkinliğinizi birkaç dakika içinde kurar. QR kodlar ve giriş bilgileri otomatik olarak e-posta ile gönderilir.</div>
+            </div>
+          </div>
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="faqTwo">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqTwoCollapse" aria-expanded="false" aria-controls="faqTwoCollapse">Misafirler hangi formatlarda dosya yükleyebilir?</button>
+            </h2>
+            <div id="faqTwoCollapse" class="accordion-collapse collapse" aria-labelledby="faqTwo" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">BİKARE yüksek çözünürlüklü fotoğraf ve videoları destekler. Büyük dosyalar için otomatik sıkıştırma ve format uyumluluğu sunar.</div>
+            </div>
+          </div>
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="faqThree">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqThreeCollapse" aria-expanded="false" aria-controls="faqThreeCollapse">Etkinlik sonrası misafir galerisini kullanmaya devam edebilir miyiz?</button>
+            </h2>
+            <div id="faqThreeCollapse" class="accordion-collapse collapse" aria-labelledby="faqThree" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">Evet. Galeriniz etkinlikten sonra da açık kalır. Yorumları, beğenileri ve sohbet geçmişini dilediğiniz zaman görüntüleyebilirsiniz.</div>
+            </div>
+          </div>
+          <div class="accordion-item">
+            <h2 class="accordion-header" id="faqFour">
+              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqFourCollapse" aria-expanded="false" aria-controls="faqFourCollapse">Bayi olmadan da BİKARE'yi kullanabilir miyiz?</button>
+            </h2>
+            <div id="faqFourCollapse" class="accordion-collapse collapse" aria-labelledby="faqFour" data-bs-parent="#faqAccordion">
+              <div class="accordion-body">Elbette. Web sitemiz üzerinden dilediğiniz paketi seçip saniyeler içinde satın alabilir, kendi etkinliğiniz için BİKARE panelini kurabilirsiniz.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="iletisim" class="mb-5">
+    <div class="row g-4 align-items-stretch">
+      <div class="col-lg-6">
+        <div class="feature-card h-100">
+          <h3 class="fw-bold mb-3">Bizimle iletişime geçin</h3>
+          <p class="muted">Projenizle ilgili sorularınızı, özel taleplerinizi veya demo isteğinizi paylaşın. Ekibimiz en kısa sürede dönüş yapacaktır.</p>
+          <ul class="list-unstyled d-flex flex-column gap-3">
+            <li><strong>Telefon:</strong> <a href="tel:+908502225566">+90 850 222 55 66</a></li>
+            <li><strong>E-posta:</strong> <a href="mailto:info@zerosoft.com.tr">info@zerosoft.com.tr</a></li>
+            <li><strong>Adres:</strong> Zerosoft Teknoloji, İzmir Teknopark</li>
+            <li><strong>Web:</strong> <a href="https://zerosoft.com.tr" target="_blank" rel="noopener">zerosoft.com.tr</a></li>
+          </ul>
+          <div class="d-flex flex-wrap gap-3">
+            <a class="btn btn-outline-secondary rounded-pill" href="mailto:info@zerosoft.com.tr">E-posta Gönder</a>
+            <a class="btn btn-brand" href="tel:+908502225566">Hemen Ara</a>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="hero position-relative text-white h-100" style="min-height:320px;">
+          <div class="position-relative" style="z-index:2;">
+            <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Zerosoft ile tanışın</span>
+            <h3 class="fw-bold mt-3">Birlikte unutulmaz deneyimler tasarlayalım</h3>
+            <p>Etkinlik konseptiniz, katılımcı sayınız veya ihtiyaç duyduğunuz entegrasyonları konuşmak için randevu planlayalım. BİKARE ekibi tüm süreci sizin için yönetir.</p>
+            <a class="btn btn-light text-dark fw-semibold" href="#lead-form">Demo Talep Et</a>
+          </div>
         </div>
       </div>
     </div>
@@ -323,12 +460,35 @@ unset($_SESSION['lead_success']);
 </main>
 
 <footer>
-  <div class="container d-flex flex-column flex-lg-row justify-content-between align-items-start gap-3">
-    <div>
-      <div class="fw-semibold mb-1">© <?=date('Y')?> <?=h(APP_NAME)?></div>
-      <div class="small text-muted">Anılarınızı güvenli bir şekilde dijitalleştirmenize yardımcı oluyoruz.</div>
+  <div class="container">
+    <div class="row gy-4">
+      <div class="col-md-4">
+        <h5 class="fw-bold">BİKARE</h5>
+        <p class="small">Misafir deneyimini dijitalleştirir, etkinliğinizin her anını tek karede toplarız. Zerosoft güvencesiyle geliştirilen BİKARE, modern etkinliklerin vazgeçilmezi.</p>
+      </div>
+      <div class="col-md-4">
+        <h6 class="fw-semibold">Zerosoft</h6>
+        <ul class="list-unstyled small">
+          <li>Telefon: <a href="tel:+908502225566">+90 850 222 55 66</a></li>
+          <li>E-posta: <a href="mailto:info@zerosoft.com.tr">info@zerosoft.com.tr</a></li>
+          <li>Web: <a href="https://zerosoft.com.tr" target="_blank" rel="noopener">zerosoft.com.tr</a></li>
+        </ul>
+      </div>
+      <div class="col-md-4">
+        <h6 class="fw-semibold">Navigasyon</h6>
+        <ul class="list-unstyled small">
+          <li><a href="#hakkimizda">Hakkımızda</a></li>
+          <li><a href="#nasil">Nasıl Çalışıyoruz</a></li>
+          <li><a href="#paketler">Paketler</a></li>
+          <li><a href="#sss">SSS</a></li>
+          <li><a href="#iletisim">İletişim</a></li>
+        </ul>
+      </div>
     </div>
-    <div class="small">Destek: <a href="mailto:support@demozerosoft.com.tr">support@demozerosoft.com.tr</a></div>
+    <div class="border-top border-secondary mt-4 pt-3 d-flex flex-column flex-md-row justify-content-between small text-secondary">
+      <span>© <?=date('Y')?> Zerosoft Teknoloji</span>
+      <span>Developed by Zerosoft — BİKARE Dijital Etkinlik Platformu</span>
+    </div>
   </div>
 </footer>
 </body></html>
