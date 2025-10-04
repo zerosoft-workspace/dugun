@@ -35,13 +35,24 @@ unset($_SESSION['lead_success'], $_SESSION['order_summary']);
         <h5 class="fw-semibold">Etkinlik Bilgileriniz</h5>
         <ul class="list-unstyled small text-muted mb-3">
           <li><strong>Etkinlik:</strong> <?=h($summary['event_title'])?></li>
-          <li><strong>Misafir bağlantısı:</strong><br><a href="<?=h($summary['upload_url'])?>" target="_blank"><?=h($summary['upload_url'])?></a></li>
+          <li><strong>Misafir bağlantısı:</strong><br><a href="<?=h($summary['upload_url'])?>" target="_blank" rel="noopener"><?=h($summary['upload_url'])?></a></li>
           <?php if (!empty($summary['qr_dynamic'])): ?>
-            <li class="mt-2"><strong>Kalıcı QR adresi:</strong><br><a href="<?=h($summary['qr_dynamic'])?>" target="_blank"><?=h($summary['qr_dynamic'])?></a></li>
+            <li class="mt-2"><strong>Kalıcı QR adresi:</strong><br><a href="<?=h($summary['qr_dynamic'])?>" target="_blank" rel="noopener"><?=h($summary['qr_dynamic'])?></a></li>
+          <?php endif; ?>
+          <?php if (!empty($summary['login_url'])): ?>
+            <li class="mt-2"><strong>Çift paneli:</strong><br><a href="<?=h($summary['login_url'])?>" target="_blank" rel="noopener"><?=h($summary['login_url'])?></a></li>
+          <?php endif; ?>
+          <?php if (!empty($summary['plain_password'])): ?>
+            <li class="mt-2"><strong>Geçici şifre:</strong> <?=h($summary['plain_password'])?> <span class="badge bg-warning-subtle text-warning-emphasis ms-2">İlk girişte değiştirin</span></li>
           <?php endif; ?>
         </ul>
-        <a class="btn btn-outline-info" href="<?=h($summary['upload_url'])?>" target="_blank">Misafir Sayfasını Aç</a>
-        <a class="btn btn-link" href="index.php">Anasayfaya Dön</a>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-outline-info" href="<?=h($summary['upload_url'])?>" target="_blank" rel="noopener">Misafir Sayfasını Aç</a>
+          <?php if (!empty($summary['login_url'])): ?>
+            <a class="btn btn-outline-primary" href="<?=h($summary['login_url'])?>" target="_blank" rel="noopener">Panelde Oturum Aç</a>
+          <?php endif; ?>
+          <a class="btn btn-link" href="index.php">Anasayfaya Dön</a>
+        </div>
       </div>
       <div class="col-md-6 text-center qr-preview">
         <p class="text-muted small">QR kodu yazdırmak için görsele sağ tıklayıp kaydedebilirsiniz.</p>

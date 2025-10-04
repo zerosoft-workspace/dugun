@@ -231,16 +231,46 @@ function install_schema(){
     event_title VARCHAR(190) NOT NULL,
     event_date DATE NULL,
     referral_code VARCHAR(64) NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    status VARCHAR(24) NOT NULL DEFAULT 'pending_payment',
+    merchant_oid VARCHAR(64) NULL,
+    paytr_token VARCHAR(64) NULL,
+    paytr_reference VARCHAR(64) NULL,
     price_cents INT NOT NULL DEFAULT 0,
     cashback_cents INT NOT NULL DEFAULT 0,
+    paid_at DATETIME NULL,
     meta_json $jsonMeta NULL,
+    payload_json $jsonMeta NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
+    UNIQUE KEY uniq_site_orders_oid (merchant_oid),
     FOREIGN KEY (package_id) REFERENCES dealer_packages(id) ON DELETE RESTRICT,
     FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL,
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('site_orders', 'merchant_oid')) {
+    pdo()->exec("ALTER TABLE site_orders ADD merchant_oid VARCHAR(64) NULL AFTER status");
+  }
+  if (!column_exists('site_orders', 'paytr_token')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paytr_token VARCHAR(64) NULL AFTER merchant_oid");
+  }
+  if (!column_exists('site_orders', 'paytr_reference')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paytr_reference VARCHAR(64) NULL AFTER paytr_token");
+  }
+  if (!column_exists('site_orders', 'paid_at')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paid_at DATETIME NULL AFTER cashback_cents");
+  }
+  if (!column_exists('site_orders', 'payload_json')) {
+    pdo()->exec("ALTER TABLE site_orders ADD payload_json $jsonMeta NULL AFTER meta_json");
+  }
+  try {
+    pdo()->exec("ALTER TABLE site_orders MODIFY status VARCHAR(24) NOT NULL DEFAULT 'pending_payment'");
+  } catch (Throwable $e) {}
+  try {
+    pdo()->exec("ALTER TABLE site_orders ADD UNIQUE KEY uniq_site_orders_oid (merchant_oid)");
+  } catch (Throwable $e) {
+    // index already exists
+  }
 
   /* uploads */
   pdo()->exec("CREATE TABLE IF NOT EXISTS uploads(
