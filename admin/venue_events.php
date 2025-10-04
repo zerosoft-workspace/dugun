@@ -4,6 +4,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/auth.php';
+require_once __DIR__.'/partials/ui.php';
 
 require_admin();
 install_schema();
@@ -200,34 +201,23 @@ if (isset($_GET['export']) && $_GET['export']==='pdf') {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?=h(APP_NAME)?> — <?=h($VNAME)?> / Düğünler</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<?=admin_base_styles()?>
 <style>
-  :root{ --zs:#0ea5b5; --zs-soft:#e0f7fb; --ink:#0f172a; --muted:#6b7280; }
-  body{ background:linear-gradient(180deg,var(--zs-soft),#fff) no-repeat }
-  .card-lite{ border:1px solid #eef2f7; border-radius:18px; background:#fff; box-shadow:0 6px 20px rgba(17,24,39,.05) }
-  .btn-zs{ background:var(--zs); border:none; color:#fff; border-radius:12px; padding:.55rem 1rem; font-weight:600 }
-  .btn-zs-outline{ background:#fff; border:1px solid var(--zs); color:var(--zs); border-radius:12px; font-weight:600 }
-  .muted{ color:var(--muted) }
-  .group-title{ font-weight:800; color:#0f172a; margin:8px 0 6px }
-  .badge-soft{ background:#eef5ff; color:#334155; border-radius:999px; padding:.25rem .55rem; font-weight:600 }
+  .btn-zs{ background:var(--brand); border:none; color:#fff; border-radius:12px; padding:.55rem 1rem; font-weight:600; }
+  .btn-zs:hover{ background:var(--brand-dark); color:#fff; }
+  .btn-zs-outline{ background:#fff; border:1px solid rgba(14,165,181,.55); color:var(--brand); border-radius:12px; font-weight:600; }
+  .btn-zs-outline:hover{ background:rgba(14,165,181,.12); color:var(--brand-dark); }
+  .muted{ color:var(--muted); }
+  .group-title{ font-weight:800; color:var(--ink); margin:8px 0 6px; }
+  .badge-soft{ background:rgba(14,165,181,.14); color:var(--brand-dark); border-radius:999px; padding:.25rem .55rem; font-weight:600; }
   .table td, .table th { vertical-align: middle; }
 </style>
 </head>
-<body>
-<nav class="navbar bg-white border-bottom">
-  <div class="container">
-    <a class="navbar-brand fw-semibold" href="<?=h(BASE_URL)?>"><?=h(APP_NAME)?></a>
-    <div class="small d-flex align-items-center gap-3">
-      <span class="badge-soft">Salon: <?=h($VNAME)?></span>
-      <a class="text-decoration-none" href="venues.php">Salon Değiştir</a>
-      <span>•</span>
-      <a class="text-decoration-none" href="dashboard.php">Panel</a>
-      <span>•</span>
-      <a class="text-decoration-none" href="login.php?logout=1">Çıkış</a>
-    </div>
-  </div>
-</nav>
+<body class="admin-body">
+<?php render_admin_topnav('venues', 'Salon Düğünleri', 'Salon: '.$VNAME.' için etkinlik listesi'); ?>
 
-<div class="container py-4">
+<main class="admin-main">
+  <div class="container">
   <?php flash_box(); ?>
 
   <!-- Filtre + PDF -->
@@ -315,6 +305,7 @@ if (isset($_GET['export']) && $_GET['export']==='pdf') {
       </div>
     <?php endforeach; ?>
   <?php endif; ?>
-</div>
+  </div>
+</main>
 </body>
 </html>

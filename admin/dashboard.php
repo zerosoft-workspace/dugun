@@ -4,6 +4,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/auth.php';
+require_once __DIR__.'/partials/ui.php';
 
 require_admin();
 install_schema();
@@ -257,17 +258,18 @@ function fmt_bytes($b){
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?=h(APP_NAME)?> — Panel (<?=h($VNAME)?>)</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<?=admin_base_styles()?>
 <style>
-  :root{ --zs:#0ea5b5; --zs-soft:#e0f7fb; --ink:#111827; --muted:#6b7280; }
-  body{ background:linear-gradient(180deg,var(--zs-soft),#fff) no-repeat }
-  .card-lite{ border:1px solid #eef2f7; border-radius:18px; background:#fff; box-shadow:0 6px 20px rgba(17,24,39,.05) }
-  .btn-zs{ background:var(--zs); border:none; color:#fff; border-radius:12px; padding:.6rem 1rem; font-weight:600 }
-  .btn-zs-outline{ background:#fff; border:1px solid var(--zs); color:var(--zs); border-radius:12px; font-weight:600 }
-  .link-badge{ padding:.35rem .6rem; border-radius:10px; background:#f3f6fb; display:inline-block; }
-  .muted{ color:var(--muted) }
-  .title-chip{ padding:.35rem .7rem; border-radius:999px; background:#eef5ff; font-weight:600 }
-  .qr-img{ width:96px; height:96px; border-radius:12px; border:1px solid #e5e7eb }
-  .grid-compact .form-control, .grid-compact .form-select{ height:42px }
+  .qr-img{ width:96px; height:96px; border-radius:14px; border:1px solid rgba(148,163,184,.32); background:#fff; object-fit:cover; }
+  .grid-compact .form-control, .grid-compact .form-select{ height:46px; }
+  .section-heading{ display:flex; justify-content:space-between; align-items:center; gap:1rem; margin-bottom:1rem; }
+  .section-heading h5{ margin:0; font-weight:700; }
+  .muted{ color:var(--muted); }
+  .link-badge{ padding:.4rem .75rem; border-radius:12px; background:rgba(14,165,181,.12); font-weight:600; color:var(--brand-dark); display:inline-flex; align-items:center; gap:.4rem; }
+  .btn-zs{ background:var(--brand); border:none; color:#fff; border-radius:12px; font-weight:600; }
+  .btn-zs:hover{ background:var(--brand-dark); color:#fff; }
+  .btn-zs-outline{ background:#fff; border:1px solid rgba(14,165,181,.55); color:var(--brand); border-radius:12px; font-weight:600; }
+  .btn-zs-outline:hover{ background:rgba(14,165,181,.12); color:var(--brand-dark); }
 </style>
 <script>
 function confirmSoftDelete(){
@@ -276,24 +278,12 @@ function confirmSoftDelete(){
 }
 </script>
 </head>
-<body>
-<nav class="navbar bg-white border-bottom">
+<body class="admin-body">
+<?php render_admin_topnav('dashboard', 'Panel Genel Bakış', 'Salon: '.$VNAME.' • Düğün ve kampanya yönetimi'); ?>
+
+<main class="admin-main">
   <div class="container">
-    <a class="navbar-brand fw-semibold" href="<?=h(BASE_URL)?>"><?=h(APP_NAME)?></a>
-    <div class="d-flex align-items-center gap-3 small">
-      <span class="title-chip">Salon: <?=h($VNAME)?></span>
-      <a class="text-decoration-none" href="<?=h(BASE_URL)?>/admin/venues.php">Salon Değiştir</a>
-      <span>•</span>
-      <span>Admin: <?= h($me['name'] ?? ($_SESSION['uname'] ?? 'Kullanıcı')) ?></span>
-      <span>•</span>
-
-      <a href="<?=h(BASE_URL)?>/admin/login.php?logout=1">Çıkış</a>
-    </div>
-  </div>
-</nav>
-
-<div class="container py-4">
-  <?php flash_box(); ?>
+    <?php flash_box(); ?>
 
   <!-- Kampanyalar -->
   <div id="cmp" class="card-lite p-3 mb-4">
@@ -569,6 +559,7 @@ function confirmSoftDelete(){
     <?php endif; ?>
   </div>
 
-</div>
+  </div>
+</main>
 </body>
 </html>

@@ -25,18 +25,22 @@ function admin_login(string $email, string $password): bool {
   $email = trim($email);
   if ($email === '' || $password === '') return false;
 
-  $st = pdo()->prepare("SELECT id, email, password_hash, name FROM users WHERE email = ? LIMIT 1");
+  $st = pdo()->prepare("SELECT id, email, password_hash, name, role FROM users WHERE email = ? LIMIT 1");
   $st->execute([$email]);
   $u = $st->fetch();
   if (!$u) return false;
 
   if (!password_verify($password, $u['password_hash'])) return false;
 
+  pdo()->prepare("UPDATE users SET last_login_at=?, updated_at=? WHERE id=?")
+      ->execute([now(), now(), (int)$u['id']]);
+
   // Oturumu yaz
   $_SESSION['admin'] = [
     'id'    => (int)$u['id'],
     'email' => $u['email'],
     'name'  => $u['name'],
+    'role'  => $u['role'] ?? 'admin',
     'since' => time(),
   ];
   return true;
@@ -55,6 +59,18 @@ function is_admin_logged_in(): bool {
 /** Mevcut admin bilgisi (yoksa null). */
 function admin_user(): ?array {
   return is_admin_logged_in() ? $_SESSION['admin'] : null;
+}
+
+function is_superadmin(): bool {
+  $u = admin_user();
+  return $u && (($u['role'] ?? 'admin') === 'superadmin');
+}
+
+function require_superadmin(string $redirect = '/admin/dashboard.php'): void {
+  if (!is_superadmin()) {
+    flash('err', 'Bu alan için yetkiniz yok.');
+    redirect($redirect);
+  }
 }
 
 /**
@@ -83,7 +99,7 @@ if (!function_exists('require_login')) {
 function ensure_first_admin(string $email, string $password, string $name='Yönetici'): void {
   $cnt = (int)pdo()->query("SELECT COUNT(*) FROM users")->fetchColumn();
   if ($cnt === 0) {
-    $st = pdo()->prepare("INSERT INTO users (email, password_hash, name, created_at) VALUES (?,?,?,NOW())");
-    $st->execute([$email, password_hash($password, PASSWORD_DEFAULT), $name]);
+    $st = pdo()->prepare("INSERT INTO users (email, password_hash, name, role, created_at, updated_at) VALUES (?,?,?,?,NOW(),NOW())");
+    $st->execute([$email, password_hash($password, PASSWORD_DEFAULT), $name, 'superadmin']);
   }
 }

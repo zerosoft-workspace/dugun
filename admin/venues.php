@@ -4,6 +4,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/auth.php';
+require_once __DIR__.'/partials/ui.php';
 
 require_admin();
 install_schema();
@@ -146,14 +147,14 @@ $venues = $st->fetchAll();
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?=h(APP_NAME)?> — Düğün Salonları</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<?=admin_base_styles()?>
 <style>
-  :root{ --zs:#0ea5b5; --zs-soft:#e0f7fb; --muted:#6b7280; }
-  body{ background:linear-gradient(180deg,var(--zs-soft),#fff) no-repeat }
-  .card-lite{ border:1px solid #eef2f7; border-radius:18px; background:#fff; box-shadow:0 6px 20px rgba(17,24,39,.05) }
-  .btn-zs{ background:var(--zs); border:none; color:#fff; border-radius:12px; padding:.55rem 1rem; font-weight:600 }
-  .btn-zs-outline{ background:#fff; border:1px solid var(--zs); color:var(--zs); border-radius:12px; font-weight:600 }
-  .grid-compact .form-control, .grid-compact .form-select{ height:42px }
-  .muted{ color:var(--muted) }
+  .grid-compact .form-control, .grid-compact .form-select{ height:46px; }
+  .muted{ color:var(--muted); }
+  .btn-zs{ background:var(--brand); border:none; color:#fff; border-radius:12px; padding:.55rem 1rem; font-weight:600; }
+  .btn-zs:hover{ background:var(--brand-dark); color:#fff; }
+  .btn-zs-outline{ background:#fff; border:1px solid rgba(14,165,181,.55); color:var(--brand); border-radius:12px; font-weight:600; }
+  .btn-zs-outline:hover{ background:rgba(14,165,181,.12); color:var(--brand-dark); }
 </style>
 <script>
 function askToggle(){
@@ -162,28 +163,11 @@ function askToggle(){
 }
 </script>
 </head>
-<body>
-<nav class="navbar bg-white border-bottom zs-topbar">
+<body class="admin-body">
+<?php render_admin_topnav('venues', 'Düğün Salonları', 'Salon portföyünüzü yönetin ve etkinliklerinizi organize edin.'); ?>
+
+<main class="admin-main">
   <div class="container">
-    <!-- Sol: Marka -->
-    <a class="navbar-brand fw-semibold d-flex align-items-center gap-2" href="<?=h(BASE_URL)?>">
-      <?=h(APP_NAME)?>
-    </a>
-
-    <!-- Sağ: Aksiyonlar (buton görünümleri senin mevcut stillerle) -->
-    <div class="d-flex align-items-center gap-2">
-      <a href="<?=h(BASE_URL)?>/admin/dashboard.php" class="btn btn-sm btn-zs-outline">Panel</a>
-
-      <!-- Yeni: Kullanıcılar (liste sayfasına gider) -->
-      <a href="<?=h(BASE_URL)?>/admin/users.php" class="btn btn-sm btn-zs">Kullanıcılar</a>
-
-      <span class="text-muted px-1">•</span>
-
-      <a href="<?=h(BASE_URL)?>/admin/login.php?logout=1" class="btn btn-sm btn-outline-secondary">Çıkış</a>
-    </div>
-  </div>
-</nav>
-<div class="container py-4">
   <?php flash_box(); ?>
 
   <!-- Yeni Salon -->
@@ -331,6 +315,7 @@ function askToggle(){
       </div>
     <?php endif; ?>
   </div>
-</div>
+  </div>
+</main>
 </body>
 </html>

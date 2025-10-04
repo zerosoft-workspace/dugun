@@ -25,9 +25,12 @@ function install_schema(){
     email VARCHAR(190) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(190) NOT NULL,
+    role ENUM('superadmin','admin') NOT NULL DEFAULT 'admin',
     reset_code VARCHAR(10) NULL,
     reset_expires DATETIME NULL,
-    created_at DATETIME NOT NULL
+    last_login_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* venues */
@@ -39,10 +42,28 @@ function install_schema(){
     is_active TINYINT(1) NOT NULL DEFAULT 1
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+  /* dealers */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealers(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NOT NULL UNIQUE,
+    phone VARCHAR(64) NULL,
+    company VARCHAR(190) NULL,
+    notes TEXT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    license_expires_at DATETIME NULL,
+    password_hash VARCHAR(255) NULL,
+    approved_at DATETIME NULL,
+    last_login_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
   /* events */
   pdo()->exec("CREATE TABLE IF NOT EXISTS events(
     id INT AUTO_INCREMENT PRIMARY KEY,
     venue_id INT NOT NULL,
+    dealer_id INT NULL,
     user_id INT NULL,
     contact_email VARCHAR(190) NULL,
     title VARCHAR(190) NOT NULL,
@@ -58,7 +79,36 @@ function install_schema(){
     updated_at DATETIME NULL,
     UNIQUE KEY uniq_event_slug (venue_id, slug),
     INDEX (venue_id),
+    INDEX (dealer_id),
+    FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE,
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* dealer_venues (çoktan çoğa) */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_venues(
+    dealer_id INT NOT NULL,
+    venue_id INT NOT NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (dealer_id, venue_id),
+    INDEX (venue_id),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
     FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* dealer_codes — statik & deneme kodları */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_codes(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    type VARCHAR(16) NOT NULL,
+    code VARCHAR(64) NOT NULL,
+    target_event_id INT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_dealer_type (dealer_id, type),
+    UNIQUE KEY uniq_code (code),
+    INDEX (dealer_id, type),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_event_id) REFERENCES events(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* uploads */
@@ -140,7 +190,28 @@ function install_schema(){
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
   pdo()->exec("INSERT IGNORE INTO settings (id, created_at) VALUES (1, NOW())");
 
+  if (!column_exists('users','role')) {
+    pdo()->exec("ALTER TABLE users ADD role ENUM('superadmin','admin') NOT NULL DEFAULT 'admin' AFTER name");
+    // En az bir süperadmin olsun
+    pdo()->exec("UPDATE users SET role='superadmin' WHERE id IN (SELECT id FROM (SELECT id FROM users ORDER BY id ASC LIMIT 1) AS t)");
+  }
+  if (!column_exists('users','last_login_at')) {
+    pdo()->exec("ALTER TABLE users ADD last_login_at DATETIME NULL AFTER reset_expires");
+  }
+  if (!column_exists('users','updated_at')) {
+    pdo()->exec("ALTER TABLE users ADD updated_at DATETIME NULL AFTER created_at");
+  }
+
   /* çift hesap alanları + lisans + fatura */
+  if (!column_exists('events','dealer_id')) {
+    try {
+      pdo()->exec("ALTER TABLE events ADD dealer_id INT NULL AFTER venue_id");
+      pdo()->exec("CREATE INDEX idx_events_dealer ON events(dealer_id)");
+      pdo()->exec("ALTER TABLE events ADD CONSTRAINT fk_events_dealer FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL");
+    } catch (Throwable $e) {
+      // sessizce yut (bazı eski MySQL sürümleri aynı anda FK eklemeyi desteklemeyebilir)
+    }
+  }
   if (!column_exists('events','guest_title'))         pdo()->exec("ALTER TABLE events ADD guest_title VARCHAR(190) NULL");
   if (!column_exists('events','guest_subtitle'))      pdo()->exec("ALTER TABLE events ADD guest_subtitle VARCHAR(255) NULL");
   if (!column_exists('events','allow_guest_view'))    pdo()->exec("ALTER TABLE events ADD allow_guest_view TINYINT(1) NOT NULL DEFAULT 1");
