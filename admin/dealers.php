@@ -130,31 +130,6 @@ if ($action === 'assign_venue_dealers') {
   redirect($_SERVER['PHP_SELF'].$anchor);
 }
 
-if ($action === 'regenerate_code') {
-  $dealerId = (int)($_POST['dealer_id'] ?? 0);
-  $type = $_POST['type'] ?? DEALER_CODE_TRIAL;
-  $dealer = dealer_get($dealerId);
-  if (!$dealer) { flash('err','Bayi bulunamadı.'); redirect($_SERVER['PHP_SELF']); }
-  dealer_regenerate_code($dealerId, $type);
-  flash('ok','Kod güncellendi.');
-  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
-}
-
-if ($action === 'set_code_event') {
-  $dealerId = (int)($_POST['dealer_id'] ?? 0);
-  $type = $_POST['type'] ?? DEALER_CODE_STATIC;
-  $eventId = (int)($_POST['event_id'] ?? 0);
-  $dealer = dealer_get($dealerId);
-  if (!$dealer) { flash('err','Bayi bulunamadı.'); redirect($_SERVER['PHP_SELF']); }
-  if ($eventId && !dealer_event_belongs_to_dealer($dealerId, $eventId)) {
-    flash('err','Seçilen düğün bu bayiye ait değil.');
-  } else {
-    dealer_set_code_target($dealerId, $type, $eventId ?: null);
-    flash('ok','Kod bağlantısı kaydedildi.');
-  }
-  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
-}
-
 if ($action === 'send_password') {
   $dealerId = (int)($_POST['dealer_id'] ?? 0);
   $dealer = dealer_get($dealerId);
@@ -176,7 +151,6 @@ if ($action === 'send_password') {
 $dealers = pdo()->query("SELECT * FROM dealers ORDER BY name")->fetchAll();
 $selectedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $selectedDealer = $selectedId ? dealer_get($selectedId) : null;
-$selectedCodes = $selectedDealer ? dealer_sync_codes($selectedId) : [];
 $assignedVenues = $selectedDealer ? dealer_fetch_venues($selectedId) : [];
 $assignedVenueIds = array_map(fn($v) => (int)$v['id'], $assignedVenues);
 $allVenues = pdo()->query("SELECT * FROM venues ORDER BY name")->fetchAll();
@@ -404,54 +378,6 @@ $venueAssignments = dealer_fetch_venue_assignments();
           </form>
         </div>
 
-        <div class="card-lite p-4">
-          <h5 class="mb-3">Kodlar</h5>
-          <div class="row g-3">
-            <?php foreach ([DEALER_CODE_STATIC=>'Kalıcı Kod', DEALER_CODE_TRIAL=>'Deneme Kodu'] as $type=>$label):
-              $code = $codes[$type] ?? null;
-              $url = $code ? BASE_URL.'/qr.php?code='.urlencode($code['code']) : '';
-            ?>
-            <div class="col-md-6">
-              <div class="border rounded-3 p-3 h-100">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h6 class="mb-0"><?=h($label)?></h6>
-                  <form method="post" class="m-0">
-                    <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                    <input type="hidden" name="do" value="regenerate_code">
-                    <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
-                    <input type="hidden" name="type" value="<?=h($type)?>">
-                    <button class="btn btn-sm btn-outline-secondary" type="submit">Yenile</button>
-                  </form>
-                </div>
-                <?php if ($code): ?>
-                  <p class="fw-semibold">Kod: <?=h($code['code'])?></p>
-                  <p class="small text-muted"><a href="<?=h($url)?>" target="_blank">QR bağlantısı</a></p>
-                  <form method="post" class="vstack gap-2">
-                    <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                    <input type="hidden" name="do" value="set_code_event">
-                    <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
-                    <input type="hidden" name="type" value="<?=h($type)?>">
-                    <label class="form-label small">Bağlı düğün</label>
-                    <select class="form-select form-select-sm" name="event_id">
-                      <option value="0">— Seçili değil —</option>
-                      <?php foreach ($events as $ev): ?>
-                        <?php
-                          $sel = ($code['target_event_id'] ?? null) == $ev['id'] ? 'selected' : '';
-                          $dateLabel = $ev['event_date'] ? date('d.m.Y', strtotime($ev['event_date'])) : 'Tarihsiz';
-                        ?>
-                        <option value="<?= (int)$ev['id'] ?>" <?=$sel?>><?=h($dateLabel.' • '.$ev['title'])?></option>
-                      <?php endforeach; ?>
-                    </select>
-                    <button class="btn btn-sm btn-brand" type="submit">Kaydet</button>
-                  </form>
-                <?php else: ?>
-                  <p class="text-muted">Kod oluşturulamadı.</p>
-                <?php endif; ?>
-              </div>
-            </div>
-            <?php endforeach; ?>
-          </div>
-        </div>
       <?php endif; ?>
     </div>
   </div>

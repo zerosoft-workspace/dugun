@@ -20,25 +20,20 @@ dealer_refresh_session((int)$dealer['id']);
 $action = $_POST['do'] ?? '';
 if ($action) {
   csrf_or_die();
-  if ($action === 'set_code') {
-    $type = $_POST['type'] ?? DEALER_CODE_STATIC;
+  if ($action === 'assign_static') {
     $eventId = (int)($_POST['event_id'] ?? 0);
     if ($eventId > 0 && !dealer_event_belongs_to_dealer((int)$dealer['id'], $eventId)) {
       flash('err', 'Bu etkinliği yönetme yetkiniz yok.');
     } else {
-      dealer_set_code_target((int)$dealer['id'], $type, $eventId > 0 ? $eventId : null);
-      flash('ok', 'Kod bağlantısı güncellendi.');
+      dealer_set_code_target((int)$dealer['id'], DEALER_CODE_STATIC, $eventId > 0 ? $eventId : null);
+      flash('ok', 'Kalıcı QR yönlendirmesi güncellendi.');
     }
-    redirect($_SERVER['PHP_SELF']);
-  }
-  if ($action === 'refresh_trial') {
-    dealer_regenerate_code((int)$dealer['id'], DEALER_CODE_TRIAL);
-    flash('ok', 'Deneme kodu yenilendi.');
-    redirect($_SERVER['PHP_SELF']);
+    redirect($_SERVER['PHP_SELF'].'#qr');
   }
 }
 
 $codes   = dealer_sync_codes((int)$dealer['id']);
+$staticCode = $codes[DEALER_CODE_STATIC] ?? null;
 $venues  = dealer_fetch_venues((int)$dealer['id']);
 $events  = dealer_allowed_events((int)$dealer['id']);
 $warning = dealer_license_warning($dealer);
@@ -83,52 +78,45 @@ $canCreate = dealer_can_manage_events($dealer);
       </div>
     </div>
     <div class="col-lg-8">
-      <div class="card-lite p-4">
-        <h5 class="mb-3">Kalıcı & Deneme Kodları</h5>
-        <div class="row g-4">
-          <?php foreach ([DEALER_CODE_STATIC=>'Kalıcı Kod', DEALER_CODE_TRIAL=>'Deneme Kodu'] as $type=>$label):
-            $code = $codes[$type] ?? null;
-            $url = $code ? BASE_URL.'/qr.php?code='.urlencode($code['code']) : '';
-          ?>
-          <div class="col-md-6">
-            <div class="border rounded-3 p-3 h-100">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="mb-0"><?=h($label)?></h6>
-                <?php if ($type === DEALER_CODE_TRIAL): ?>
-                  <form method="post" class="m-0">
-                    <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                    <input type="hidden" name="do" value="refresh_trial">
-                    <button class="btn btn-sm btn-outline-secondary">Yenile</button>
-                  </form>
-                <?php endif; ?>
+      <div class="card-lite p-4" id="qr">
+        <h5 class="mb-3">Kalıcı QR Kodunuz</h5>
+        <?php if (!$staticCode): ?>
+          <p class="text-muted mb-0">Kalıcı kod oluşturulamadı. Lütfen yönetici ile iletişime geçin.</p>
+        <?php else: ?>
+          <?php $staticUrl = BASE_URL.'/qr.php?code='.urlencode($staticCode['code']); ?>
+          <div class="row g-4 align-items-start">
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <div class="text-uppercase small text-muted fw-semibold mb-1">Kod</div>
+                <div class="code-pill mb-3"><?=h($staticCode['code'])?></div>
+                <p class="small text-muted mb-1">Bu kod sabittir ve tek bir kez atanmıştır.</p>
+                <p class="small text-muted mb-0"><a href="<?=h($staticUrl)?>" target="_blank">Kalıcı QR bağlantısını aç</a></p>
               </div>
-              <?php if ($code): ?>
-                <div class="code-pill mb-2"><?=h($code['code'])?></div>
-                <p class="small text-muted mb-2"><a href="<?=h($url)?>" target="_blank">QR bağlantısı</a></p>
+            </div>
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3 h-100">
+                <h6 class="fw-semibold mb-2">Yönlendirme</h6>
+                <p class="small text-muted">Kod okutulduğunda misafirler seçtiğiniz etkinliğe yönlendirilir.</p>
                 <form method="post" class="vstack gap-2">
                   <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                  <input type="hidden" name="do" value="set_code">
-                  <input type="hidden" name="type" value="<?=h($type)?>">
-                  <label class="form-label small mb-1">Bağlı düğün</label>
+                  <input type="hidden" name="do" value="assign_static">
+                  <label class="form-label small mb-1">Bağlı etkinlik</label>
                   <select class="form-select form-select-sm" name="event_id">
                     <option value="0">— Seçili değil —</option>
                     <?php foreach ($events as $ev): ?>
                       <?php
-                        $selected = ($code['target_event_id'] ?? null) == $ev['id'] ? 'selected' : '';
+                        $selected = ($staticCode['target_event_id'] ?? null) == $ev['id'] ? 'selected' : '';
                         $dateLabel = $ev['event_date'] ? date('d.m.Y', strtotime($ev['event_date'])) : 'Tarihsiz';
                       ?>
                       <option value="<?= (int)$ev['id'] ?>" <?=$selected?>><?=h($dateLabel.' • '.$ev['title'])?></option>
                     <?php endforeach; ?>
                   </select>
-                  <button class="btn btn-sm btn-primary" type="submit">Kaydet</button>
+                  <button class="btn btn-sm btn-primary" type="submit">Yönlendirmeyi Kaydet</button>
                 </form>
-              <?php else: ?>
-                <p class="text-muted small">Kod oluşturulamadı.</p>
-              <?php endif; ?>
+              </div>
             </div>
           </div>
-          <?php endforeach; ?>
-        </div>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -153,7 +141,7 @@ $canCreate = dealer_can_manage_events($dealer);
                 </td>
                 <td><?= $v['is_active'] ? 'Aktif' : 'Pasif' ?></td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-primary" href="venue_events.php?venue_id=<?= (int)$v['id'] ?>">Düğünleri Yönet</a>
+                  <a class="btn btn-sm btn-primary" href="venue_events.php?venue_id=<?= (int)$v['id'] ?>">Etkinlikleri Yönet</a>
                 </td>
               </tr>
             <?php endforeach; ?>
