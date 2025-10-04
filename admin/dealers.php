@@ -232,7 +232,24 @@ if ($action === 'topup_cancel_admin') {
   redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#finance');
 }
 
-$dealers = pdo()->query("SELECT * FROM dealers ORDER BY name")->fetchAll();
+$statusFilter = $_GET['status'] ?? 'all';
+$validStatusFilters = ['all', 'active', 'pending', 'inactive'];
+if (!in_array($statusFilter, $validStatusFilters, true)) {
+  $statusFilter = 'all';
+}
+
+$statusCounts = dealer_status_counts();
+$dealerListSql = "SELECT * FROM dealers";
+$dealerListParams = [];
+if ($statusFilter !== 'all') {
+  $dealerListSql .= " WHERE status=?";
+  $dealerListParams[] = $statusFilter;
+}
+$dealerListSql .= " ORDER BY name";
+$dealerListStmt = pdo()->prepare($dealerListSql);
+$dealerListStmt->execute($dealerListParams);
+$dealersList = $dealerListStmt->fetchAll();
+$allDealers = pdo()->query("SELECT * FROM dealers ORDER BY name")->fetchAll();
 $selectedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $selectedDealer = $selectedId ? dealer_get($selectedId) : null;
 $assignedVenues = $selectedDealer ? dealer_fetch_venues($selectedId) : [];
@@ -243,6 +260,7 @@ if ($selectedDealer) {
   dealer_refresh_purchase_states($selectedId);
   $walletBalance = dealer_get_balance($selectedId);
   $walletTransactions = dealer_wallet_transactions($selectedId, 10);
+  $walletFlowTotals = dealer_wallet_flow_totals($selectedId);
   $quotaSummary = dealer_event_quota_summary($selectedId);
   $purchaseHistory = dealer_fetch_purchases($selectedId);
   $cashbackPending = dealer_cashback_candidates($selectedId, DEALER_CASHBACK_PENDING);
@@ -250,6 +268,7 @@ if ($selectedDealer) {
 } else {
   $walletBalance = 0;
   $walletTransactions = [];
+  $walletFlowTotals = ['in' => 0, 'out' => 0];
   $quotaSummary = ['active' => [], 'has_credit' => false, 'remaining_events' => 0, 'has_unlimited' => false, 'cashback_waiting' => 0, 'cashback_pending_amount' => 0, 'cashback_awaiting_event' => 0];
   $purchaseHistory = [];
   $cashbackPending = [];
@@ -292,6 +311,18 @@ $venueAssignments = dealer_fetch_venue_assignments();
   .venue-chip-empty{color:var(--muted);font-size:.85rem;}
   .section-subtitle{font-size:.85rem;color:var(--muted);}
   .tab-card{border-radius:18px; background:#fff; border:1px solid rgba(148,163,184,.16); box-shadow:0 22px 45px -28px rgba(15,23,42,.45);}
+  .filter-pills .nav-link{padding:.35rem .65rem;font-size:.75rem;border-radius:999px;color:var(--muted);background:rgba(148,163,184,.18);margin-left:.35rem;}
+  .filter-pills .nav-link:first-child{margin-left:0;}
+  .filter-pills .nav-link.active{background:#0ea5e9;color:#fff;}
+  .balance-stat{border:1px solid rgba(148,163,184,.2);border-radius:14px;padding:1rem 1.25rem;background:#f8fafc;}
+  .balance-stat h6{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem;}
+  .balance-stat .value{font-size:1.35rem;font-weight:700;color:#0f172a;}
+  .balance-stat.income .value{color:#15803d;}
+  .balance-stat.expense .value{color:#b91c1c;}
+  .badge-soft-lg{display:inline-flex;align-items:center;gap:.4rem;padding:.4rem .8rem;border-radius:999px;font-size:.85rem;font-weight:600;background:rgba(14,165,181,.12);color:#0f172a;}
+  .wallet-direction{font-size:.75rem;font-weight:600;padding:.2rem .55rem;border-radius:999px;}
+  .wallet-direction.in{background:rgba(34,197,94,.16);color:#166534;}
+  .wallet-direction.out{background:rgba(248,113,113,.18);color:#b91c1c;}
 </style>
 </head>
 <body class="admin-body">
@@ -345,16 +376,43 @@ $venueAssignments = dealer_fetch_venue_assignments();
         </form>
       </div>
       <div class="card-lite p-0">
-        <div class="p-3 border-bottom"><h5 class="m-0">Bayiler</h5></div>
+        <div class="p-3 border-bottom">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h5 class="m-0">Bayiler</h5>
+            <div class="filter-pills nav nav-pills">
+              <?php
+                $statusLabels = [
+                  'all' => 'Tümü',
+                  'active' => 'Aktif',
+                  'pending' => 'Onay Bekliyor',
+                  'inactive' => 'Pasif',
+                ];
+              ?>
+              <?php foreach ($statusLabels as $key => $label): ?>
+                <?php $isActive = $statusFilter === $key; ?>
+                <a class="nav-link <?= $isActive ? 'active' : '' ?>" href="?status=<?=$key?>">
+                  <?=h($label)?>
+                  <span class="fw-semibold ms-1">(<?= (int)($statusCounts[$key] ?? 0) ?>)</span>
+                </a>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        </div>
         <div class="list-group list-group-flush" style="max-height:420px;overflow:auto;">
-          <?php foreach ($dealers as $d): ?>
+          <?php foreach ($dealersList as $d): ?>
             <?php
               $badge = dealer_status_badge($d['status']);
               $badgeClass = dealer_status_class($d['status']);
               $activeClass = ($selectedId === (int)$d['id']) ? 'active' : '';
               $license = $d['license_expires_at'] ? date('d.m.Y', strtotime($d['license_expires_at'])) : '—';
             ?>
-            <a href="?id=<?= (int)$d['id'] ?>" class="list-group-item list-group-item-action <?= $activeClass ?>">
+            <?php
+              $linkQuery = http_build_query(array_filter([
+                'status' => $statusFilter !== 'all' ? $statusFilter : null,
+                'id' => (int)$d['id'],
+              ]));
+            ?>
+            <a href="?<?=$linkQuery?>" class="list-group-item list-group-item-action <?= $activeClass ?>">
               <div class="d-flex justify-content-between align-items-center mb-1">
                 <div class="fw-semibold me-2"><?=h($d['name'])?></div>
                 <span class="badge-status <?=$badgeClass?>"><?=h($badge)?></span>
@@ -390,6 +448,26 @@ $venueAssignments = dealer_fetch_venue_assignments();
               <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
               <button class="btn btn-sm btn-outline-primary" type="submit">Yeni Şifre Gönder</button>
             </form>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <div class="balance-stat">
+                <h6>Güncel Bakiye</h6>
+                <div class="value"><?=h(format_currency($walletBalance))?></div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="balance-stat income">
+                <h6>Toplam Giriş</h6>
+                <div class="value"><?=h(format_currency($walletFlowTotals['in']))?></div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="balance-stat expense">
+                <h6>Toplam Çıkış</h6>
+                <div class="value"><?=h(format_currency($walletFlowTotals['out']))?></div>
+              </div>
+            </div>
           </div>
           <div class="d-flex flex-wrap gap-4 mb-3">
             <div>
@@ -456,7 +534,7 @@ $venueAssignments = dealer_fetch_venue_assignments();
               <p class="text-muted mb-0">Bakiye hareketlerini, paket haklarını ve cashback ödemelerini yönetin.</p>
             </div>
             <div class="text-end">
-              <span class="badge-soft">Bakiye: <?=h(format_currency($walletBalance))?></span>
+              <span class="badge-soft-lg"><span>Bakiye</span> <?=h(format_currency($walletBalance))?></span>
             </div>
           </div>
           <?php if (is_superadmin()): ?>
@@ -521,19 +599,27 @@ $venueAssignments = dealer_fetch_venue_assignments();
               <h6 class="fw-semibold mb-2">Son Cari Hareketler</h6>
               <div class="table-responsive">
                 <table class="table table-sm align-middle mb-0">
-                  <thead><tr><th>Tarih</th><th>İşlem</th><th>Tutar</th><th>Bakiye</th></tr></thead>
+                  <thead><tr><th>Tarih</th><th>İşlem</th><th>Tip</th><th>Tutar</th><th>Bakiye</th></tr></thead>
                   <tbody>
                     <?php if (!$walletTransactions): ?>
-                      <tr><td colspan="4" class="text-center text-muted">Henüz hareket kaydı yok.</td></tr>
+                      <tr><td colspan="5" class="text-center text-muted">Henüz hareket kaydı yok.</td></tr>
                     <?php else: ?>
                       <?php foreach ($walletTransactions as $mov): ?>
+                        <?php
+                          $direction = $mov['amount_cents'] >= 0 ? 'in' : 'out';
+                          $directionLabel = $direction === 'in' ? 'Giriş' : 'Çıkış';
+                          $amountClass = $direction === 'in' ? 'text-success' : 'text-danger';
+                        ?>
                         <tr>
                           <td><?=h(date('d.m.Y H:i', strtotime($mov['created_at'] ?? 'now')))?></td>
                           <td>
                             <div class="fw-semibold"><?=h(dealer_wallet_type_label($mov['type']))?></div>
                             <?php if (!empty($mov['description'])): ?><div class="small text-muted"><?=h($mov['description'])?></div><?php endif; ?>
                           </td>
-                          <td><?=h(format_currency($mov['amount_cents']))?></td>
+                          <td>
+                            <span class="wallet-direction <?=$direction?>"><?=h($directionLabel)?></span>
+                          </td>
+                          <td class="<?=$amountClass?> fw-semibold"><?=h(format_currency($mov['amount_cents']))?></td>
                           <td><?=h(format_currency($mov['balance_after']))?></td>
                         </tr>
                       <?php endforeach; ?>
@@ -682,13 +768,13 @@ $venueAssignments = dealer_fetch_venue_assignments();
                 <?php else: ?>
                   <div class="venue-chip-empty mb-2">Bu salona henüz bayi atanmadı.</div>
                 <?php endif; ?>
-                <?php if ($dealers): ?>
+                <?php if ($allDealers): ?>
                   <form method="post" class="vstack gap-2">
                     <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
                     <input type="hidden" name="do" value="assign_venue_dealers">
                     <input type="hidden" name="venue_id" value="<?= (int)$venue['id'] ?>">
                     <select class="form-select js-combobox" name="dealer_ids[]" multiple data-placeholder="Bayi seçin">
-                      <?php foreach ($dealers as $dealerOption): ?>
+                      <?php foreach ($allDealers as $dealerOption): ?>
                         <option value="<?= (int)$dealerOption['id'] ?>" <?= in_array((int)$dealerOption['id'], $assignedIds, true) ? 'selected' : '' ?>><?=h(($dealerOption['code'] ?? '—').' • '.$dealerOption['name'])?></option>
                       <?php endforeach; ?>
                     </select>

@@ -386,6 +386,23 @@ function dealer_get_balance(int $dealer_id): int {
   return $value !== false ? (int)$value : 0;
 }
 
+function dealer_wallet_flow_totals(int $dealer_id): array {
+  $st = pdo()->prepare(
+    "SELECT \
+        COALESCE(SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END),0) AS total_in, \
+        COALESCE(SUM(CASE WHEN amount_cents < 0 THEN amount_cents ELSE 0 END),0) AS total_out \
+     FROM dealer_wallet_transactions WHERE dealer_id=?"
+  );
+  $st->execute([$dealer_id]);
+  $row = $st->fetch();
+  $totalIn = (int)($row['total_in'] ?? 0);
+  $totalOut = (int)($row['total_out'] ?? 0);
+  return [
+    'in' => $totalIn,
+    'out' => abs($totalOut),
+  ];
+}
+
 function dealer_wallet_adjust(int $dealer_id, int $amount_cents, string $type, string $description = '', array $meta = []): int {
   $pdo = pdo();
   $ownTxn = !$pdo->inTransaction();
@@ -453,6 +470,23 @@ function dealer_wallet_type_label(string $type): string {
     DEALER_WALLET_TYPE_TOPUP_REQ  => 'Yükleme Talebi',
     default                       => ucfirst($type),
   };
+}
+
+function dealer_status_counts(): array {
+  $rows = pdo()->query("SELECT status, COUNT(*) AS c FROM dealers GROUP BY status")->fetchAll();
+  $counts = [
+    'active' => 0,
+    'pending' => 0,
+    'inactive' => 0,
+  ];
+  foreach ($rows as $row) {
+    $status = $row['status'] ?? '';
+    if (isset($counts[$status])) {
+      $counts[$status] = (int)$row['c'];
+    }
+  }
+  $counts['all'] = array_sum($counts);
+  return $counts;
 }
 
 function dealer_packages_all(bool $onlyActive = false): array {
