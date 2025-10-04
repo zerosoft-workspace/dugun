@@ -149,6 +149,33 @@ if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) { $ip = '1.2.3.4'; }
 $oid = 'EV'.$event_id.'PKT'.strtoupper(bin2hex(random_bytes(8)));
 $oid = substr(preg_replace('/[^A-Za-z0-9]/','', $oid), 0, 64);
 
+if (paytr_is_test_mode()) {
+  $merchant_oid = 'TEST-'.$oid;
+  $now = now();
+  $itemsJson = safe_json_encode($items);
+  pdo()->prepare("INSERT INTO purchases (venue_id,event_id,campaign_id,status,amount,currency,paytr_oid,items_json,created_at,updated_at,paid_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+      ->execute([
+        $VID,
+        $event_id,
+        null,
+        'paid',
+        $totalKurus,
+        'TL',
+        $merchant_oid,
+        $itemsJson,
+        $now,
+        $now,
+        $now,
+      ]);
+  $totalTl = number_format($totalKurus / 100, 2, ',', '.');
+  echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Test Ödemesi</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body class="p-4">'
+      .'<div class="alert alert-info"><strong>Test modu:</strong> Ödeme simüle edildi ve seçilen ek paketler "paid" olarak kaydedildi.</div>'
+      .'<p><strong>Toplam:</strong> '.$totalTl.' TL</p>'
+      .'<a class="btn btn-primary" href="'.h(BASE_URL).'/couple/index.php">Panele dön</a>'
+      .'</body></html>';
+  exit;
+}
+
 // PayTR parametreleri
 $no_installment=0; $max_installment=0; $currency='TL'; $test=(int)PAYTR_TEST_MODE;
 

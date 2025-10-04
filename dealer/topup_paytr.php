@@ -35,7 +35,11 @@ if ($status === DEALER_TOPUP_STATUS_COMPLETED) {
   redirect('billing.php#topup');
 }
 if ($status === DEALER_TOPUP_STATUS_AWAITING_REVIEW) {
-  flash('ok', 'Ödeme alındı, yönetici onayı bekleniyor.');
+  $msg = 'Ödeme alındı, yönetici onayı bekleniyor.';
+  if (paytr_is_test_mode()) {
+    $msg = 'Test modunda ödeme otomatik alındı, yönetici onayı bekleniyor.';
+  }
+  flash('ok', $msg);
   redirect('billing.php#topup');
 }
 $token = $topup['paytr_token'] ?? null;

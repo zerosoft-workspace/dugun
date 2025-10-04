@@ -32,7 +32,7 @@ const PAYTR_SITE_OK_URL  = BASE_URL.'/order_paytr_ok.php';
 const PAYTR_SITE_FAIL_URL= BASE_URL.'/order_paytr_fail.php';
 const PAYTR_DEALER_OK_URL   = BASE_URL.'/dealer/paytr_ok.php';
 const PAYTR_DEALER_FAIL_URL = BASE_URL.'/dealer/paytr_fail.php';
-const PAYTR_TEST_MODE    = 0; // 1=test, 0=canlı
+const PAYTR_TEST_MODE    = 1; // 1=test, 0=canlı
 /* ========================================= */
 
 /* =================================================== */

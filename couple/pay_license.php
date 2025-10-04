@@ -122,15 +122,35 @@ $merchant_oid = preg_replace('/[^A-Za-z0-9]/', '', $merchant_oid);
 // ---- purchases kaydı (pending) ----
 // campaign_id NULL, items_json'ta tip=license, years=x
 $items = json_encode(['type'=>'license','years'=>$years,'price_tl'=>$price_tl], JSON_UNESCAPED_UNICODE);
+$isTest = paytr_is_test_mode();
+$now = now();
 $ins = pdo()->prepare("
   INSERT INTO purchases
-    (venue_id, event_id, campaign_id, status, amount, currency, paytr_oid, items_json, created_at)
+    (venue_id, event_id, campaign_id, status, amount, currency, paytr_oid, items_json, created_at, updated_at, paid_at)
   VALUES
-    (?,?,?,?,?,?,?,?,?)
+    (?,?,?,?,?,?,?,?,?,?,?)
 ");
 $ins->execute([
-  $VENUE_ID, $EVENT_ID, null, 'pending', $amount_kurus, 'TL', $merchant_oid, $items, now()
+  $VENUE_ID,
+  $EVENT_ID,
+  null,
+  $isTest ? 'paid' : 'pending',
+  $amount_kurus,
+  'TL',
+  $merchant_oid,
+  $items,
+  $now,
+  $isTest ? $now : null,
+  $isTest ? $now : null,
 ]);
+
+if ($isTest) {
+  echo '<!doctype html><html lang="tr"><head><meta charset="utf-8"><title>Test Ödemesi</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"></head><body class="p-4">'
+      .'<div class="alert alert-info"><strong>Test modu:</strong> Lisans ödemesi simüle edilerek kaydınız tamamlandı.</div>'
+      .'<a class="btn btn-primary" href="'.h(BASE_URL).'/couple/index.php">Panele dön</a>'
+      .'</body></html>';
+  exit;
+}
 
 // ---- PAYTR token al ----
 $merchant_ok_url   = BASE_URL.'/couple/index.php'; // Bilgilendirme amaçlı dönüş

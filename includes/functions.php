@@ -16,6 +16,10 @@ function format_currency(int $cents, string $suffix = ' TL'): string {
   return number_format($value, 2, ',', '.').$suffix;
 }
 
+function paytr_is_test_mode(): bool {
+  return defined('PAYTR_TEST_MODE') && (int)PAYTR_TEST_MODE === 1;
+}
+
 function money_to_cents(string $input): int {
   $clean = trim($input);
   if ($clean === '') return 0;

@@ -386,6 +386,8 @@ function site_ensure_order_paytr_token(int $order_id): array {
   $user_address = 'Online Sipariş';
   $user_phone = $order['customer_phone'] ?: '—';
 
+  $testMode = paytr_is_test_mode();
+
   $ip = $_SERVER['HTTP_CF_CONNECTING_IP']
      ?? $_SERVER['HTTP_X_FORWARDED_FOR']
      ?? $_SERVER['REMOTE_ADDR']
@@ -410,6 +412,41 @@ function site_ensure_order_paytr_token(int $order_id): array {
   $user_basket = base64_encode(json_encode($basket, JSON_UNESCAPED_UNICODE));
 
   $merchantOid = $order['merchant_oid'] ?: site_generate_order_oid($order['id']);
+  if ($testMode) {
+    $payload = [
+      'request' => [
+        'amount_cents' => $amount_cents,
+        'basket'       => $basket,
+        'ip'           => $ip,
+      ],
+      'merchant_oid' => $merchantOid,
+      'test_mode'    => true,
+      'note'         => 'Ödeme test modunda simüle edildi.',
+    ];
+    $now = now();
+    pdo()->prepare("UPDATE site_orders SET merchant_oid=?, paytr_token=?, status=?, payload_json=?, paid_at=?, updated_at=? WHERE id=?")
+        ->execute([
+          $merchantOid,
+          null,
+          SITE_ORDER_STATUS_PAID,
+          safe_json_encode($payload),
+          $now,
+          $now,
+          $order['id'],
+        ]);
+    $result = site_finalize_order($order['id'], ['payload' => ['status' => 'success', 'test_mode' => true]]);
+    $order = site_get_order($order['id']);
+    return [
+      'order' => $order,
+      'package' => $package,
+      'dealer' => $dealer,
+      'token' => null,
+      'merchant_oid' => $merchantOid,
+      'test_mode' => true,
+      'result' => $result,
+    ];
+  }
+
   $no_installment = 0;
   $max_installment = 0;
   $currency = 'TL';

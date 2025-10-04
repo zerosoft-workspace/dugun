@@ -1031,54 +1031,10 @@ function dealer_create_topup_request(int $dealer_id, int $amount_cents): array {
   $no_installment = 0;
   $max_installment = 0;
   $currency = 'TL';
-  $test = (int)PAYTR_TEST_MODE;
-  $hash_str = PAYTR_MERCHANT_ID . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
-  $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . PAYTR_MERCHANT_SALT, PAYTR_MERCHANT_KEY, true));
-
-  $post = [
-    'merchant_id'         => PAYTR_MERCHANT_ID,
-    'user_ip'             => $ip,
-    'merchant_oid'        => $merchantOid,
-    'email'               => $email,
-    'payment_amount'      => $amount_cents,
-    'paytr_token'         => $paytr_token,
-    'user_basket'         => $user_basket,
-    'no_installment'      => $no_installment,
-    'max_installment'     => $max_installment,
-    'user_name'           => $user_name,
-    'user_address'        => $user_address,
-    'user_phone'          => $user_phone,
-    'merchant_ok_url'     => PAYTR_DEALER_OK_URL,
-    'merchant_fail_url'   => PAYTR_DEALER_FAIL_URL,
-    'merchant_callback_url'=> PAYTR_CALLBACK_URL,
-    'timeout_limit'       => 30,
-    'currency'            => $currency,
-    'test_mode'           => $test,
-  ];
-
-  $ch = curl_init();
-  curl_setopt_array($ch, [
-    CURLOPT_URL            => 'https://www.paytr.com/odeme/api/get-token',
-    CURLOPT_RETURNTRANSFER => 1,
-    CURLOPT_POST           => 1,
-    CURLOPT_POSTFIELDS     => $post,
-    CURLOPT_TIMEOUT        => 30,
-    CURLOPT_SSL_VERIFYPEER => 1,
-  ]);
-  $res = curl_exec($ch);
-  $curlErr = curl_errno($ch) ? curl_error($ch) : null;
-  curl_close($ch);
-
-  if ($curlErr) {
-    throw new RuntimeException('PAYTR bağlantı hatası: '.$curlErr);
-  }
-  $data = json_decode((string)$res, true);
-  if (!$data || ($data['status'] ?? '') !== 'success') {
-    $reason = $data['reason'] ?? 'bilinmiyor';
-    throw new RuntimeException('PAYTR token alınamadı: '.$reason);
-  }
-  $token = $data['token'];
-
+  $testMode = paytr_is_test_mode();
+  $status = $testMode ? DEALER_TOPUP_STATUS_AWAITING_REVIEW : DEALER_TOPUP_STATUS_PENDING;
+  $token = null;
+  $reference = null;
   $payload = [
     'request' => [
       'amount_cents' => $amount_cents,
@@ -1087,14 +1043,70 @@ function dealer_create_topup_request(int $dealer_id, int $amount_cents): array {
     ],
     'merchant_oid' => $merchantOid,
   ];
+
+  if ($testMode) {
+    $payload['test_mode'] = true;
+    $payload['note'] = 'Ödeme test modunda otomatik onaylandı.';
+    $reference = 'TEST-'.$merchantOid;
+  } else {
+    $test = (int)PAYTR_TEST_MODE;
+    $hash_str = PAYTR_MERCHANT_ID . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
+    $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . PAYTR_MERCHANT_SALT, PAYTR_MERCHANT_KEY, true));
+
+    $post = [
+      'merchant_id'         => PAYTR_MERCHANT_ID,
+      'user_ip'             => $ip,
+      'merchant_oid'        => $merchantOid,
+      'email'               => $email,
+      'payment_amount'      => $amount_cents,
+      'paytr_token'         => $paytr_token,
+      'user_basket'         => $user_basket,
+      'no_installment'      => $no_installment,
+      'max_installment'     => $max_installment,
+      'user_name'           => $user_name,
+      'user_address'        => $user_address,
+      'user_phone'          => $user_phone,
+      'merchant_ok_url'     => PAYTR_DEALER_OK_URL,
+      'merchant_fail_url'   => PAYTR_DEALER_FAIL_URL,
+      'merchant_callback_url'=> PAYTR_CALLBACK_URL,
+      'timeout_limit'       => 30,
+      'currency'            => $currency,
+      'test_mode'           => $test,
+    ];
+
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+      CURLOPT_URL            => 'https://www.paytr.com/odeme/api/get-token',
+      CURLOPT_RETURNTRANSFER => 1,
+      CURLOPT_POST           => 1,
+      CURLOPT_POSTFIELDS     => $post,
+      CURLOPT_TIMEOUT        => 30,
+      CURLOPT_SSL_VERIFYPEER => 1,
+    ]);
+    $res = curl_exec($ch);
+    $curlErr = curl_errno($ch) ? curl_error($ch) : null;
+    curl_close($ch);
+
+    if ($curlErr) {
+      throw new RuntimeException('PAYTR bağlantı hatası: '.$curlErr);
+    }
+    $data = json_decode((string)$res, true);
+    if (!$data || ($data['status'] ?? '') !== 'success') {
+      $reason = $data['reason'] ?? 'bilinmiyor';
+      throw new RuntimeException('PAYTR token alınamadı: '.$reason);
+    }
+    $token = $data['token'];
+  }
+
   $now = now();
-  pdo()->prepare("INSERT INTO dealer_topups (dealer_id, amount_cents, status, paytr_token, merchant_oid, payload_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)")
+  pdo()->prepare("INSERT INTO dealer_topups (dealer_id, amount_cents, status, paytr_token, merchant_oid, paytr_reference, payload_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
       ->execute([
         $dealer_id,
         $amount_cents,
-        DEALER_TOPUP_STATUS_PENDING,
+        $status,
         $token,
         $merchantOid,
+        $reference,
         safe_json_encode($payload),
         $now,
         $now,
@@ -1106,6 +1118,7 @@ function dealer_create_topup_request(int $dealer_id, int $amount_cents): array {
     'id'           => $topupId,
     'token'        => $token,
     'merchant_oid' => $merchantOid,
+    'test_mode'    => $testMode,
   ];
 }
 

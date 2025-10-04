@@ -39,6 +39,20 @@ try {
   $order = $paytr['order'];
   $package = $paytr['package'];
   $token = $paytr['token'];
+  if (!empty($paytr['test_mode']) && !empty($paytr['result'])) {
+    $result = $paytr['result'];
+    $_SESSION['lead_success'] = 'Test modunda ödeme başarıyla işlendi.';
+    $_SESSION['order_summary'] = [
+      'event_title'    => $result['event']['title'],
+      'upload_url'     => $result['event']['upload_url'],
+      'qr_dynamic'     => $result['event']['qr_dynamic_url'],
+      'qr_image'       => $result['event']['qr_image_url'],
+      'login_url'      => $result['event']['login_url'],
+      'plain_password' => $result['event']['plain_password'],
+      'customer_email' => $result['customer']['email'],
+    ];
+    redirect('order_thanks.php');
+  }
 } catch (Throwable $e) {
   flash('err', $e->getMessage());
   redirect('index.php#lead-form');
