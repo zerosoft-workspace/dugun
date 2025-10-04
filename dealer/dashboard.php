@@ -26,6 +26,12 @@ $canCreate = $creationStatus['allowed'];
 $quotaSummary = $creationStatus['summary'];
 $balance = dealer_get_balance((int)$dealer['id']);
 $totalCashback = dealer_total_cashback((int)$dealer['id']);
+$cashbackPending = dealer_cashback_candidates((int)$dealer['id'], DEALER_CASHBACK_PENDING);
+$pendingCashbackCount = count($cashbackPending);
+$pendingCashbackAmount = 0;
+foreach ($cashbackPending as $row) {
+  $pendingCashbackAmount += max(0, (int)$row['cashback_amount']);
+}
 $activeNav = 'dashboard';
 
 $totalVenues  = count($venues);
@@ -187,8 +193,8 @@ $nextEvent = $upcoming[0] ?? null;
 
     <div class="alert alert-info d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
       <div>
-        Web üzerinden gelen referans satışlarınız otomatik olarak bakiyenize <strong>%20 cashback</strong> olarak işlenir.
-        <?php if ($totalCashback > 0): ?>Bugüne kadar <strong><?=h(format_currency($totalCashback))?></strong> kazandınız.<?php endif; ?>
+        Web üzerinden gelen referans satışlarınız <strong>%20 cashback</strong> kazandırır ve finans onayı sonrasında bakiyenize eklenir.
+        <?php if ($pendingCashbackCount): ?>Şu anda onay bekleyen <strong><?=h($pendingCashbackCount)?></strong> ödeme var (<?=h(format_currency($pendingCashbackAmount))?>).<?php elseif ($totalCashback > 0): ?>Bugüne kadar <strong><?=h(format_currency($totalCashback))?></strong> kazandınız.<?php endif; ?>
       </div>
       <a class="btn btn-sm btn-outline-brand" href="billing.php#wallet">Hareketleri Gör</a>
     </div>

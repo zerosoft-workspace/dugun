@@ -65,6 +65,12 @@ $walletTransactions = dealer_wallet_transactions($dealerId, 20);
 $purchaseHistory = dealer_fetch_purchases($dealerId);
 $topups = dealer_topups_for_dealer($dealerId);
 $pendingTopups = array_filter($topups, fn($row) => $row['status'] === DEALER_TOPUP_STATUS_PENDING);
+$cashbackPending = dealer_cashback_candidates($dealerId, DEALER_CASHBACK_PENDING);
+$cashbackPendingCount = count($cashbackPending);
+$cashbackPendingAmount = 0;
+foreach ($cashbackPending as $row) {
+  $cashbackPendingAmount += max(0, (int)$row['cashback_amount']);
+}
 
 ?>
 <!doctype html>
@@ -156,12 +162,18 @@ $pendingTopups = array_filter($topups, fn($row) => $row['status'] === DEALER_TOP
           </div>
           <div class="stat-card">
             <h6>Cashback Bekleyen</h6>
-            <strong><?=h($summary['cashback_waiting'])?></strong>
-            <span><?= $summary['cashback_waiting'] ? h(format_currency($summary['cashback_pending_amount']).' bekliyor') : 'Şu anda bekleyen ödeme yok' ?></span>
+            <strong><?=h($cashbackPendingCount)?></strong>
+            <span><?= $cashbackPendingCount ? h(format_currency($cashbackPendingAmount).' onay bekliyor') : 'Şu anda bekleyen ödeme yok' ?></span>
           </div>
         </div>
       </div>
     </section>
+
+    <?php if ($cashbackPendingCount): ?>
+      <div class="alert alert-info mb-4">
+        Web referans siparişlerinizden gelen <strong><?=h(format_currency($cashbackPendingAmount))?></strong> tutarında cashback onay bekliyor. Finans ekibi onayladığında tutar otomatik olarak bakiyenize yansıtılır.
+      </div>
+    <?php endif; ?>
 
     <section id="topup" class="card-lite p-4 p-lg-5 mb-4">
       <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
@@ -218,7 +230,7 @@ $pendingTopups = array_filter($topups, fn($row) => $row['status'] === DEALER_TOP
         <h5 class="section-title mb-0">Paket Seçenekleri</h5>
         <span class="muted">Bakiyeniz: <?=h(format_currency($balance))?></span>
       </div>
-      <p class="text-muted small mb-4">Paket satın alımları cashback oluşturmaz. Web sitesinden gelen müşteri yönlendirmelerinizde bayi kodunuzla <strong>%20 cashback</strong> kazanırsınız.</p>
+      <p class="text-muted small mb-4">Paket satın alımları cashback oluşturmaz. Web sitesinden gelen müşteri yönlendirmelerinizde bayi kodunuzla <strong>%20 cashback</strong> kazanırsınız; tutarlar finans onayından sonra bakiyenize eklenir.</p>
       <?php if (!$packages): ?>
         <p class="text-muted mb-0">Henüz tanımlanmış paket yok. Lütfen yönetici ile iletişime geçin.</p>
       <?php else: ?>

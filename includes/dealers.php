@@ -43,6 +43,88 @@ function dealer_generate_identifier_candidate(): string {
   return 'B'.str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 }
 
+function dealer_email_template(string $headline, string $contentHtml): string {
+  if (function_exists('site_email_template')) {
+    return site_email_template($headline, $contentHtml);
+  }
+  $brand = h(APP_NAME);
+  return '<div style="background:#f4f7fb;padding:32px 0;font-family:\'Inter\',Arial,sans-serif;color:#0f172a;">'
+    .'<div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 18px 45px rgba(15,118,110,0.18);">'
+    .'<div style="background:linear-gradient(135deg,#0ea5b5,#6366f1);padding:32px 40px;color:#ffffff;">'
+    .'<div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;opacity:0.85;">'.$brand.'</div>'
+    .'<h1 style="margin:12px 0 0;font-size:26px;">'.h($headline).'</h1>'
+    .'</div>'
+    .'<div style="padding:36px 40px;font-size:15px;line-height:1.6;">'.$contentHtml.'</div>'
+    .'<div style="padding:18px 40px 28px;font-size:12px;color:#64748b;background:#f8fafc;">'
+    .'Bu e-posta '.$brand.' tarafından otomatik olarak gönderildi. Sorularınız için <a href="mailto:support@demozerosoft.com.tr" style="color:#0ea5b5;text-decoration:none;">support@demozerosoft.com.tr</a> adresine ulaşabilirsiniz.'
+    .'</div>'
+    .'</div>'
+    .'</div>';
+}
+
+function dealer_send_cashback_paid_mail(int $dealer_id, int $amountCents, array $purchase): void {
+  $dealer = dealer_get($dealer_id);
+  if (!$dealer || empty($dealer['email'])) {
+    return;
+  }
+  $pdo = pdo();
+  $packageName = null;
+  if (!empty($purchase['package_id'])) {
+    $pkgSt = $pdo->prepare("SELECT name FROM dealer_packages WHERE id=?");
+    $pkgSt->execute([(int)$purchase['package_id']]);
+    $packageName = $pkgSt->fetchColumn() ?: null;
+  }
+  $eventTitle = null;
+  $eventDate = null;
+  if (!empty($purchase['lead_event_id'])) {
+    $eventSt = $pdo->prepare("SELECT title, event_date FROM events WHERE id=?");
+    $eventSt->execute([(int)$purchase['lead_event_id']]);
+    $eventRow = $eventSt->fetch();
+    if ($eventRow) {
+      $eventTitle = $eventRow['title'] ?? null;
+      $eventDate = $eventRow['event_date'] ?? null;
+    }
+  }
+  $orderInfo = null;
+  if (!empty($purchase['lead_event_id'])) {
+    $orderSt = $pdo->prepare("SELECT id, customer_name, customer_email FROM site_orders WHERE event_id=? ORDER BY id DESC LIMIT 1");
+    $orderSt->execute([(int)$purchase['lead_event_id']]);
+    $orderInfo = $orderSt->fetch() ?: null;
+    if ($orderInfo) {
+      $orderInfo['id'] = (int)$orderInfo['id'];
+    }
+  }
+  $amountText = format_currency($amountCents);
+  $rows = '<tr><td style="padding:6px 0;color:#6b7280;">Tutar</td><td style="padding:6px 0;text-align:right;font-weight:600;">'.h($amountText).'</td></tr>';
+  if ($packageName) {
+    $rows .= '<tr><td style="padding:6px 0;color:#6b7280;">Paket</td><td style="padding:6px 0;text-align:right;">'.h($packageName).'</td></tr>';
+  }
+  if ($eventTitle) {
+    $eventLabel = $eventTitle;
+    if ($eventDate) {
+      $eventLabel .= ' • '.date('d.m.Y', strtotime($eventDate));
+    }
+    $rows .= '<tr><td style="padding:6px 0;color:#6b7280;">Etkinlik</td><td style="padding:6px 0;text-align:right;">'.h($eventLabel).'</td></tr>';
+  }
+  if ($orderInfo) {
+    $customerLine = $orderInfo['customer_name'] ?? '';
+    if (!empty($orderInfo['customer_email'])) {
+      $customerLine .= ($customerLine ? ' · ' : '').$orderInfo['customer_email'];
+    }
+    if ($customerLine) {
+      $rows .= '<tr><td style="padding:6px 0;color:#6b7280;">Müşteri</td><td style="padding:6px 0;text-align:right;">'.h($customerLine).'</td></tr>';
+    }
+  }
+  $billingUrl = BASE_URL.'/dealer/billing.php';
+  $body = '<p>Merhaba '.h($dealer['name']).',</p>'
+    .'<p>Referans kodunuzla gerçekleşen satışın cashback ödemesi finans ekibimiz tarafından onaylandı ve cari bakiyenize eklendi.</p>'
+    .'<table style="width:100%;margin:20px 0;border-collapse:collapse;font-size:14px;">'.$rows.'</table>'
+    .'<p>Güncel bakiye hareketlerinizi <a href="'.h($billingUrl).'" style="color:#0ea5b5;text-decoration:none;">Bakiye &amp; Paketler</a> sayfasından takip edebilirsiniz.</p>'
+    .'<p>İş ortaklığınız için teşekkür ederiz.<br><strong>'.h(APP_NAME).' Ekibi</strong></p>';
+  $html = dealer_email_template('Cashback ödemeniz onaylandı', $body);
+  send_mail_simple($dealer['email'], APP_NAME.' cashback ödemeniz onaylandı', $html);
+}
+
 function dealer_identifier_exists(string $code, ?int $ignoreId = null): bool {
   $sql = "SELECT 1 FROM dealers WHERE code=?";
   $params = [$code];
@@ -881,16 +963,27 @@ function dealer_consume_event_credit(int $dealer_id, int $event_id): void {
   }
 }
 
-function dealer_cashback_candidates(int $dealer_id, ?string $status = DEALER_CASHBACK_PENDING): array {
-  $sql = "SELECT pp.*, pkg.name AS package_name, e.title AS event_title, e.event_date"
+function dealer_cashback_candidates(int $dealer_id, ?string $status = DEALER_CASHBACK_PENDING, ?array $sources = null): array {
+  if ($sources === null) {
+    $sources = [DEALER_PURCHASE_SOURCE_DEALER, DEALER_PURCHASE_SOURCE_LEAD];
+  }
+  $sql = "SELECT pp.*, pkg.name AS package_name, e.title AS event_title, e.event_date, so.id AS order_id, so.customer_name, so.customer_email"
        . " FROM dealer_package_purchases pp"
        . " INNER JOIN dealer_packages pkg ON pkg.id=pp.package_id"
        . " LEFT JOIN events e ON e.id=pp.lead_event_id"
-       . " WHERE pp.dealer_id=? AND pp.source=?";
-  $params = [$dealer_id, DEALER_PURCHASE_SOURCE_DEALER];
+       . " LEFT JOIN site_orders so ON so.event_id=pp.lead_event_id"
+       . " WHERE pp.dealer_id=?";
+  $params = [$dealer_id];
   if ($status !== null) {
     $sql .= " AND pp.cashback_status=?";
     $params[] = $status;
+  }
+  if (!empty($sources)) {
+    $placeholders = implode(',', array_fill(0, count($sources), '?'));
+    $sql .= " AND COALESCE(pp.source, '".DEALER_PURCHASE_SOURCE_DEALER."') IN ($placeholders)";
+    foreach ($sources as $src) {
+      $params[] = $src;
+    }
   }
   $sql .= " ORDER BY pp.created_at DESC";
   $st = pdo()->prepare($sql);
@@ -899,6 +992,8 @@ function dealer_cashback_candidates(int $dealer_id, ?string $status = DEALER_CAS
   foreach ($rows as &$row) {
     $row['cashback_amount'] = (int)$row['cashback_amount'];
     $row['price_cents'] = (int)$row['price_cents'];
+    $row['order_id'] = isset($row['order_id']) ? (int)$row['order_id'] : null;
+    $row['source'] = $row['source'] ?? DEALER_PURCHASE_SOURCE_DEALER;
   }
   return $rows;
 }
@@ -909,6 +1004,7 @@ function dealer_pay_cashback(int $purchase_id, string $note = '', array $meta = 
   if ($ownTxn) {
     $pdo->beginTransaction();
   }
+  $notify = null;
   try {
     $st = $pdo->prepare("SELECT * FROM dealer_package_purchases WHERE id=? FOR UPDATE");
     $st->execute([$purchase_id]);
@@ -936,6 +1032,17 @@ function dealer_pay_cashback(int $purchase_id, string $note = '', array $meta = 
           now(),
           $purchase_id,
         ]);
+    $notify = [
+      'dealer_id' => (int)$purchase['dealer_id'],
+      'amount' => $amount,
+      'purchase' => [
+        'id' => (int)$purchase['id'],
+        'package_id' => (int)$purchase['package_id'],
+        'lead_event_id' => !empty($purchase['lead_event_id']) ? (int)$purchase['lead_event_id'] : null,
+        'cashback_amount' => $amount,
+        'cashback_rate' => isset($purchase['cashback_rate']) ? (float)$purchase['cashback_rate'] : 0.0,
+      ],
+    ];
     if ($ownTxn) {
       $pdo->commit();
     }
@@ -944,6 +1051,9 @@ function dealer_pay_cashback(int $purchase_id, string $note = '', array $meta = 
       $pdo->rollBack();
     }
     throw $e;
+  }
+  if ($notify) {
+    dealer_send_cashback_paid_mail($notify['dealer_id'], $notify['amount'], $notify['purchase']);
   }
 }
 

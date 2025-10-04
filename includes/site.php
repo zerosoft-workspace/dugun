@@ -686,10 +686,6 @@ function site_finalize_order(int $order_id, array $options = []): array {
       $existsSt->execute([(int)$dealer['id'], $order['event_id'], DEALER_PURCHASE_SOURCE_LEAD]);
       $exists = $existsSt->fetchColumn();
       if (!$exists) {
-        dealer_wallet_adjust((int)$dealer['id'], (int)$order['cashback_cents'], DEALER_WALLET_TYPE_CASHBACK, 'Web satış cashback', [
-          'order_id' => $order['id'],
-          'package_id' => $order['package_id'],
-        ]);
         $duration = $package['duration_days'];
         $startsAt = $now;
         $expiresAt = null;
@@ -711,9 +707,9 @@ function site_finalize_order(int $order_id, array $options = []): array {
           $startsAt,
           $expiresAt,
           $package['cashback_rate'],
-          DEALER_CASHBACK_PAID,
+          DEALER_CASHBACK_PENDING,
           $order['cashback_cents'],
-          $now,
+          null,
           $order['event_id'],
           DEALER_PURCHASE_SOURCE_LEAD,
           $now,
@@ -845,6 +841,9 @@ function site_send_dealer_order_mail(array $result): void {
     .'<table style="width:100%;margin:20px 0;border-collapse:collapse;font-size:14px;">'.$rows.'</table>'
     .'<p>Ekibimiz desteğe her zaman hazır. İş ortaklığınız için teşekkür ederiz.</p>'
     .'<p><strong>BİKARE Bayi Destek</strong></p>';
+  if ($cashback > 0) {
+    $body .= '<p style="margin-top:18px;color:#475569;">Cashback tutarınız finans ekibimizin onayına iletildi. Onaylandığında bakiyenize eklenecek ve ayrıca e-posta ile bilgilendirileceksiniz.</p>';
+  }
 
   $html = site_email_template('Yeni web siparişiniz var', $body);
   send_mail_simple($dealer['email'], 'BİKARE referans siparişiniz tamamlandı', $html);

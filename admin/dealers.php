@@ -264,6 +264,11 @@ if ($selectedDealer) {
   $quotaSummary = dealer_event_quota_summary($selectedId);
   $purchaseHistory = dealer_fetch_purchases($selectedId);
   $cashbackPending = dealer_cashback_candidates($selectedId, DEALER_CASHBACK_PENDING);
+  $cashbackPendingCount = count($cashbackPending);
+  $cashbackPendingAmount = 0;
+  foreach ($cashbackPending as $row) {
+    $cashbackPendingAmount += max(0, (int)$row['cashback_amount']);
+  }
   $topupRequests = dealer_topups_for_dealer($selectedId);
 } else {
   $walletBalance = 0;
@@ -272,6 +277,8 @@ if ($selectedDealer) {
   $quotaSummary = ['active' => [], 'has_credit' => false, 'remaining_events' => 0, 'has_unlimited' => false, 'cashback_waiting' => 0, 'cashback_pending_amount' => 0, 'cashback_awaiting_event' => 0];
   $purchaseHistory = [];
   $cashbackPending = [];
+  $cashbackPendingCount = 0;
+  $cashbackPendingAmount = 0;
   $topupRequests = [];
 }
 $venueAssignments = dealer_fetch_venue_assignments();
@@ -591,7 +598,7 @@ $venueAssignments = dealer_fetch_venue_assignments();
                 </div>
               <?php endif; ?>
               <div class="text-muted small mt-2">
-                Kalan hak: <?=h($quotaSummary['has_unlimited'] ? 'Sınırsız' : (string)$quotaSummary['remaining_events'])?> · Cashback bekleyen paket: <?=h($quotaSummary['cashback_waiting'])?>
+                Kalan hak: <?=h($quotaSummary['has_unlimited'] ? 'Sınırsız' : (string)$quotaSummary['remaining_events'])?> · Bekleyen cashback: <?=h($cashbackPendingCount)?><?= $cashbackPendingAmount ? ' • '.h(format_currency($cashbackPendingAmount)) : '' ?>
               </div>
             </div>
             <div class="col-lg-6">
@@ -631,15 +638,22 @@ $venueAssignments = dealer_fetch_venue_assignments();
           <h6 class="fw-semibold mb-2">Bekleyen Cashback</h6>
           <div class="table-responsive mb-4">
             <table class="table table-sm align-middle mb-0">
-              <thead><tr><th>Paket</th><th>Etkinlik</th><th>Tutar</th><th></th></tr></thead>
+              <thead><tr><th>Paket</th><th>Kaynak</th><th>Etkinlik</th><th>Tutar</th><th></th></tr></thead>
               <tbody>
                 <?php if (!$cashbackPending): ?>
-                  <tr><td colspan="4" class="text-center text-muted">Bekleyen cashback bulunmuyor.</td></tr>
+                  <tr><td colspan="5" class="text-center text-muted">Bekleyen cashback bulunmuyor.</td></tr>
                 <?php else: ?>
                   <?php foreach ($cashbackPending as $cb): ?>
                     <tr>
                       <td><?=h($cb['package_name'])?></td>
-                      <td><?=h($cb['event_title'] ?? 'Etkinlik yok')?><?= !empty($cb['event_date']) ? ' • '.h(date('d.m.Y', strtotime($cb['event_date']))) : '' ?></td>
+                      <td>
+                        <?php if (($cb['source'] ?? '') === DEALER_PURCHASE_SOURCE_LEAD): ?>
+                          <span class="badge bg-info-subtle text-info-emphasis">Web siparişi<?php if (!empty($cb['order_id'])): ?> #<?= (int)$cb['order_id'] ?><?php endif; ?></span>
+                        <?php else: ?>
+                          <span class="badge bg-secondary-subtle text-secondary-emphasis">Bayi paketi</span>
+                        <?php endif; ?>
+                      </td>
+                      <td><?=h($cb['event_title'] ?? 'Etkinlik yok')?><?= !empty($cb['event_date']) ? ' • '.h(date('d.m.Y', strtotime($cb['event_date']))) : '' ?><?php if (!empty($cb['customer_name'])): ?><div class="text-muted small"><?=h($cb['customer_name'])?><?= !empty($cb['customer_email']) ? ' · '.h($cb['customer_email']) : '' ?></div><?php endif; ?></td>
                       <td><?=h(format_currency($cb['cashback_amount']))?></td>
                       <td class="text-end">
                         <form method="post" class="d-inline">
