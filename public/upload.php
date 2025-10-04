@@ -603,26 +603,39 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .dropzone.drag{ border-color:var(--zs); background:rgba(14,165,181,.08); }
 .form-text{ color:var(--muted); }
 .gallery-card{ padding:28px; }
-.gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:24px; }
-@media(min-width:768px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); } }
-@media(min-width:1400px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); } }
-.gallery-item{ display:flex; flex-direction:column; border-radius:22px; overflow:hidden; background:#fff; border:1px solid rgba(148,163,184,.18); box-shadow:0 16px 32px rgba(15,23,42,.08); transition:transform .2s ease, box-shadow .2s ease; }
-.gallery-item:hover{ transform:translateY(-4px); box-shadow:0 20px 44px rgba(15,23,42,.12); }
-.gallery-media{ position:relative; width:100%; background:#020617; display:flex; align-items:center; justify-content:center; padding:16px; min-height:160px; }
-.gallery-media img,.gallery-media video{ width:100%; height:auto; max-height:320px; display:block; object-fit:contain; border-radius:14px; box-shadow:0 6px 18px rgba(15,23,42,.22); }
-.gallery-header{ display:flex; align-items:center; gap:12px; padding:18px 20px 12px; }
-.avatar{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; letter-spacing:.5px; }
-.gallery-actions{ display:flex; align-items:center; justify-content:space-between; padding:12px 20px 4px; gap:12px; }
-.action-buttons{ display:flex; gap:10px; }
-.icon-btn{ border:none; background:rgba(248,250,252,.9); border-radius:999px; padding:8px 16px; display:flex; align-items:center; gap:8px; font-weight:600; color:var(--muted); cursor:pointer; }
-.icon-btn.active{ background:rgba(14,165,181,.12); color:var(--zs); }
-.icon-btn:hover{ background:rgba(14,165,181,.18); color:var(--zs); }
-.gallery-meta{ font-size:13px; color:var(--muted); }
-.gallery-body{ padding:8px 20px 20px; }
-.comment{ padding:10px 14px; border-radius:14px; background:rgba(241,245,249,.6); margin-top:8px; }
-.comment strong{ display:block; font-size:13px; color:var(--ink); }
-.comment p{ margin:4px 0 0; font-size:13px; color:var(--muted); }
+.gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:28px; }
+@media(min-width:768px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(320px,1fr)); } }
+@media(min-width:1400px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(360px,1fr)); } }
+.gallery-item{ display:flex; flex-direction:column; border-radius:26px; overflow:hidden; background:linear-gradient(172deg, rgba(6,66,82,.94) 0%, rgba(8,104,124,.88) 45%, rgba(12,146,170,.82) 100%); border:1px solid rgba(14,165,181,.35); box-shadow:0 28px 60px rgba(4,31,45,.28); color:#f1fbfd; position:relative; transition:transform .25s ease, box-shadow .25s ease; }
+.gallery-item:hover{ transform:translateY(-6px); box-shadow:0 32px 70px rgba(4,31,45,.35); }
+.gallery-media{ position:relative; width:100%; background:rgba(2,27,36,.7); display:flex; align-items:center; justify-content:center; padding:10px; }
+.gallery-media img,.gallery-media video{ width:100%; height:auto; max-height:420px; display:block; object-fit:contain; border-radius:18px; box-shadow:0 18px 38px rgba(1,14,20,.45); }
+.gallery-header{ display:flex; align-items:center; gap:14px; padding:18px 22px; background:rgba(3,23,31,.45); border-bottom:1px solid rgba(255,255,255,.08); }
+.gallery-author{ font-weight:700; font-size:15px; color:#fff; letter-spacing:.02em; }
+.avatar{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; letter-spacing:.5px; box-shadow:0 8px 18px rgba(4,31,45,.35); border:2px solid rgba(255,255,255,.2); }
+.gallery-actions{ display:flex; align-items:center; justify-content:space-between; padding:14px 22px 12px; gap:18px; background:rgba(3,23,31,.45); border-top:1px solid rgba(255,255,255,.08); }
+.action-buttons{ display:flex; align-items:center; gap:12px; }
+.icon-btn{ border:none; background:rgba(255,255,255,.12); border-radius:999px; padding:9px 18px; display:flex; align-items:center; gap:8px; font-weight:600; color:#e0f6f9; cursor:pointer; transition:background .2s ease, color .2s ease; }
+.icon-btn span{ display:inline-flex; align-items:center; }
+.icon-btn .like-count{ font-variant-numeric:tabular-nums; }
+.icon-btn.active{ background:rgba(255,255,255,.22); color:#fff; }
+.icon-btn:hover{ background:rgba(255,255,255,.26); color:#fff; }
+.icon-btn:disabled{ cursor:not-allowed; opacity:.55; }
+.gallery-actions .btn{ border-radius:999px; border:1px solid rgba(255,255,255,.28); color:#fff; background:transparent; font-weight:600; }
+.gallery-actions .btn:hover{ background:rgba(255,255,255,.18); color:#fff; }
+.gallery-meta{ font-size:13px; color:rgba(226,248,250,.8); }
+.gallery-body{ padding:16px 22px 24px; background:rgba(3,23,31,.32); color:#f1fbfd; }
+.gallery-body p{ color:rgba(226,248,250,.88); }
+.gallery-body .smallmuted{ color:rgba(226,248,250,.82); }
+.comment{ padding:12px 16px; border-radius:18px; background:rgba(255,255,255,.12); margin-top:10px; color:#f1fbfd; }
+.gallery-item .comment strong{ display:block; font-size:13px; color:#fff; }
+.gallery-item .comment p{ margin:6px 0 0; font-size:13px; color:rgba(226,248,250,.88); }
+.gallery-item .comment .smallmuted{ color:rgba(226,248,250,.65); }
+.gallery-item .comment.smallmuted{ color:rgba(226,248,250,.82); }
 .comment-form textarea{ resize:vertical; border-radius:16px; }
+.gallery-item .comment-form textarea{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#fff; }
+.gallery-item .comment-form textarea::placeholder{ color:rgba(226,248,250,.6); }
+.gallery-item .comment-form textarea:focus{ background:rgba(3,23,31,.6); border-color:rgba(255,255,255,.45); box-shadow:0 0 0 .25rem rgba(14,165,181,.35); }
 .note-card textarea{ min-height:140px; }
 .form-feedback{ color:var(--zs); font-weight:600; }
 .form-feedback.error{ color:#ef4444; }
@@ -798,7 +811,7 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
                   <?=h(avatar_initial($name))?>
                 </div>
                 <div>
-                  <div style="font-weight:600; color:var(--ink);"><?=h($name)?></div>
+                  <div class="gallery-author"><?=h($name)?></div>
                   <div class="gallery-meta"><?=relative_time($u['created_at'])?></div>
                 </div>
               </div>
