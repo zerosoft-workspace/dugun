@@ -1,6 +1,10 @@
 <?php
 require_once __DIR__.'/../config.php';
 
+if (!defined('APP_SCHEMA_VERSION')) {
+  define('APP_SCHEMA_VERSION', '20240506_01');
+}
+
 function pdo(): PDO {
   static $pdo = null;
   if (!$pdo) {
@@ -19,6 +23,33 @@ function column_exists(string $t, string $c): bool {
 function supports_json(): bool { try{pdo()->query("SELECT JSON_VALID('[]')");return true;}catch(Throwable){return false;} }
 
 function install_schema(){
+  static $ran = false;
+  if ($ran) {
+    return;
+  }
+  $ran = true;
+
+  $pdo = pdo();
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS app_meta(
+    meta_key VARCHAR(64) PRIMARY KEY,
+    meta_value TEXT NULL,
+    updated_at DATETIME NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $currentVersion = null;
+  try {
+    $st = $pdo->prepare("SELECT meta_value FROM app_meta WHERE meta_key='schema_version' LIMIT 1");
+    $st->execute();
+    $currentVersion = $st->fetchColumn() ?: null;
+  } catch (Throwable $e) {
+    $currentVersion = null;
+  }
+
+  if ($currentVersion === APP_SCHEMA_VERSION) {
+    return;
+  }
+
   /* users */
   pdo()->exec("CREATE TABLE IF NOT EXISTS users(
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -542,6 +573,11 @@ try {
     try{ pdo()->exec("ALTER TABLE $t MODIFY created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"); }catch(Throwable $e){}
     try{ if(column_exists($t,'updated_at')) pdo()->exec("ALTER TABLE $t MODIFY updated_at DATETIME NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"); }catch(Throwable $e){}
   }
+
+  try {
+    $st = $pdo->prepare("REPLACE INTO app_meta (meta_key, meta_value, updated_at) VALUES ('schema_version', ?, ?)");
+    $st->execute([APP_SCHEMA_VERSION, date('Y-m-d H:i:s')]);
+  } catch (Throwable $e) {}
 }
   if (!column_exists('dealers', 'balance_cents')) {
     pdo()->exec("ALTER TABLE dealers ADD balance_cents INT NOT NULL DEFAULT 0 AFTER last_login_at");
