@@ -13,6 +13,50 @@ const DEALER_STATUS_INACTIVE= 'inactive';
 const DEALER_CODE_STATIC = 'static';
 const DEALER_CODE_TRIAL  = 'trial';
 
+function dealer_generate_identifier_candidate(): string {
+  return 'B'.str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+}
+
+function dealer_identifier_exists(string $code, ?int $ignoreId = null): bool {
+  $sql = "SELECT 1 FROM dealers WHERE code=?";
+  $params = [$code];
+  if ($ignoreId) {
+    $sql .= " AND id<>?";
+    $params[] = $ignoreId;
+  }
+  $sql .= " LIMIT 1";
+  $st = pdo()->prepare($sql);
+  $st->execute($params);
+  return (bool)$st->fetchColumn();
+}
+
+function dealer_generate_unique_identifier(?int $ignoreId = null): string {
+  do {
+    $candidate = dealer_generate_identifier_candidate();
+  } while (dealer_identifier_exists($candidate, $ignoreId));
+  return $candidate;
+}
+
+function dealer_ensure_identifier(int $dealer_id): string {
+  $st = pdo()->prepare("SELECT code FROM dealers WHERE id=? LIMIT 1");
+  $st->execute([$dealer_id]);
+  $code = $st->fetchColumn();
+  if ($code) {
+    return $code;
+  }
+  $code = dealer_generate_unique_identifier();
+  pdo()->prepare("UPDATE dealers SET code=?, updated_at=COALESCE(updated_at, now()) WHERE id=?")
+      ->execute([$code, $dealer_id]);
+  return $code;
+}
+
+function dealer_backfill_codes(): void {
+  $rows = pdo()->query("SELECT id FROM dealers WHERE code IS NULL OR code=''" )->fetchAll();
+  foreach ($rows as $row) {
+    dealer_ensure_identifier((int)$row['id']);
+  }
+}
+
 /** Benzersiz kod üret (harf + rakam, karışık). */
 function dealer_generate_code_string(int $length = 8): string {
   $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -80,7 +124,11 @@ function dealer_get(int $dealer_id): ?array {
   $st = pdo()->prepare("SELECT * FROM dealers WHERE id=? LIMIT 1");
   $st->execute([$dealer_id]);
   $row = $st->fetch();
-  return $row ?: null;
+  if (!$row) return null;
+  if (empty($row['code'])) {
+    $row['code'] = dealer_ensure_identifier((int)$row['id']);
+  }
+  return $row;
 }
 
 function dealer_find_by_email(string $email): ?array {
@@ -142,6 +190,71 @@ function dealer_assign_venues(int $dealer_id, array $venue_ids): void {
     $pdo->rollBack();
     throw $e;
   }
+}
+
+function dealer_assign_dealers_to_venue(int $venue_id, array $dealer_ids): void {
+  $dealer_ids = array_map('intval', $dealer_ids);
+  $dealer_ids = array_values(array_unique(array_filter($dealer_ids)));
+  $pdo = pdo();
+  $pdo->beginTransaction();
+  try {
+    if ($dealer_ids) {
+      $ph = implode(',', array_fill(0, count($dealer_ids), '?'));
+      $params = array_merge([$venue_id], $dealer_ids);
+      $pdo->prepare("DELETE FROM dealer_venues WHERE venue_id=? AND dealer_id NOT IN ($ph)")
+          ->execute($params);
+    } else {
+      $pdo->prepare("DELETE FROM dealer_venues WHERE venue_id=?")->execute([$venue_id]);
+    }
+
+    $existing = $pdo->prepare("SELECT dealer_id FROM dealer_venues WHERE venue_id=?");
+    $existing->execute([$venue_id]);
+    $current = array_map('intval', array_column($existing->fetchAll(), 'dealer_id'));
+    foreach ($dealer_ids as $did) {
+      if (!in_array($did, $current, true)) {
+        $pdo->prepare("INSERT INTO dealer_venues (dealer_id, venue_id, created_at) VALUES (?,?,?)")
+            ->execute([$did, $venue_id, now()]);
+      }
+    }
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
+  }
+}
+
+function dealer_fetch_venue_assignments(): array {
+  $venues = pdo()->query("SELECT * FROM venues ORDER BY name")->fetchAll();
+  $map = [];
+  foreach ($venues as $venue) {
+    $map[$venue['id']] = [
+      'venue' => $venue,
+      'dealers' => [],
+    ];
+  }
+
+  $sql = "SELECT dv.venue_id, d.id AS dealer_id, d.name, d.code, d.status"
+       . " FROM dealer_venues dv"
+       . " INNER JOIN dealers d ON d.id=dv.dealer_id"
+       . " ORDER BY dv.venue_id, d.name";
+  foreach (pdo()->query($sql) as $row) {
+    if (!isset($map[$row['venue_id']])) continue;
+    $map[$row['venue_id']]['dealers'][] = [
+      'id' => (int)$row['dealer_id'],
+      'name' => $row['name'],
+      'code' => $row['code'],
+      'status' => $row['status'],
+    ];
+  }
+  return array_values($map);
+}
+
+function dealer_status_class(string $status): string {
+  return match ($status) {
+    DEALER_STATUS_ACTIVE => 'status-active',
+    DEALER_STATUS_INACTIVE => 'status-inactive',
+    default => 'status-pending',
+  };
 }
 
 function dealer_fetch_venues(int $dealer_id, bool $onlyActive = false): array {

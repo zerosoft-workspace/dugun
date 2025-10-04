@@ -8,6 +8,7 @@ require_once __DIR__.'/partials/ui.php';
 
 require_admin();
 install_schema();
+dealer_backfill_codes();
 
 function parse_license_input(?string $input): ?string {
   if (!$input) return null;
@@ -33,6 +34,7 @@ if ($action === 'create') {
   $status = $_POST['status'] ?? DEALER_STATUS_PENDING;
   $licenseInput = $_POST['license_expires_at'] ?? '';
   $license = parse_license_input($licenseInput);
+  $code = dealer_generate_unique_identifier();
 
   if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     flash('err', 'Ad ve geçerli e-posta gerekli.');
@@ -44,8 +46,8 @@ if ($action === 'create') {
   }
 
   $pdo = pdo();
-  $pdo->prepare("INSERT INTO dealers (name,email,phone,company,notes,status,license_expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
-      ->execute([$name,$email,$phone,$company,$notes,$status,$license, now(), now()]);
+  $pdo->prepare("INSERT INTO dealers (code,name,email,phone,company,notes,status,license_expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
+      ->execute([$code,$name,$email,$phone,$company,$notes,$status,$license, now(), now()]);
   $dealerId = (int)$pdo->lastInsertId();
   dealer_ensure_codes($dealerId);
 
@@ -113,6 +115,21 @@ if ($action === 'assign_venues') {
   redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
 }
 
+if ($action === 'assign_venue_dealers') {
+  $venueId = (int)($_POST['venue_id'] ?? 0);
+  $dealerIds = $_POST['dealer_ids'] ?? [];
+  $venueCheck = pdo()->prepare("SELECT id FROM venues WHERE id=? LIMIT 1");
+  $venueCheck->execute([$venueId]);
+  if (!$venueCheck->fetch()) {
+    flash('err','Salon bulunamadı.');
+    redirect($_SERVER['PHP_SELF']);
+  }
+  dealer_assign_dealers_to_venue($venueId, $dealerIds);
+  $anchor = '#venue-'.$venueId;
+  flash('ok','Salon için bayi atamaları kaydedildi.');
+  redirect($_SERVER['PHP_SELF'].$anchor);
+}
+
 if ($action === 'regenerate_code') {
   $dealerId = (int)($_POST['dealer_id'] ?? 0);
   $type = $_POST['type'] ?? DEALER_CODE_TRIAL;
@@ -156,7 +173,7 @@ if ($action === 'send_password') {
   redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
 }
 
-$dealers = pdo()->query("SELECT * FROM dealers ORDER BY created_at DESC")->fetchAll();
+$dealers = pdo()->query("SELECT * FROM dealers ORDER BY name")->fetchAll();
 $selectedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $selectedDealer = $selectedId ? dealer_get($selectedId) : null;
 $selectedCodes = $selectedDealer ? dealer_sync_codes($selectedId) : [];
@@ -164,6 +181,7 @@ $assignedVenues = $selectedDealer ? dealer_fetch_venues($selectedId) : [];
 $assignedVenueIds = array_map(fn($v) => (int)$v['id'], $assignedVenues);
 $allVenues = pdo()->query("SELECT * FROM venues ORDER BY name")->fetchAll();
 $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
+$venueAssignments = dealer_fetch_venue_assignments();
 ?>
 <!doctype html>
 <html lang="tr">
@@ -172,6 +190,7 @@ $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?=h(APP_NAME)?> — Bayi Yönetimi</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css">
 <?=admin_base_styles()?>
 <style>
   .card-lite{ padding:1.5rem; }
@@ -182,6 +201,22 @@ $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
   .dealer-list .card-lite{padding:1.2rem 1.5rem;}
   .dealer-meta{color:var(--muted); font-size:.9rem;}
   .dealer-meta strong{color:var(--ink);}
+  .dealer-code{font-family:"JetBrains Mono",monospace;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink);}
+  .dealer-list .list-group-item{padding:1rem 1.25rem;}
+  .dealer-list .list-group-item.active{background:rgba(14,165,181,.08);border-color:rgba(14,165,181,.3);}
+  .assigned-tags{display:flex;flex-wrap:wrap;gap:.4rem;}
+  .assigned-tags .dealer-chip{background:rgba(14,165,181,.12);color:#0f172a;border-radius:999px;padding:.25rem .75rem;font-size:.75rem;font-weight:500;}
+  .assigned-tags .dealer-chip span{font-weight:600;color:#0f172a;}
+  .venue-card{border:1px solid rgba(148,163,184,.25);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;background:#fff;box-shadow:0 10px 28px -20px rgba(15,23,42,.4);}
+  .venue-card:last-child{margin-bottom:0;}
+  .venue-card h6{margin-bottom:.35rem;}
+  .combo-helper{font-size:.8rem;color:var(--muted);}
+  .ts-wrapper.form-select .ts-control{padding:.35rem .5rem;}
+  .ts-wrapper.multi .ts-control>div{background:rgba(14,165,181,.12);color:#0f172a;border-radius:999px;padding:.25rem .5rem;font-weight:500;}
+  .ts-wrapper.multi .ts-control>div .remove{color:rgba(15,23,42,.55);}
+  .ts-wrapper.multi .ts-control>div .remove:hover{color:#0f172a;}
+  .venue-chip-empty{color:var(--muted);font-size:.85rem;}
+  .section-subtitle{font-size:.85rem;color:var(--muted);}
   .tab-card{border-radius:18px; background:#fff; border:1px solid rgba(148,163,184,.16); box-shadow:0 22px 45px -28px rgba(15,23,42,.45);}
 </style>
 </head>
@@ -241,14 +276,18 @@ $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
           <?php foreach ($dealers as $d): ?>
             <?php
               $badge = dealer_status_badge($d['status']);
+              $badgeClass = dealer_status_class($d['status']);
               $activeClass = ($selectedId === (int)$d['id']) ? 'active' : '';
               $license = $d['license_expires_at'] ? date('d.m.Y', strtotime($d['license_expires_at'])) : '—';
             ?>
             <a href="?id=<?= (int)$d['id'] ?>" class="list-group-item list-group-item-action <?= $activeClass ?>">
-              <div class="fw-semibold"><?=h($d['name'])?></div>
-              <div class="d-flex justify-content-between small text-muted">
-                <span><?=h($badge)?></span>
-                <span>Lisans: <?=h($license)?></span>
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <div class="fw-semibold me-2"><?=h($d['name'])?></div>
+                <span class="badge-status <?=$badgeClass?>"><?=h($badge)?></span>
+              </div>
+              <div class="d-flex justify-content-between align-items-center">
+                <span class="dealer-code"><?=h($d['code'] ?? '—')?></span>
+                <span class="dealer-meta">Lisans: <?=h($license)?></span>
               </div>
             </a>
           <?php endforeach; ?>
@@ -265,6 +304,8 @@ $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
         <?php
           $licenseValue = $selectedDealer['license_expires_at'] ? date('Y-m-d\TH:i', strtotime($selectedDealer['license_expires_at'])) : '';
           $codes = $selectedCodes;
+          $statusLabel = dealer_status_badge($selectedDealer['status']);
+          $statusClass = dealer_status_class($selectedDealer['status']);
         ?>
         <div class="card-lite p-4 mb-4">
           <div class="d-flex justify-content-between align-items-center mb-3">
@@ -275,6 +316,22 @@ $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
               <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
               <button class="btn btn-sm btn-outline-primary" type="submit">Yeni Şifre Gönder</button>
             </form>
+          </div>
+          <div class="d-flex flex-wrap gap-4 mb-3">
+            <div>
+              <div class="text-uppercase text-muted small fw-semibold">Bayi Kodu</div>
+              <div class="dealer-code fs-5"><?=h($selectedDealer['code'])?></div>
+            </div>
+            <div>
+              <div class="text-uppercase text-muted small fw-semibold">Durum</div>
+              <span class="badge-status <?=$statusClass?>"><?=h($statusLabel)?></span>
+            </div>
+            <?php if (!empty($selectedDealer['license_expires_at'])): ?>
+            <div>
+              <div class="text-uppercase text-muted small fw-semibold">Lisans Bitişi</div>
+              <div class="dealer-meta mb-0"><?=h(date('d.m.Y H:i', strtotime($selectedDealer['license_expires_at'])))?></div>
+            </div>
+            <?php endif; ?>
           </div>
           <form method="post" class="row g-2">
             <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
@@ -319,13 +376,23 @@ $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
         </div>
 
         <div class="card-lite p-4 mb-4">
-          <h5 class="mb-3">Salon Atamaları</h5>
+          <h5 class="mb-1">Salon Atamaları</h5>
+          <p class="combo-helper mb-3">Birden fazla salonu seçebilir, arama yaparak kolayca filtreleyebilirsiniz.</p>
+          <?php if ($assignedVenues): ?>
+            <div class="assigned-tags mb-3">
+              <?php foreach ($assignedVenues as $v): ?>
+                <span class="dealer-chip"><span><?=h($v['name'])?></span></span>
+              <?php endforeach; ?>
+            </div>
+          <?php else: ?>
+            <div class="venue-chip-empty mb-3">Bu bayiye henüz salon atanmadı.</div>
+          <?php endif; ?>
           <form method="post" class="row g-3">
             <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
             <input type="hidden" name="do" value="assign_venues">
             <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
             <div class="col-12">
-              <select class="form-select" name="venue_ids[]" multiple size="8">
+              <select class="form-select js-combobox" name="venue_ids[]" multiple data-placeholder="Salon seçin">
                 <?php foreach ($allVenues as $v): ?>
                   <option value="<?= (int)$v['id'] ?>" <?= in_array((int)$v['id'], $assignedVenueIds, true) ? 'selected' : '' ?>><?=h($v['name'])?></option>
                 <?php endforeach; ?>
@@ -388,7 +455,80 @@ $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
       <?php endif; ?>
     </div>
   </div>
+
+  <div class="row mt-4">
+    <div class="col-12">
+      <div class="card-lite p-4">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <h5 class="mb-1">Salon Bazlı Bayi Ataması</h5>
+            <p class="section-subtitle mb-0">Salonlara atanmış bayileri görüntüleyin ve çoklu seçimle hızla güncelleyin.</p>
+          </div>
+        </div>
+        <?php if (!$allVenues): ?>
+          <p class="text-muted mb-0">Henüz tanımlanmış salon bulunmuyor.</p>
+        <?php else: ?>
+        <div class="row g-3">
+          <?php foreach ($venueAssignments as $group): ?>
+            <?php
+              $venue = $group['venue'];
+              $assigned = $group['dealers'];
+              $assignedIds = array_map(fn($d) => (int)$d['id'], $assigned);
+            ?>
+            <div class="col-xl-6">
+              <div class="venue-card" id="venue-<?= (int)$venue['id'] ?>">
+                <h6 class="fw-semibold mb-1"><?=h($venue['name'])?></h6>
+                <?php if ($assigned): ?>
+                  <div class="assigned-tags mb-2">
+                    <?php foreach ($assigned as $dealer): ?>
+                      <span class="dealer-chip"><span><?=h($dealer['code'] ?? '—')?></span> • <?=h($dealer['name'])?></span>
+                    <?php endforeach; ?>
+                  </div>
+                <?php else: ?>
+                  <div class="venue-chip-empty mb-2">Bu salona henüz bayi atanmadı.</div>
+                <?php endif; ?>
+                <?php if ($dealers): ?>
+                  <form method="post" class="vstack gap-2">
+                    <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                    <input type="hidden" name="do" value="assign_venue_dealers">
+                    <input type="hidden" name="venue_id" value="<?= (int)$venue['id'] ?>">
+                    <select class="form-select js-combobox" name="dealer_ids[]" multiple data-placeholder="Bayi seçin">
+                      <?php foreach ($dealers as $dealerOption): ?>
+                        <option value="<?= (int)$dealerOption['id'] ?>" <?= in_array((int)$dealerOption['id'], $assignedIds, true) ? 'selected' : '' ?>><?=h(($dealerOption['code'] ?? '—').' • '.$dealerOption['name'])?></option>
+                      <?php endforeach; ?>
+                    </select>
+                    <button class="btn btn-sm btn-brand align-self-start" type="submit">Kaydet</button>
+                  </form>
+                <?php else: ?>
+                  <p class="venue-chip-empty mb-0">Bayi tanımlanmadan atama yapılamaz.</p>
+                <?php endif; ?>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
   </div>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  document.querySelectorAll('.js-combobox').forEach(function(el){
+    new TomSelect(el, {
+      plugins: {
+        remove_button: { title: 'Seçimi kaldır' }
+      },
+      persist: false,
+      create: false,
+      hideSelected: true,
+      closeAfterSelect: false,
+      placeholder: el.dataset.placeholder || '',
+      sortField: { field: 'text', direction: 'asc' }
+    });
+  });
+});
+</script>
 </body>
 </html>

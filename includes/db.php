@@ -45,6 +45,7 @@ function install_schema(){
   /* dealers */
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealers(
     id INT AUTO_INCREMENT PRIMARY KEY,
+    code VARCHAR(16) NULL,
     name VARCHAR(190) NOT NULL,
     email VARCHAR(190) NOT NULL UNIQUE,
     phone VARCHAR(64) NULL,
@@ -58,6 +59,15 @@ function install_schema(){
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('dealers', 'code')) {
+    pdo()->exec("ALTER TABLE dealers ADD code VARCHAR(16) NULL AFTER id");
+  }
+  try {
+    pdo()->exec("ALTER TABLE dealers ADD UNIQUE KEY uniq_dealer_code (code)");
+  } catch (Throwable $e) {
+    // index already exists
+  }
 
   /* events */
   pdo()->exec("CREATE TABLE IF NOT EXISTS events(
