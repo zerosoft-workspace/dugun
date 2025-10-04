@@ -388,9 +388,9 @@ function dealer_get_balance(int $dealer_id): int {
 
 function dealer_wallet_flow_totals(int $dealer_id): array {
   $st = pdo()->prepare(
-    "SELECT \
-        COALESCE(SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END),0) AS total_in, \
-        COALESCE(SUM(CASE WHEN amount_cents < 0 THEN amount_cents ELSE 0 END),0) AS total_out \
+    "SELECT
+        COALESCE(SUM(CASE WHEN amount_cents > 0 THEN amount_cents ELSE 0 END), 0) AS total_in,
+        COALESCE(SUM(CASE WHEN amount_cents < 0 THEN amount_cents ELSE 0 END), 0) AS total_out
      FROM dealer_wallet_transactions WHERE dealer_id=?"
   );
   $st->execute([$dealer_id]);
