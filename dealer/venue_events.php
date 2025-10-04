@@ -174,6 +174,22 @@ $st = pdo()->prepare("SELECT * FROM events WHERE venue_id=? ORDER BY event_date 
 $st->execute([$venueId]);
 $events = $st->fetchAll();
 
+$activeEvents = [];
+$passiveEvents = [];
+$todayTs = strtotime('today');
+foreach ($events as $ev) {
+  $eventTs = null;
+  if (!empty($ev['event_date'])) {
+    $eventTs = strtotime($ev['event_date']);
+  }
+  $isPast = $eventTs !== null && $eventTs < $todayTs;
+  if (!empty($ev['is_active']) && !$isPast) {
+    $activeEvents[] = $ev;
+  } else {
+    $passiveEvents[] = $ev;
+  }
+}
+
 $qrCodes = pdo()->prepare("SELECT q.*, e.title AS event_title, e.event_date FROM qr_codes q LEFT JOIN events e ON e.id=q.target_event_id WHERE q.venue_id=? ORDER BY q.id DESC");
 $qrCodes->execute([$venueId]);
 $qrCodes = $qrCodes->fetchAll();
@@ -295,14 +311,24 @@ $qrCodes = $qrCodes->fetchAll();
     </section>
 
     <section class="card-lite card-section mb-4" id="events">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="mb-0">Etkinlik Listesi</h5>
-        <span class="text-muted small">Toplam <?=count($events)?> etkinlik</span>
+      <div class="d-flex justify-content-between align-items-start mb-3 flex-column flex-md-row">
+        <div>
+          <h5 class="mb-1">Etkinlik Listesi</h5>
+          <span class="text-muted small">Toplam <?=count($events)?> etkinlik</span>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <span class="badge-soft">Aktif: <?=count($activeEvents)?></span>
+          <span class="badge-soft">Pasif / Geçmiş: <?=count($passiveEvents)?></span>
+        </div>
       </div>
       <?php if (!$events): ?>
         <p class="text-muted mb-0">Bu salona ait etkinlik bulunmuyor.</p>
       <?php else: ?>
-        <div class="table-responsive">
+        <?php
+          $renderEventTable = function(array $list) {
+            ob_start();
+        ?>
+        <div class="table-responsive mb-3">
           <table class="table align-middle">
             <thead>
               <tr>
@@ -314,7 +340,7 @@ $qrCodes = $qrCodes->fetchAll();
               </tr>
             </thead>
             <tbody>
-              <?php foreach ($events as $ev):
+              <?php foreach ($list as $ev):
                 $guestLink = public_upload_url($ev['id']);
                 $coupleLink = BASE_URL.'/couple/index.php?event='.$ev['id'].'&key='.$ev['couple_panel_key'];
                 $qrImage = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data='.urlencode($guestLink);
@@ -350,6 +376,24 @@ $qrCodes = $qrCodes->fetchAll();
             </tbody>
           </table>
         </div>
+        <?php
+            return ob_get_clean();
+          };
+        ?>
+
+        <h6 class="text-uppercase small fw-semibold text-muted">Aktif Etkinlikler</h6>
+        <?php if ($activeEvents): ?>
+          <?= $renderEventTable($activeEvents) ?>
+        <?php else: ?>
+          <p class="text-muted fst-italic mb-4">Aktif etkinlik bulunmuyor.</p>
+        <?php endif; ?>
+
+        <h6 class="text-uppercase small fw-semibold text-muted mt-3">Pasif / Geçmiş Etkinlikler</h6>
+        <?php if ($passiveEvents): ?>
+          <?= $renderEventTable($passiveEvents) ?>
+        <?php else: ?>
+          <p class="text-muted fst-italic mb-0">Pasif veya geçmiş etkinlik bulunmuyor.</p>
+        <?php endif; ?>
       <?php endif; ?>
     </section>
 
