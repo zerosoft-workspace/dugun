@@ -17,27 +17,32 @@ if (!$dealer) {
 
 dealer_refresh_session((int)$dealer['id']);
 
-$action = $_POST['do'] ?? '';
-if ($action) {
-  csrf_or_die();
-  if ($action === 'assign_static') {
-    $eventId = (int)($_POST['event_id'] ?? 0);
-    if ($eventId > 0 && !dealer_event_belongs_to_dealer((int)$dealer['id'], $eventId)) {
-      flash('err', 'Bu etkinliği yönetme yetkiniz yok.');
-    } else {
-      dealer_set_code_target((int)$dealer['id'], DEALER_CODE_STATIC, $eventId > 0 ? $eventId : null);
-      flash('ok', 'Kalıcı QR yönlendirmesi güncellendi.');
-    }
-    redirect($_SERVER['PHP_SELF'].'#qr');
-  }
-}
-
-$codes   = dealer_sync_codes((int)$dealer['id']);
-$staticCode = $codes[DEALER_CODE_STATIC] ?? null;
 $venues  = dealer_fetch_venues((int)$dealer['id']);
 $events  = dealer_allowed_events((int)$dealer['id']);
 $warning = dealer_license_warning($dealer);
 $canCreate = dealer_can_manage_events($dealer);
+
+$totalVenues  = count($venues);
+$activeVenues = count(array_filter($venues, fn($v) => !empty($v['is_active'])));
+$totalEvents  = count($events);
+$today = new DateTimeImmutable('today');
+$upcoming = array_values(array_filter($events, function ($ev) use ($today) {
+  if (empty($ev['event_date'])) {
+    return false;
+  }
+  try {
+    $date = new DateTimeImmutable($ev['event_date']);
+  } catch (Exception $e) {
+    return false;
+  }
+  return $date >= $today;
+}));
+usort($upcoming, function ($a, $b) {
+  $da = $a['event_date'] ? strtotime($a['event_date']) : 0;
+  $db = $b['event_date'] ? strtotime($b['event_date']) : 0;
+  return $da <=> $db;
+});
+$nextEvent = $upcoming[0] ?? null;
 ?>
 <!doctype html>
 <html lang="tr">
@@ -47,10 +52,33 @@ $canCreate = dealer_can_manage_events($dealer);
 <title><?=h(APP_NAME)?> — Bayi Paneli</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
-  body{background:linear-gradient(180deg,#f4f9fb,#fff) no-repeat;font-family:'Inter',sans-serif;}
-  .topbar{background:#fff;border-bottom:1px solid #e5e7eb;}
-  .card-lite{border:1px solid #e5e7eb;border-radius:16px;background:#fff;box-shadow:0 10px 30px rgba(15,23,42,.08);}
-  .code-pill{font-family:'Fira Code',monospace;font-size:1.1rem;padding:.35rem .8rem;border-radius:10px;background:#f1f5f9;display:inline-block;}
+  :root{
+    --brand:#0ea5b5;
+    --brand-dark:#0b8692;
+    --bg:#f4f7fb;
+    --text:#0f172a;
+    --muted:#6b7280;
+  }
+  body{background:var(--bg);font-family:'Inter',sans-serif;color:var(--text);}
+  a{color:var(--brand);} a:hover{color:var(--brand-dark);}
+  .topbar{background:#fff;border-bottom:1px solid rgba(15,23,42,.05);box-shadow:0 10px 20px rgba(15,23,42,.04);}
+  .hero{padding:2.5rem 0;}
+  .hero h1{font-size:1.75rem;font-weight:700;margin-bottom:.5rem;}
+  .hero p{color:var(--muted);max-width:560px;}
+  .card-lite{border:1px solid rgba(15,23,42,.06);border-radius:18px;background:#fff;box-shadow:0 15px 35px rgba(15,23,42,.07);}
+  .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1.2rem;}
+  .stat-card{padding:1.4rem;border-radius:16px;background:linear-gradient(145deg,#fff,rgba(14,165,181,.08));position:relative;overflow:hidden;}
+  .stat-card h6{font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem;}
+  .stat-card strong{font-size:1.8rem;display:block;}
+  .stat-card span{color:var(--muted);font-size:.85rem;}
+  .table thead th{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);}
+  .badge-soft{background:rgba(14,165,181,.12);color:var(--brand);border-radius:999px;padding:.35rem .75rem;font-weight:600;font-size:.8rem;}
+  .empty-state{padding:2.5rem;text-align:center;color:var(--muted);}
+  .btn-brand{background:var(--brand);border:none;color:#fff;border-radius:14px;padding:.65rem 1.4rem;font-weight:600;box-shadow:0 8px 18px rgba(14,165,181,.25);}
+  .btn-brand:hover{background:var(--brand-dark);color:#fff;}
+  .btn-outline-brand{background:#fff;border:1px solid rgba(14,165,181,.5);color:var(--brand);border-radius:14px;padding:.65rem 1.4rem;font-weight:600;}
+  .btn-outline-brand:hover{background:rgba(14,165,181,.08);color:var(--brand-dark);}
+  .btn-brand.btn-sm,.btn-outline-brand.btn-sm{padding:.45rem .9rem;border-radius:12px;font-size:.85rem;}
 </style>
 </head>
 <body>
@@ -66,68 +94,68 @@ $canCreate = dealer_can_manage_events($dealer);
 </nav>
 <div class="container py-4">
   <?php flash_box(); ?>
-  <div class="row g-4">
-    <div class="col-lg-4">
-      <div class="card-lite p-4 h-100">
-        <h5 class="mb-3">Lisans Durumu</h5>
-        <p class="mb-1"><strong>Bitiş:</strong> <?=h(dealer_license_label($dealer))?></p>
-        <p class="text-muted small">Durum: <?= dealer_has_valid_license($dealer) ? 'Geçerli' : 'Geçersiz' ?></p>
-        <?php if ($warning): ?>
-          <div class="alert alert-warning small mb-0"><?=h($warning)?></div>
-        <?php endif; ?>
-      </div>
-    </div>
-    <div class="col-lg-8">
-      <div class="card-lite p-4" id="qr">
-        <h5 class="mb-3">Kalıcı QR Kodunuz</h5>
-        <?php if (!$staticCode): ?>
-          <p class="text-muted mb-0">Kalıcı kod oluşturulamadı. Lütfen yönetici ile iletişime geçin.</p>
-        <?php else: ?>
-          <?php $staticUrl = BASE_URL.'/qr.php?code='.urlencode($staticCode['code']); ?>
-          <div class="row g-4 align-items-start">
-            <div class="col-md-6">
-              <div class="border rounded-3 p-3 h-100">
-                <div class="text-uppercase small text-muted fw-semibold mb-1">Kod</div>
-                <div class="code-pill mb-3"><?=h($staticCode['code'])?></div>
-                <p class="small text-muted mb-1">Bu kod sabittir ve tek bir kez atanmıştır.</p>
-                <p class="small text-muted mb-0"><a href="<?=h($staticUrl)?>" target="_blank">Kalıcı QR bağlantısını aç</a></p>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="border rounded-3 p-3 h-100">
-                <h6 class="fw-semibold mb-2">Yönlendirme</h6>
-                <p class="small text-muted">Kod okutulduğunda misafirler seçtiğiniz etkinliğe yönlendirilir.</p>
-                <form method="post" class="vstack gap-2">
-                  <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                  <input type="hidden" name="do" value="assign_static">
-                  <label class="form-label small mb-1">Bağlı etkinlik</label>
-                  <select class="form-select form-select-sm" name="event_id">
-                    <option value="0">— Seçili değil —</option>
-                    <?php foreach ($events as $ev): ?>
-                      <?php
-                        $selected = ($staticCode['target_event_id'] ?? null) == $ev['id'] ? 'selected' : '';
-                        $dateLabel = $ev['event_date'] ? date('d.m.Y', strtotime($ev['event_date'])) : 'Tarihsiz';
-                      ?>
-                      <option value="<?= (int)$ev['id'] ?>" <?=$selected?>><?=h($dateLabel.' • '.$ev['title'])?></option>
-                    <?php endforeach; ?>
-                  </select>
-                  <button class="btn btn-sm btn-primary" type="submit">Yönlendirmeyi Kaydet</button>
-                </form>
-              </div>
-            </div>
+  <section class="hero">
+    <div class="card-lite p-4 p-lg-5">
+      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-4">
+        <div>
+          <h1>Merhaba <?=h($dealer['name'])?> 👋</h1>
+          <p>Bayi panelinizde atanmış salonlarınızı yönetin, etkinliklerinizi takip edin ve <?=h(APP_NAME)?> ekibinin sunduğu kampanyalardan haberdar olun.</p>
+          <div class="d-flex flex-wrap gap-3 mt-3">
+            <span class="badge-soft">Lisans Bitiş: <?=h(dealer_license_label($dealer))?></span>
+            <?php if ($warning): ?>
+              <span class="badge bg-warning-subtle text-warning-emphasis fw-semibold"><?=h($warning)?></span>
+            <?php else: ?>
+              <span class="badge-soft">Durum: <?= dealer_has_valid_license($dealer) ? 'Geçerli' : 'Geçersiz' ?></span>
+            <?php endif; ?>
           </div>
-        <?php endif; ?>
+        </div>
+        <div class="stat-grid flex-grow-1">
+          <div class="stat-card">
+            <h6>Salon</h6>
+            <strong><?=$totalVenues?></strong>
+            <span><?=$activeVenues?> aktif</span>
+          </div>
+          <div class="stat-card">
+            <h6>Etkinlik</h6>
+            <strong><?=$totalEvents?></strong>
+            <span><?=count($upcoming)?> yaklaşan</span>
+          </div>
+          <div class="stat-card">
+            <h6>Son Giriş</h6>
+            <strong><?=h($dealer['last_login_at'] ? date('d.m.Y', strtotime($dealer['last_login_at'])) : '—')?></strong>
+            <span><?=h($dealer['last_login_at'] ? date('H:i', strtotime($dealer['last_login_at'])).' • '.APP_NAME : 'İlk girişinizi yapın')?></span>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card-lite p-4 mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0">Salonlarınız</h5>
-      <a class="btn btn-sm btn-outline-primary" href="mailto:<?=h(MAIL_FROM ?? 'info@localhost')?>?subject=Bayi%20Salon%20Talebi">Yeni salon talep et</a>
+  <?php if ($nextEvent): ?>
+    <div class="card-lite p-4 mb-4">
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3">
+        <div>
+          <h5 class="mb-1">Sıradaki Etkinliğiniz</h5>
+          <div class="text-muted"><?=h(date('d.m.Y', strtotime($nextEvent['event_date'] ?? 'now'))).' • '.h($nextEvent['title'] ?? 'Etkinlik')?></div>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-brand" href="venue_events.php?venue_id=<?= (int)$nextEvent['venue_id'] ?>">Detayları Gör</a>
+          <?php if ($canCreate): ?>
+            <a class="btn btn-brand" href="venue_events.php?venue_id=<?= (int)$nextEvent['venue_id'] ?>#create">Yeni Etkinlik Oluştur</a>
+          <?php endif; ?>
+        </div>
+      </div>
     </div>
+  <?php endif; ?>
+
+  <div class="card-lite p-4 mb-4">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Salonlarınız</h5>
+        <a class="btn btn-sm btn-outline-brand" href="mailto:<?=h(MAIL_FROM ?? 'info@localhost')?>?subject=Bayi%20Salon%20Talebi">Yeni salon talep et</a>
+      </div>
     <?php if (!$venues): ?>
-      <p class="text-muted">Henüz size atanmış salon bulunmuyor. Lütfen yönetici ile iletişime geçin.</p>
+      <div class="empty-state">
+        Henüz size atanmış salon bulunmuyor. Lütfen yönetici ile iletişime geçin.
+      </div>
     <?php else: ?>
       <div class="table-responsive">
         <table class="table align-middle">
@@ -139,9 +167,9 @@ $canCreate = dealer_can_manage_events($dealer);
                   <div class="fw-semibold"><?=h($v['name'])?></div>
                   <div class="small text-muted">Slug: <?=h($v['slug'])?></div>
                 </td>
-                <td><?= $v['is_active'] ? 'Aktif' : 'Pasif' ?></td>
+                <td><?= $v['is_active'] ? '<span class="badge-soft">Aktif</span>' : '<span class="badge bg-secondary-subtle text-secondary-emphasis fw-semibold">Pasif</span>' ?></td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-primary" href="venue_events.php?venue_id=<?= (int)$v['id'] ?>">Etkinlikleri Yönet</a>
+                  <a class="btn btn-sm btn-brand" href="venue_events.php?venue_id=<?= (int)$v['id'] ?>">Etkinlikleri Yönet</a>
                 </td>
               </tr>
             <?php endforeach; ?>
@@ -149,6 +177,30 @@ $canCreate = dealer_can_manage_events($dealer);
         </table>
       </div>
     <?php endif; ?>
+  </div>
+
+  <div class="card-lite p-4">
+    <h5 class="mb-3">Panel İpuçları</h5>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="p-3 border rounded-4 h-100">
+          <h6 class="fw-semibold">Kalıcı QR Yönetimi</h6>
+          <p class="text-muted small mb-0">Her salon için kalıcı QR kodlarını <strong>Etkinlikleri Yönet</strong> sayfasından görebilir, davetlilerinizle paylaşabilirsiniz.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 border rounded-4 h-100">
+          <h6 class="fw-semibold">Etkinlik Kampanyaları</h6>
+          <p class="text-muted small mb-0">Yönetici ekibinin yayınladığı kampanyalar etkinlik panelinde otomatik görünür. Ek avantajlar için yöneticinizle iletişime geçin.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="p-3 border rounded-4 h-100">
+          <h6 class="fw-semibold">Destek</h6>
+          <p class="text-muted small mb-0">Sorularınız için <a href="mailto:<?=h(MAIL_FROM ?? 'destek@localhost')?>"><?=h(MAIL_FROM ?? 'destek@localhost')?></a> adresine yazabilirsiniz.</p>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 </body>
