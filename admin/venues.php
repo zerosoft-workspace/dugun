@@ -177,6 +177,8 @@ function askToggle(){
       <!-- Yeni: Kullanıcılar (liste sayfasına gider) -->
       <a href="<?=h(BASE_URL)?>/admin/users.php" class="btn btn-sm btn-zs">Kullanıcılar</a>
 
+      <a href="<?=h(BASE_URL)?>/admin/dealers.php" class="btn btn-sm btn-zs-outline">Bayiler</a>
+
       <span class="text-muted px-1">•</span>
 
       <a href="<?=h(BASE_URL)?>/admin/login.php?logout=1" class="btn btn-sm btn-outline-secondary">Çıkış</a>

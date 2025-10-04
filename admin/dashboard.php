@@ -284,6 +284,8 @@ function confirmSoftDelete(){
       <span class="title-chip">Salon: <?=h($VNAME)?></span>
       <a class="text-decoration-none" href="<?=h(BASE_URL)?>/admin/venues.php">Salon Değiştir</a>
       <span>•</span>
+      <a class="text-decoration-none" href="<?=h(BASE_URL)?>/admin/dealers.php">Bayiler</a>
+      <span>•</span>
       <span>Admin: <?= h($me['name'] ?? ($_SESSION['uname'] ?? 'Kullanıcı')) ?></span>
       <span>•</span>
 

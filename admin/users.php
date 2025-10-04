@@ -161,9 +161,11 @@ if ($detail_id) {
 <nav class="navbar bg-white border-bottom no-print">
   <div class="container">
     <a class="navbar-brand fw-semibold" href="<?=h(BASE_URL)?>"><?=h(APP_NAME)?></a>
-    <div class="small">
+    <div class="small d-flex align-items-center gap-2">
       <a href="<?=h(BASE_URL)?>/admin/dashboard.php" class="text-decoration-none">Panel</a>
-      <span class="mx-2">•</span>
+      <span>•</span>
+      <a href="<?=h(BASE_URL)?>/admin/dealers.php" class="text-decoration-none">Bayiler</a>
+      <span>•</span>
       <a href="<?=h(BASE_URL)?>/admin/login.php?logout=1" class="text-decoration-none">Çıkış</a>
     </div>
   </div>
