@@ -31,9 +31,8 @@ try {
     if ($amountCents < 10000) {
       throw new RuntimeException('Minimum 100 TL yükleme yapabilirsiniz.');
     }
-    dealer_create_topup_request($dealerId, $amountCents);
-    flash('ok', 'Bakiye yükleme talebiniz alındı. PayTR doğrulaması sonrası bakiyenize yansıyacaktır.');
-    redirect('billing.php#topup');
+    $topup = dealer_create_topup_request($dealerId, $amountCents);
+    redirect('topup_paytr.php?topup_id='.$topup['id']);
   }
   if ($action === 'buy_package') {
     $packageId = (int)($_POST['package_id'] ?? 0);
@@ -168,13 +167,13 @@ $pendingTopups = array_filter($topups, fn($row) => $row['status'] === DEALER_TOP
       <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
         <div>
           <h5 class="section-title mb-1">Bakiye Yükle</h5>
-          <p class="muted mb-0">PayTR entegrasyonu ile bakiye yüklemeleri kısa süre içinde otomatikleşecektir. Şimdilik talepleriniz manuel olarak onaylanır.</p>
+          <p class="muted mb-0">Kart ödemeleri PayTR üzerinden alınır, ardından finans ekibimiz onayladıktan sonra bakiyenize yansır.</p>
         </div>
         <form class="d-flex flex-column flex-sm-row gap-2" method="post">
           <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
           <input type="hidden" name="do" value="request_topup">
           <input type="text" class="form-control" name="amount" placeholder="Örn. 3.000" required>
-          <button class="btn btn-brand" type="submit">Talep Oluştur</button>
+          <button class="btn btn-brand" type="submit">Ödemeyi Başlat</button>
         </form>
       </div>
       <div class="table-responsive">
@@ -191,12 +190,17 @@ $pendingTopups = array_filter($topups, fn($row) => $row['status'] === DEALER_TOP
                   <td><?=h(dealer_topup_status_label($topup['status']))?></td>
                   <td class="text-end">
                     <?php if ($topup['status'] === DEALER_TOPUP_STATUS_PENDING): ?>
-                      <form method="post" class="d-inline">
-                        <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                        <input type="hidden" name="do" value="cancel_topup">
-                        <input type="hidden" name="topup_id" value="<?= (int)$topup['id'] ?>">
-                        <button class="btn btn-sm btn-outline-brand" type="submit">İptal Et</button>
-                      </form>
+                      <div class="d-flex flex-column flex-lg-row gap-2 justify-content-end">
+                        <a class="btn btn-sm btn-brand" href="topup_paytr.php?topup_id=<?= (int)$topup['id'] ?>">Ödeme Sayfası</a>
+                        <form method="post" class="d-inline-flex">
+                          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                          <input type="hidden" name="do" value="cancel_topup">
+                          <input type="hidden" name="topup_id" value="<?= (int)$topup['id'] ?>">
+                          <button class="btn btn-sm btn-outline-brand" type="submit">İptal Et</button>
+                        </form>
+                      </div>
+                    <?php elseif ($topup['status'] === DEALER_TOPUP_STATUS_AWAITING_REVIEW): ?>
+                      <span class="badge bg-warning-subtle text-warning fw-semibold">Ödeme alındı, onay bekliyor</span>
                     <?php else: ?>
                       <span class="text-muted small">—</span>
                     <?php endif; ?>

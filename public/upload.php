@@ -3,6 +3,7 @@
 require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
+require_once __DIR__.'/../includes/dealers.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
@@ -94,6 +95,36 @@ if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='upload'){
           $okCount++;
         }
       }
+    }
+  }
+  if ($okCount > 0 && !empty($ev['dealer_id'])) {
+    $pdo = pdo();
+    $ownTxn = !$pdo->inTransaction();
+    if ($ownTxn) {
+      $pdo->beginTransaction();
+    }
+    try {
+      $lock = $pdo->prepare("SELECT dealer_id, dealer_credit_consumed_at FROM events WHERE id=? FOR UPDATE");
+      $lock->execute([$event_id]);
+      if ($row = $lock->fetch()) {
+        $dealerId = (int)$row['dealer_id'];
+        $consumedAt = $row['dealer_credit_consumed_at'];
+        if ($dealerId > 0 && empty($consumedAt)) {
+          dealer_consume_event_credit($dealerId, $event_id);
+          $stamp = now();
+          $pdo->prepare("UPDATE events SET dealer_credit_consumed_at=?, updated_at=? WHERE id=?")
+              ->execute([$stamp, $stamp, $event_id]);
+          $ev['dealer_credit_consumed_at'] = $stamp;
+        }
+      }
+      if ($ownTxn) {
+        $pdo->commit();
+      }
+    } catch (Throwable $consumeErr) {
+      if ($ownTxn && $pdo->inTransaction()) {
+        $pdo->rollBack();
+      }
+      error_log('Dealer credit consumption failed for event '.$event_id.': '.$consumeErr->getMessage());
     }
   }
   $to=BASE_URL.'/public/upload.php?event='.$event_id.'&t='.rawurlencode($token);

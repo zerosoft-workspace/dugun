@@ -75,6 +75,7 @@ function install_schema(){
     id INT AUTO_INCREMENT PRIMARY KEY,
     venue_id INT NOT NULL,
     dealer_id INT NULL,
+    dealer_credit_consumed_at DATETIME NULL,
     user_id INT NULL,
     contact_email VARCHAR(190) NULL,
     title VARCHAR(190) NOT NULL,
@@ -183,14 +184,23 @@ function install_schema(){
     amount_cents INT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'pending',
     paytr_token VARCHAR(64) NULL,
+    merchant_oid VARCHAR(64) NULL,
     paytr_reference VARCHAR(64) NULL,
     payload_json $jsonMeta NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
     completed_at DATETIME NULL,
     INDEX idx_topups_status (dealer_id, status),
+    UNIQUE KEY uniq_topup_oid (merchant_oid),
     FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('dealer_topups','merchant_oid')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_topups ADD merchant_oid VARCHAR(64) NULL AFTER paytr_token");
+      pdo()->exec("ALTER TABLE dealer_topups ADD UNIQUE KEY uniq_topup_oid (merchant_oid)");
+    } catch (Throwable $e) {}
+  }
 
   /* uploads */
   pdo()->exec("CREATE TABLE IF NOT EXISTS uploads(
@@ -292,6 +302,11 @@ function install_schema(){
     } catch (Throwable $e) {
       // sessizce yut (bazı eski MySQL sürümleri aynı anda FK eklemeyi desteklemeyebilir)
     }
+  }
+  if (!column_exists('events','dealer_credit_consumed_at')) {
+    try {
+      pdo()->exec("ALTER TABLE events ADD dealer_credit_consumed_at DATETIME NULL AFTER dealer_id");
+    } catch (Throwable $e) {}
   }
   if (!column_exists('events','guest_title'))         pdo()->exec("ALTER TABLE events ADD guest_title VARCHAR(190) NULL");
   if (!column_exists('events','guest_subtitle'))      pdo()->exec("ALTER TABLE events ADD guest_subtitle VARCHAR(255) NULL");

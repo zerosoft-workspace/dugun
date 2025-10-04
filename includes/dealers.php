@@ -24,9 +24,10 @@ const DEALER_CASHBACK_AWAITING  = 'awaiting_event';
 const DEALER_CASHBACK_PENDING   = 'pending';
 const DEALER_CASHBACK_PAID      = 'paid';
 
-const DEALER_TOPUP_STATUS_PENDING   = 'pending';
-const DEALER_TOPUP_STATUS_COMPLETED = 'completed';
-const DEALER_TOPUP_STATUS_CANCELLED = 'cancelled';
+const DEALER_TOPUP_STATUS_PENDING         = 'pending';
+const DEALER_TOPUP_STATUS_AWAITING_REVIEW = 'awaiting_review';
+const DEALER_TOPUP_STATUS_COMPLETED       = 'completed';
+const DEALER_TOPUP_STATUS_CANCELLED       = 'cancelled';
 
 const DEALER_WALLET_TYPE_TOPUP      = 'topup';
 const DEALER_WALLET_TYPE_PURCHASE   = 'purchase';
@@ -843,14 +844,166 @@ function dealer_pay_cashback(int $purchase_id, string $note = '', array $meta = 
   }
 }
 
-function dealer_create_topup_request(int $dealer_id, int $amount_cents): int {
+function dealer_topup_get(int $topup_id): ?array {
+  $st = pdo()->prepare("SELECT * FROM dealer_topups WHERE id=? LIMIT 1");
+  $st->execute([$topup_id]);
+  $row = $st->fetch();
+  if (!$row) {
+    return null;
+  }
+  $row['id'] = (int)$row['id'];
+  $row['dealer_id'] = (int)$row['dealer_id'];
+  $row['amount_cents'] = (int)$row['amount_cents'];
+  $row['paytr_token'] = $row['paytr_token'] ?? null;
+  $row['merchant_oid'] = $row['merchant_oid'] ?? null;
+  $row['payload'] = !empty($row['payload_json']) ? safe_json_decode($row['payload_json']) : null;
+  return $row;
+}
+
+function dealer_topup_find_by_oid(string $merchant_oid): ?array {
+  $oid = trim($merchant_oid);
+  if ($oid === '') {
+    return null;
+  }
+  $st = pdo()->prepare("SELECT * FROM dealer_topups WHERE merchant_oid=? LIMIT 1");
+  $st->execute([$oid]);
+  $row = $st->fetch();
+  if (!$row) {
+    return null;
+  }
+  $row['id'] = (int)$row['id'];
+  $row['dealer_id'] = (int)$row['dealer_id'];
+  $row['amount_cents'] = (int)$row['amount_cents'];
+  $row['paytr_token'] = $row['paytr_token'] ?? null;
+  $row['merchant_oid'] = $row['merchant_oid'] ?? null;
+  $row['payload'] = !empty($row['payload_json']) ? safe_json_decode($row['payload_json']) : null;
+  return $row;
+}
+
+function dealer_generate_topup_oid(int $dealer_id): string {
+  $dealer_id = max(0, (int)$dealer_id);
+  do {
+    $rand = strtoupper(bin2hex(random_bytes(6)));
+    $oid = 'DT'.$dealer_id.'T'.$rand;
+    $oid = substr(preg_replace('/[^A-Za-z0-9]/', '', $oid), 0, 64);
+    $st = pdo()->prepare("SELECT 1 FROM dealer_topups WHERE merchant_oid=? LIMIT 1");
+    $st->execute([$oid]);
+    $exists = (bool)$st->fetchColumn();
+  } while ($exists);
+  return $oid;
+}
+
+function dealer_create_topup_request(int $dealer_id, int $amount_cents): array {
   if ($amount_cents <= 0) {
     throw new RuntimeException('Geçerli bir tutar girin.');
   }
+  $dealer = dealer_get($dealer_id);
+  if (!$dealer) {
+    throw new RuntimeException('Bayi bulunamadı.');
+  }
+  $email = filter_var($dealer['email'] ?? '', FILTER_VALIDATE_EMAIL) ?: 'test@example.com';
+  $user_name = mb_substr($dealer['name'] ?? 'Bayi', 0, 64, 'UTF-8');
+  $user_address = $dealer['company'] ?: '—';
+  $user_phone = $dealer['phone'] ?: '—';
+
+  $ip = $_SERVER['HTTP_CF_CONNECTING_IP']
+     ?? $_SERVER['HTTP_X_FORWARDED_FOR']
+     ?? $_SERVER['REMOTE_ADDR']
+     ?? '1.2.3.4';
+  if (strpos($ip, ',') !== false) {
+    $ip = trim(explode(',', $ip)[0]);
+  }
+  if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+    $ip = '1.2.3.4';
+  }
+
+  $basket = [[
+    'Bakiye Yükleme',
+    number_format($amount_cents / 100, 2, '.', ''),
+    1,
+  ]];
+  $user_basket = base64_encode(json_encode($basket, JSON_UNESCAPED_UNICODE));
+
+  $merchantOid = dealer_generate_topup_oid($dealer_id);
+  $no_installment = 0;
+  $max_installment = 0;
+  $currency = 'TL';
+  $test = (int)PAYTR_TEST_MODE;
+  $hash_str = PAYTR_MERCHANT_ID . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
+  $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . PAYTR_MERCHANT_SALT, PAYTR_MERCHANT_KEY, true));
+
+  $post = [
+    'merchant_id'         => PAYTR_MERCHANT_ID,
+    'user_ip'             => $ip,
+    'merchant_oid'        => $merchantOid,
+    'email'               => $email,
+    'payment_amount'      => $amount_cents,
+    'paytr_token'         => $paytr_token,
+    'user_basket'         => $user_basket,
+    'no_installment'      => $no_installment,
+    'max_installment'     => $max_installment,
+    'user_name'           => $user_name,
+    'user_address'        => $user_address,
+    'user_phone'          => $user_phone,
+    'merchant_ok_url'     => PAYTR_DEALER_OK_URL,
+    'merchant_fail_url'   => PAYTR_DEALER_FAIL_URL,
+    'merchant_callback_url'=> PAYTR_CALLBACK_URL,
+    'timeout_limit'       => 30,
+    'currency'            => $currency,
+    'test_mode'           => $test,
+  ];
+
+  $ch = curl_init();
+  curl_setopt_array($ch, [
+    CURLOPT_URL            => 'https://www.paytr.com/odeme/api/get-token',
+    CURLOPT_RETURNTRANSFER => 1,
+    CURLOPT_POST           => 1,
+    CURLOPT_POSTFIELDS     => $post,
+    CURLOPT_TIMEOUT        => 30,
+    CURLOPT_SSL_VERIFYPEER => 1,
+  ]);
+  $res = curl_exec($ch);
+  $curlErr = curl_errno($ch) ? curl_error($ch) : null;
+  curl_close($ch);
+
+  if ($curlErr) {
+    throw new RuntimeException('PAYTR bağlantı hatası: '.$curlErr);
+  }
+  $data = json_decode((string)$res, true);
+  if (!$data || ($data['status'] ?? '') !== 'success') {
+    $reason = $data['reason'] ?? 'bilinmiyor';
+    throw new RuntimeException('PAYTR token alınamadı: '.$reason);
+  }
+  $token = $data['token'];
+
+  $payload = [
+    'request' => [
+      'amount_cents' => $amount_cents,
+      'basket'       => $basket,
+      'ip'           => $ip,
+    ],
+    'merchant_oid' => $merchantOid,
+  ];
   $now = now();
-  $st = pdo()->prepare("INSERT INTO dealer_topups (dealer_id, amount_cents, status, created_at, updated_at) VALUES (?,?,?,?,?)");
-  $st->execute([$dealer_id, $amount_cents, DEALER_TOPUP_STATUS_PENDING, $now, $now]);
-  return (int)pdo()->lastInsertId();
+  pdo()->prepare("INSERT INTO dealer_topups (dealer_id, amount_cents, status, paytr_token, merchant_oid, payload_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?)")
+      ->execute([
+        $dealer_id,
+        $amount_cents,
+        DEALER_TOPUP_STATUS_PENDING,
+        $token,
+        $merchantOid,
+        safe_json_encode($payload),
+        $now,
+        $now,
+      ]);
+
+  $topupId = (int)pdo()->lastInsertId();
+
+  return [
+    'id'           => $topupId,
+    'token'        => $token,
+    'merchant_oid' => $merchantOid,
+  ];
 }
 
 function dealer_topups_for_dealer(int $dealer_id, ?string $status = null): array {
@@ -867,6 +1020,8 @@ function dealer_topups_for_dealer(int $dealer_id, ?string $status = null): array
   foreach ($rows as &$row) {
     $row['amount_cents'] = (int)$row['amount_cents'];
     $row['dealer_id'] = (int)$row['dealer_id'];
+    $row['merchant_oid'] = $row['merchant_oid'] ?? null;
+    $row['paytr_token'] = $row['paytr_token'] ?? null;
     $row['payload'] = !empty($row['payload_json']) ? safe_json_decode($row['payload_json']) : null;
   }
   return $rows;
@@ -874,9 +1029,10 @@ function dealer_topups_for_dealer(int $dealer_id, ?string $status = null): array
 
 function dealer_topup_status_label(string $status): string {
   return match ($status) {
-    DEALER_TOPUP_STATUS_PENDING   => 'Bekliyor',
-    DEALER_TOPUP_STATUS_COMPLETED => 'Tamamlandı',
-    DEALER_TOPUP_STATUS_CANCELLED => 'İptal',
+    DEALER_TOPUP_STATUS_PENDING         => 'Ödeme Bekleniyor',
+    DEALER_TOPUP_STATUS_AWAITING_REVIEW => 'Onay Bekliyor',
+    DEALER_TOPUP_STATUS_COMPLETED       => 'Tamamlandı',
+    DEALER_TOPUP_STATUS_CANCELLED       => 'İptal',
     default                       => ucfirst($status),
   };
 }
@@ -900,7 +1056,7 @@ function dealer_mark_topup_completed(int $topup_id, ?string $reference = null, a
       }
       return;
     }
-    if ($row['status'] !== DEALER_TOPUP_STATUS_PENDING) {
+    if (!in_array($row['status'], [DEALER_TOPUP_STATUS_PENDING, DEALER_TOPUP_STATUS_AWAITING_REVIEW], true)) {
       throw new RuntimeException('Bu kayıt işleme kapalı.');
     }
     $amount = (int)$row['amount_cents'];
@@ -912,11 +1068,18 @@ function dealer_mark_topup_completed(int $topup_id, ?string $reference = null, a
       $meta['reference'] = $reference;
     }
     dealer_wallet_adjust((int)$row['dealer_id'], $amount, DEALER_WALLET_TYPE_TOPUP, 'Bakiye yükleme', $meta);
-    $payloadJson = $payload ? safe_json_encode($payload) : null;
+    $payloadData = !empty($row['payload_json']) ? safe_json_decode($row['payload_json']) : [];
+    if (!is_array($payloadData)) {
+      $payloadData = [];
+    }
+    if ($payload) {
+      $payloadData['admin'] = $payload;
+    }
+    $payloadJson = $payloadData ? safe_json_encode($payloadData) : null;
     $pdo->prepare("UPDATE dealer_topups SET status=?, paytr_reference=?, payload_json=?, completed_at=?, updated_at=? WHERE id=?")
         ->execute([
           DEALER_TOPUP_STATUS_COMPLETED,
-          $reference ?: null,
+          $reference ?: ($row['paytr_reference'] ?: null),
           $payloadJson,
           now(),
           now(),
@@ -938,10 +1101,85 @@ function dealer_cancel_topup(int $topup_id, ?int $dealer_id = null): void {
     $st = pdo()->prepare("UPDATE dealer_topups SET status=?, updated_at=? WHERE id=? AND dealer_id=? AND status=?");
     $st->execute([DEALER_TOPUP_STATUS_CANCELLED, now(), $topup_id, $dealer_id, DEALER_TOPUP_STATUS_PENDING]);
   } else {
-    $st = pdo()->prepare("UPDATE dealer_topups SET status=?, updated_at=? WHERE id=? AND status=?");
-    $st->execute([DEALER_TOPUP_STATUS_CANCELLED, now(), $topup_id, DEALER_TOPUP_STATUS_PENDING]);
+    $st = pdo()->prepare("UPDATE dealer_topups SET status=?, updated_at=? WHERE id=? AND status IN (?, ?)");
+    $st->execute([DEALER_TOPUP_STATUS_CANCELLED, now(), $topup_id, DEALER_TOPUP_STATUS_PENDING, DEALER_TOPUP_STATUS_AWAITING_REVIEW]);
   }
   if ($st->rowCount() === 0) {
     throw new RuntimeException('İptal edilecek bekleyen yükleme bulunamadı.');
+  }
+}
+
+function dealer_handle_topup_callback(string $merchant_oid, string $status, array $payload = []): void {
+  $oid = trim($merchant_oid);
+  if ($oid === '') {
+    return;
+  }
+  $pdo = pdo();
+  $ownTxn = !$pdo->inTransaction();
+  if ($ownTxn) {
+    $pdo->beginTransaction();
+  }
+  try {
+    $st = $pdo->prepare("SELECT * FROM dealer_topups WHERE merchant_oid=? FOR UPDATE");
+    $st->execute([$oid]);
+    $row = $st->fetch();
+    if (!$row) {
+      if ($ownTxn) {
+        $pdo->commit();
+      }
+      return;
+    }
+    $payloadData = !empty($row['payload_json']) ? safe_json_decode($row['payload_json']) : [];
+    if (!is_array($payloadData)) {
+      $payloadData = [];
+    }
+    if (!isset($payloadData['paytr_callbacks']) || !is_array($payloadData['paytr_callbacks'])) {
+      $payloadData['paytr_callbacks'] = [];
+    }
+    $payloadData['paytr_callbacks'][] = [
+      'status'      => $status,
+      'received_at' => now(),
+      'data'        => array_intersect_key($payload, array_flip(['payment_amount','currency','payment_id','merchant_oid','status','hash'])),
+    ];
+    $payloadJson = safe_json_encode($payloadData);
+
+    if ($status === 'success') {
+      if ($row['status'] !== DEALER_TOPUP_STATUS_COMPLETED) {
+        $reference = $payload['payment_id'] ?? ($payload['merchant_oid'] ?? $row['paytr_reference']);
+        $pdo->prepare("UPDATE dealer_topups SET status=?, paytr_reference=?, payload_json=?, updated_at=? WHERE id=?")
+            ->execute([
+              DEALER_TOPUP_STATUS_AWAITING_REVIEW,
+              $reference,
+              $payloadJson,
+              now(),
+              (int)$row['id'],
+            ]);
+      } else {
+        $pdo->prepare("UPDATE dealer_topups SET payload_json=?, updated_at=? WHERE id=?")
+            ->execute([$payloadJson, now(), (int)$row['id']]);
+      }
+    } else {
+      if (in_array($row['status'], [DEALER_TOPUP_STATUS_PENDING, DEALER_TOPUP_STATUS_AWAITING_REVIEW], true)) {
+        $pdo->prepare("UPDATE dealer_topups SET status=?, payload_json=?, updated_at=? WHERE id=?")
+            ->execute([
+              DEALER_TOPUP_STATUS_CANCELLED,
+              $payloadJson,
+              now(),
+              (int)$row['id'],
+            ]);
+      } else {
+        $pdo->prepare("UPDATE dealer_topups SET payload_json=?, updated_at=? WHERE id=?")
+            ->execute([$payloadJson, now(), (int)$row['id']]);
+      }
+    }
+
+    if ($ownTxn) {
+      $pdo->commit();
+    }
+  } catch (Throwable $e) {
+    if ($ownTxn && $pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    throw $e;
   }
 }

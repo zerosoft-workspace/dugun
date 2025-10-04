@@ -585,14 +585,14 @@ $venueAssignments = dealer_fetch_venue_assignments();
                       <td><?=h(format_currency($req['amount_cents']))?></td>
                       <td><?=h(dealer_topup_status_label($req['status']))?></td>
                       <td class="text-end">
-                        <?php if ($req['status'] === DEALER_TOPUP_STATUS_PENDING): ?>
-                          <div class="d-flex flex-column flex-lg-row gap-2 justify-content-end">
+                        <?php if (in_array($req['status'], [DEALER_TOPUP_STATUS_PENDING, DEALER_TOPUP_STATUS_AWAITING_REVIEW], true)): ?>
+                          <div class="d-flex flex-column flex-lg-row gap-2 justify-content-end align-items-stretch">
                             <form method="post" class="d-flex gap-2">
                               <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
                               <input type="hidden" name="do" value="topup_complete">
                               <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
                               <input type="hidden" name="topup_id" value="<?= (int)$req['id'] ?>">
-                              <input type="text" name="reference" class="form-control form-control-sm" placeholder="Referans (opsiyonel)">
+                              <input type="text" name="reference" class="form-control form-control-sm" placeholder="Referans (opsiyonel)" value="<?=h($req['paytr_reference'] ?? '')?>">
                               <button class="btn btn-sm btn-outline-primary" type="submit">Onayla</button>
                             </form>
                             <form method="post">
@@ -603,6 +603,9 @@ $venueAssignments = dealer_fetch_venue_assignments();
                               <button class="btn btn-sm btn-outline-secondary" type="submit">İptal</button>
                             </form>
                           </div>
+                          <?php if ($req['status'] === DEALER_TOPUP_STATUS_AWAITING_REVIEW): ?>
+                            <div class="text-warning small mt-1">PayTR tarafından ödeme alındı, onay bekliyor.</div>
+                          <?php endif; ?>
                         <?php else: ?>
                           <span class="text-muted small">—</span>
                         <?php endif; ?>
