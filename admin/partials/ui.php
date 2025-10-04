@@ -51,10 +51,11 @@ CSS;
   function render_admin_topnav(string $active = '', string $title = '', string $subtitle = ''): void {
     $me = admin_user();
     $links = [
-      'dashboard' => ['href' => BASE_URL.'/admin/dashboard.php', 'label' => 'Genel Bakış'],
-      'venues'    => ['href' => BASE_URL.'/admin/venues.php',    'label' => 'Salonlar'],
-      'users'     => ['href' => BASE_URL.'/admin/users.php',     'label' => 'Çiftler'],
-      'dealers'   => ['href' => BASE_URL.'/admin/dealers.php',   'label' => 'Bayiler'],
+      'dashboard'  => ['href' => BASE_URL.'/admin/dashboard.php',  'label' => 'Genel Bakış'],
+      'campaigns'  => ['href' => BASE_URL.'/admin/campaigns.php',  'label' => 'Kampanyalar'],
+      'venues'     => ['href' => BASE_URL.'/admin/venues.php',     'label' => 'Salonlar'],
+      'users'      => ['href' => BASE_URL.'/admin/users.php',      'label' => 'Etkinlikler'],
+      'dealers'    => ['href' => BASE_URL.'/admin/dealers.php',    'label' => 'Bayiler'],
     ];
     if (is_superadmin()) {
       $links['team'] = ['href' => BASE_URL.'/admin/team.php', 'label' => 'Yönetim'];

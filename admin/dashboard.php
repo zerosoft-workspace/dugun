@@ -49,42 +49,6 @@ catch(Throwable $e){
   }catch(Throwable $e2){}
 }
 
-/* ---- Kampanya işlemleri ---- */
-if (($_POST['do'] ?? '') === 'camp_create') {
-  csrf_or_die();
-  $name = trim($_POST['name'] ?? '');
-  $type = trim($_POST['type'] ?? '');
-  $desc = trim($_POST['description'] ?? '');
-  $price= max(0,(int)($_POST['price'] ?? 0));
-  if(!$name || !$type){ flash('err','Kampanya adı ve türü gerekli.'); redirect($_SERVER['PHP_SELF'].'#cmp'); }
-  pdo()->prepare("INSERT INTO campaigns (venue_id,name,type,description,price,is_active,created_at) VALUES (?,?,?,?,?,1,?)")
-      ->execute([$VID,$name,$type,$desc,$price, now()]);
-  flash('ok','Kampanya eklendi.');
-  redirect($_SERVER['PHP_SELF'].'#cmp');
-}
-
-if (($_POST['do'] ?? '') === 'camp_update') {
-  csrf_or_die();
-  $id    = (int)($_POST['id'] ?? 0);
-  $name  = trim($_POST['name'] ?? '');
-  $type  = trim($_POST['type'] ?? '');
-  $desc  = trim($_POST['description'] ?? '');
-  $price = max(0,(int)($_POST['price'] ?? 0));
-  $act   = isset($_POST['is_active']) ? 1 : 0;
-  pdo()->prepare("UPDATE campaigns SET name=?, type=?, description=?, price=?, is_active=?, updated_at=? WHERE id=? AND venue_id=?")
-      ->execute([$name,$type,$desc,$price,$act, now(), $id, $VID]);
-  flash('ok','Kampanya güncellendi.');
-  redirect($_SERVER['PHP_SELF'].'#cmp');
-}
-
-if (($_POST['do'] ?? '') === 'camp_toggle') {
-  csrf_or_die();
-  $id=(int)($_POST['id'] ?? 0);
-  pdo()->prepare("UPDATE campaigns SET is_active=1-is_active, updated_at=? WHERE id=? AND venue_id=?")
-      ->execute([now(), $id, $VID]);
-  redirect($_SERVER['PHP_SELF'].'#cmp');
-}
-
 /* ---- Etkinlik işlemleri (ÇİFT HESABI İLE) ---- */
 if (($_POST['do'] ?? '') === 'create_event') {
   csrf_or_die();
@@ -92,12 +56,10 @@ if (($_POST['do'] ?? '') === 'create_event') {
   $title = trim($_POST['title'] ?? '');
   $date  = trim($_POST['event_date'] ?? '');
   $email = trim($_POST['couple_email'] ?? '');
-  $pass  = (string)($_POST['couple_pass'] ?? '');
-  $force_reset = isset($_POST['force_reset']) ? 1 : 0;
+  $force_reset = 1;
 
   if(!$title){ flash('err','Başlık gerekli.'); redirect($_SERVER['PHP_SELF'].'#ev'); }
   if(!filter_var($email, FILTER_VALIDATE_EMAIL)){ flash('err','Geçerli bir e-posta girin.'); redirect($_SERVER['PHP_SELF'].'#ev'); }
-  if(strlen($pass) < 6){ flash('err','Geçici şifre en az 6 karakter olmalı.'); redirect($_SERVER['PHP_SELF'].'#ev'); }
 
   // salon gerçekten var mı (aktif)?
   $st = pdo()->prepare("SELECT id FROM venues WHERE id=? AND is_active=1");
@@ -126,7 +88,8 @@ if (($_POST['do'] ?? '') === 'create_event') {
   $key   = bin2hex(random_bytes(16));
   $pcol  = defined('THEME_PRIMARY_DEFAULT') ? THEME_PRIMARY_DEFAULT : '#0ea5b5';
   $acol  = defined('THEME_ACCENT_DEFAULT')  ? THEME_ACCENT_DEFAULT  : '#e0f7fb';
-  $hash  = password_hash($pass, PASSWORD_DEFAULT);
+  $plain_pass = substr(bin2hex(random_bytes(8)),0,12);
+  $hash  = password_hash($plain_pass, PASSWORD_DEFAULT);
 
   // insert
   try {
@@ -158,17 +121,12 @@ if (($_POST['do'] ?? '') === 'create_event') {
     ]);
   }
 
-  // mail gönder
-  $loginUrl = BASE_URL.'/couple/login.php?event='.pdo()->lastInsertId();
-  $html = '<h3>'.h(APP_NAME).'</h3>
-           <p>Çift paneliniz oluşturuldu.</p>
-           <p><b>Kullanıcı adı (e-posta):</b> '.h($email).'<br>
-              <b>Geçici şifre:</b> '.h($pass).'</p>
-           <p><a href="'.h($loginUrl).'">Panele giriş</a></p>'.
-           ($force_reset ? '<p>İlk girişte şifrenizi değiştirmeniz istenecektir.</p>' : '');
-  send_mail_simple($email, 'Çift Panel Giriş Bilgileriniz', $html);
+  $eventId = (int)pdo()->lastInsertId();
+  if ($eventId) {
+    couple_set_account($eventId, $email, $plain_pass);
+  }
 
-  flash('ok','Düğün oluşturuldu ve çift hesabı tanımlandı.');
+  flash('ok','Etkinlik oluşturuldu ve giriş bilgileri e-posta ile gönderildi.');
   redirect($_SERVER['PHP_SELF'].'#ev');
 }
 
@@ -184,7 +142,7 @@ if (($_POST['do'] ?? '')==='soft_delete' && isset($_POST['event_id'])) {
   csrf_or_die();
   $eid = (int)$_POST['event_id'];
   pdo()->prepare("UPDATE events SET is_active=0 WHERE id=? AND venue_id=?")->execute([$eid,$VID]);
-  flash('ok','Düğün pasife alındı (silindi olarak işaretlendi).');
+  flash('ok','Etkinlik pasife alındı (silindi olarak işaretlendi).');
   redirect($_SERVER['PHP_SELF'].'#ev');
 }
 
@@ -210,7 +168,7 @@ if (($_POST['do'] ?? '')==='bind_qr'){
   redirect($_SERVER['PHP_SELF'].'#qr');
 }
 
-/* ---- Filtreler (düğün listesi) ---- */
+/* ---- Filtreler (etkinlik listesi) ---- */
 $q  = trim($_GET['q'] ?? '');
 $df = trim($_GET['date_from'] ?? '');
 $dt = trim($_GET['date_to'] ?? '');
@@ -222,10 +180,6 @@ if ($dt!==''){ $where[]="(e.event_date IS NOT NULL AND e.event_date <= ?)"; $arg
 // Sadece aktifleri göster
 $where[] = "e.is_active = 1";
 $W = implode(' AND ',$where);
-
-/* ---- Veriler ---- */
-$campaigns = pdo()->prepare("SELECT * FROM campaigns WHERE venue_id=? ORDER BY is_active DESC, id DESC");
-$campaigns->execute([$VID]); $campaigns=$campaigns->fetchAll();
 
 $sql = "
   SELECT e.*,
@@ -273,170 +227,59 @@ function fmt_bytes($b){
 </style>
 <script>
 function confirmSoftDelete(){
-  if(!confirm('Bu düğünü silmek istiyor musunuz?')) return false;
+  if(!confirm('Bu etkinliği silmek istiyor musunuz?')) return false;
   return confirm('Emin misiniz? Silinirse panelden kaldırılacak (veriler silinmez).');
 }
 </script>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('dashboard', 'Panel Genel Bakış', 'Salon: '.$VNAME.' • Düğün ve kampanya yönetimi'); ?>
+<?php render_admin_topnav('dashboard', 'Panel Genel Bakış', 'Salon: '.$VNAME.' • Etkinlik ve QR yönetimi'); ?>
 
 <main class="admin-main">
   <div class="container">
     <?php flash_box(); ?>
 
-  <!-- Kampanyalar -->
-  <div id="cmp" class="card-lite p-3 mb-4">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h5 class="m-0">Kampanyalar</h5>
-      <span class="muted small">PyTR entegrasyonu çift panelinde yapılacak; burada yalnız fiyat girilir.</span>
-    </div>
-    <div class="row g-3 grid-compact">
-      <div class="col-lg-5">
-        <div class="p-3 border rounded-3">
-          <h6 class="fw-semibold mb-3">Yeni Kampanya</h6>
-          <form method="post" class="row g-2">
-            <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
-            <input type="hidden" name="do" value="camp_create">
-            <div class="col-12">
-              <label class="form-label">Ad</label>
-              <input class="form-control" name="name" placeholder="Örn: En Mutlu Anlar">
-            </div>
-            <div class="col-12">
-              <label class="form-label">Tür</label>
-              <input class="form-control" name="type" placeholder="Örn: video_kolaj, slayt, premium">
-            </div>
-            <div class="col-12">
-              <label class="form-label">Açıklama</label>
-              <textarea class="form-control" name="description" rows="3" placeholder="Kısa açıklama"></textarea>
-            </div>
-            <div class="col-6">
-              <label class="form-label">Fiyat (TL)</label>
-              <input type="number" class="form-control" name="price" value="0" min="0">
-            </div>
-            <div class="col-12 d-grid mt-1">
-              <button class="btn btn-zs">Ekle</button>
-            </div>
-          </form>
-        </div>
-      </div>
-      <div class="col-lg-7">
-        <?php if(!$campaigns): ?>
-          <div class="muted">Henüz kampanya yok.</div>
-        <?php else: ?>
-          <div class="table-responsive">
-            <table class="table align-middle">
-              <thead><tr><th>Ad</th><th>Tür</th><th>Açıklama</th><th>Fiyat</th><th>Durum</th><th style="width:180px">İşlem</th></tr></thead>
-              <tbody>
-                <?php foreach($campaigns as $c): ?>
-                  <tr>
-                    <td class="fw-semibold"><?=h($c['name'])?></td>
-                    <td><?=h($c['type'])?></td>
-                    <td class="small"><?=h($c['description'])?></td>
-                    <td><?= (int)$c['price'] ?> TL</td>
-                    <td><?= $c['is_active']?'<span class="badge bg-success">Aktif</span>':'<span class="badge bg-secondary">Pasif</span>' ?></td>
-                    <td>
-                      <form method="post" class="d-inline">
-                        <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
-                        <input type="hidden" name="do" value="camp_toggle">
-                        <input type="hidden" name="id" value="<?=$c['id']?>">
-                        <button class="btn btn-sm btn-outline-secondary"><?= $c['is_active']?'Pasifleştir':'Aktifleştir' ?></button>
-                      </form>
-                      <button class="btn btn-sm btn-zs-outline" type="button" onclick="document.getElementById('edit<?= $c['id']?>').classList.toggle('d-none')">Düzenle</button>
-                    </td>
-                  </tr>
-                  <tr id="edit<?= $c['id']?>" class="d-none">
-                    <td colspan="6">
-                      <form method="post" class="row g-2 grid-compact">
-                        <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
-                        <input type="hidden" name="do" value="camp_update">
-                        <input type="hidden" name="id" value="<?=$c['id']?>">
-                        <div class="col-md-3"><input class="form-control" name="name" value="<?=h($c['name'])?>"></div>
-                        <div class="col-md-2"><input class="form-control" name="type" value="<?=h($c['type'])?>"></div>
-                        <div class="col-md-4"><input class="form-control" name="description" value="<?=h($c['description'])?>"></div>
-                        <div class="col-md-2"><input type="number" class="form-control" name="price" value="<?= (int)$c['price'] ?>"></div>
-                        <div class="col-md-1 form-check d-flex align-items-center">
-                          <input class="form-check-input" type="checkbox" name="is_active" <?= $c['is_active']?'checked':'' ?>>
-                        </div>
-                        <div class="col-12 d-grid"><button class="btn btn-zs">Kaydet</button></div>
-                      </form>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-        <?php endif; ?>
-      </div>
-    </div>
-  </div>
-
-  <!-- Yeni Düğün + Çift hesabı -->
+  <!-- Yeni Etkinlik -->
   <div id="ev" class="card-lite p-3 mb-4">
-    <h5 class="mb-3">Yeni Düğün (<?=h($VNAME)?>)</h5>
-    <form method="post" class="row g-2 grid-compact">
+    <div class="section-heading">
+      <h5>Yeni Etkinlik Oluştur</h5>
+      <a class="btn btn-zs-outline" href="<?=h(BASE_URL)?>/admin/campaigns.php">Kampanyaları Yönet</a>
+    </div>
+    <p class="muted small mb-4">E-posta alanına yazdığınız kullanıcıya otomatik olarak geçici şifre gönderilir ve ilk girişte şifre yenilemesi istenir.</p>
+    <form method="post" class="row g-3 grid-compact">
       <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
       <input type="hidden" name="do" value="create_event">
-
-      <div class="col-md-6">
-        <label class="form-label">Başlık</label>
-        <input class="form-control" name="title" placeholder="Örn: Elif & Arda Düğünü" required>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Düğün Tarihi</label>
-        <input type="date" class="form-control" name="event_date">
-      </div>
-
-      <div class="col-12 mt-2"><hr></div>
-
-      <div class="col-md-6">
-        <label class="form-label">Çift E-posta (kullanıcı adı)</label>
-        <input type="email" class="form-control" name="couple_email" placeholder="musteri@ornek.com" required>
+      <div class="col-md-4">
+        <label class="form-label">Etkinlik Başlığı</label>
+        <input class="form-control" name="title" placeholder="Örn: Bahar Daveti" required>
       </div>
       <div class="col-md-4">
-        <label class="form-label">Geçici Şifre</label>
-        <input type="text" class="form-control" name="couple_pass" placeholder="en az 6 karakter" required>
+        <label class="form-label">Çift E-posta Adresi</label>
+        <input class="form-control" name="couple_email" type="email" placeholder="ornek@eposta.com" required>
       </div>
-      <div class="col-md-2 d-flex align-items-end">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" name="force_reset" id="fr" checked>
-          <label class="form-check-label" for="fr">İlk girişte değiştir</label>
-        </div>
+      <div class="col-md-4">
+        <label class="form-label">Etkinlik Tarihi</label>
+        <input class="form-control" name="event_date" type="date" value="<?=h(date('Y-m-d'))?>">
       </div>
-
-      <div class="col-md-2 d-grid align-items-end">
-        <button class="btn btn-zs" style="margin-top:30px">Oluştur</button>
+      <div class="col-12">
+        <button class="btn btn-zs" type="submit">Etkinliği Oluştur ve Davet Gönder</button>
       </div>
     </form>
   </div>
 
-  <!-- Arama / Filtre -->
-  <div class="card-lite p-3 mb-3">
-    <form class="row g-2 grid-compact" method="get">
-      <div class="col-md-6">
-        <label class="form-label">Başlık</label>
-        <input class="form-control" name="q" value="<?=h($q)?>" placeholder="Başlık/slug ara…">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Tarih (Başlangıç)</label>
-        <input type="date" class="form-control" name="date_from" value="<?=h($df)?>">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Tarih (Bitiş)</label>
-        <input type="date" class="form-control" name="date_to" value="<?=h($dt)?>">
-      </div>
-      <div class="col-12 d-flex gap-2">
-        <button class="btn btn-zs-outline">Filtrele</button>
-        <a class="btn btn-outline-secondary" href="<?=h($_SERVER['PHP_SELF'])?>#ev">Temizle</a>
-      </div>
-    </form>
-  </div>
-
-  <!-- Düğün Listesi (aktifler) -->
+  <!-- Etkinlik Listesi -->
   <div class="card-lite p-3 mb-4">
-    <h5 class="mb-3">Düğünlerim</h5>
+    <div class="section-heading">
+      <h5>Etkinliklerim</h5>
+      <form class="d-flex align-items-center gap-2" method="get">
+        <input type="date" class="form-control" name="date_from" value="<?=h($df)?>" placeholder="Başlangıç">
+        <input type="date" class="form-control" name="date_to" value="<?=h($dt)?>" placeholder="Bitiş">
+        <input type="search" class="form-control" name="q" value="<?=h($q)?>" placeholder="Başlık veya kısa adres">
+        <button class="btn btn-zs-outline" type="submit">Filtrele</button>
+      </form>
+    </div>
     <?php if(!$events): ?>
-      <div class="muted">Kayıt bulunamadı.</div>
+      <div class="muted">Henüz etkinlik oluşturulmadı.</div>
     <?php else: ?>
       <div class="table-responsive">
         <table class="table align-middle">
@@ -464,7 +307,7 @@ function confirmSoftDelete(){
                 <td class="small"><?= $e['event_date'] ? h($e['event_date']) : '—' ?></td>
                 <td class="small">
                   <a class="link-badge text-decoration-none" target="_blank" href="<?=h($pub)?>">Misafir Yükleme</a>
-                  <a class="link-badge text-decoration-none" target="_blank" href="<?=h($couple_link)?>">Çift Paneli</a>
+                  <a class="link-badge text-decoration-none" target="_blank" href="<?=h($couple_link)?>">Etkinlik Paneli</a>
                 </td>
                 <td class="text-center"><span class="badge bg-secondary"><?= (int)$e['file_count'] ?></span></td>
                 <td class="text-center"><?= fmt_bytes((int)$e['total_bytes']) ?></td>

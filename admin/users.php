@@ -160,7 +160,7 @@ if ($detail_id) {
 </style>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('users', 'Çiftler & Ödemeler', 'Etkinlik hesaplarını, lisans sürelerini ve ödeme durumlarını inceleyin.'); ?>
+<?php render_admin_topnav('users', 'Etkinlik Hesapları', 'Etkinlik panellerini, lisans sürelerini ve ödeme durumlarını inceleyin.'); ?>
 
 <main class="admin-main">
   <div class="container">
@@ -169,7 +169,7 @@ if ($detail_id) {
   <!-- Filtreler -->
   <div class="card-lite p-3 mb-3 no-print">
     <div class="d-flex justify-content-between align-items-center">
-      <h5 class="m-0">Kullanıcılar & Ödemeler</h5>
+      <h5 class="m-0">Etkinlik Hesapları & Ödemeler</h5>
       <div class="d-flex gap-2">
         <button class="btn btn-sm btn-outline-secondary" onclick="window.print()">Yazdır / PDF</button>
       </div>

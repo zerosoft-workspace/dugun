@@ -35,25 +35,20 @@ $action = $_POST['do'] ?? '';
 if ($action === 'create_event') {
   csrf_or_die();
   if (!$canManage) {
-    flash('err', 'Lisans süreniz dolduğu için yeni düğün oluşturamazsınız.');
+    flash('err', 'Lisans süreniz dolduğu için yeni etkinlik oluşturamazsınız.');
     redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
   }
 
   $title = trim($_POST['title'] ?? '');
   $date  = trim($_POST['event_date'] ?? '');
   $email = trim($_POST['couple_email'] ?? '');
-  $pass  = (string)($_POST['couple_pass'] ?? '');
 
-  if ($title === '' || $email === '' || $pass === '') {
-    flash('err', 'Başlık, e-posta ve şifre alanları zorunlu.');
+  if ($title === '' || $email === '') {
+    flash('err', 'Başlık ve e-posta alanları zorunlu.');
     redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
   }
   if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     flash('err', 'Geçerli bir e-posta girin.');
-    redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
-  }
-  if (strlen($pass) < 6) {
-    flash('err', 'Geçici şifre en az 6 karakter olmalı.');
     redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
   }
 
@@ -70,12 +65,13 @@ if ($action === 'create_event') {
   $same = pdo()->prepare("SELECT id FROM events WHERE couple_username=? LIMIT 1");
   $same->execute([$email]);
   if ($same->fetch()) {
-    flash('err', 'Bu e-posta farklı bir düğün için kullanılıyor.');
+    flash('err', 'Bu e-posta farklı bir etkinlik için kullanılıyor.');
     redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
   }
 
   $key  = bin2hex(random_bytes(16));
-  $hash = password_hash($pass, PASSWORD_DEFAULT);
+  $plain_pass = substr(bin2hex(random_bytes(8)),0,12);
+  $hash = password_hash($plain_pass, PASSWORD_DEFAULT);
   $primary = '#0ea5b5';
   $accent  = '#e0f7fb';
 
@@ -98,15 +94,11 @@ if ($action === 'create_event') {
   ]);
 
   $eventId = (int)pdo()->lastInsertId();
-  $loginUrl = BASE_URL.'/couple/login.php?event='.$eventId;
-  $html = '<h3>'.h(APP_NAME).' Çift Paneli</h3>'
-        . '<p>Düğün paneliniz oluşturuldu.</p>'
-        . '<p><strong>Kullanıcı adı:</strong> '.h($email).'<br>'
-        . '<strong>Geçici şifre:</strong> '.h($pass).'</p>'
-        . '<p><a href="'.h($loginUrl).'">Panele giriş yapın</a> ve ilk girişte şifrenizi değiştirin.</p>';
-  send_mail_simple($email, 'Çift paneliniz hazır', $html);
+  if ($eventId) {
+    couple_set_account($eventId, $email, $plain_pass);
+  }
 
-  flash('ok', 'Düğün oluşturuldu ve bilgiler çifte e-posta ile gönderildi.');
+  flash('ok', 'Etkinlik oluşturuldu ve bilgiler çifte e-posta ile gönderildi.');
   redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
 }
 
@@ -114,7 +106,7 @@ if ($action === 'toggle' && isset($_POST['event_id'])) {
   csrf_or_die();
   $eventId = (int)$_POST['event_id'];
   if (!dealer_event_belongs_to_dealer((int)$dealer['id'], $eventId)) {
-    flash('err', 'Bu düğünü yönetme yetkiniz yok.');
+    flash('err', 'Bu etkinliği yönetme yetkiniz yok.');
   } else {
     pdo()->prepare("UPDATE events SET is_active=1-is_active WHERE id=? AND venue_id=?")
         ->execute([$eventId, $venueId]);
@@ -133,7 +125,7 @@ $events = $st->fetchAll();
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?=h($venue['name'])?> — Düğünler</title>
+<title><?=h($venue['name'])?> — Etkinlikler</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <style>
   body{background:#f4f6fb;}
@@ -153,39 +145,35 @@ $events = $st->fetchAll();
 <div class="container pb-5">
   <?php flash_box(); ?>
   <div class="card-lite p-4 mb-4">
-    <h5 class="mb-3">Yeni Düğün Oluştur</h5>
+    <h5 class="mb-3">Yeni Etkinlik Oluştur</h5>
     <?php if (!$canManage): ?>
-      <div class="alert alert-warning">Lisans süreniz geçersiz olduğu için yeni düğün oluşturamazsınız. Lütfen yönetici ile iletişime geçin.</div>
+      <div class="alert alert-warning">Lisans süreniz geçersiz olduğu için yeni etkinlik oluşturamazsınız. Lütfen yönetici ile iletişime geçin.</div>
     <?php endif; ?>
     <form method="post" class="row g-3" autocomplete="off">
       <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
       <input type="hidden" name="do" value="create_event">
       <div class="col-md-6">
-        <label class="form-label">Düğün Başlığı</label>
+        <label class="form-label">Etkinlik Başlığı</label>
         <input class="form-control" name="title" required <?= $canManage ? '' : 'disabled' ?>>
       </div>
       <div class="col-md-3">
-        <label class="form-label">Düğün Tarihi</label>
-        <input type="date" class="form-control" name="event_date" <?= $canManage ? '' : 'disabled' ?>>
+        <label class="form-label">Etkinlik Tarihi</label>
+        <input type="date" class="form-control" name="event_date" value="<?=h(date('Y-m-d'))?>" <?= $canManage ? '' : 'disabled' ?>>
       </div>
       <div class="col-md-3">
         <label class="form-label">Çift E-postası</label>
         <input type="email" class="form-control" name="couple_email" required <?= $canManage ? '' : 'disabled' ?>>
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Geçici Şifre</label>
-        <input type="text" class="form-control" name="couple_pass" minlength="6" required <?= $canManage ? '' : 'disabled' ?>>
-      </div>
       <div class="col-md-9 d-flex align-items-end">
-        <button class="btn btn-primary" type="submit" <?= $canManage ? '' : 'disabled' ?>>Düğünü Oluştur</button>
+        <button class="btn btn-primary" type="submit" <?= $canManage ? '' : 'disabled' ?>>Etkinliği Oluştur</button>
       </div>
     </form>
   </div>
 
   <div class="card-lite p-4">
-    <h5 class="mb-3">Düğün Listesi</h5>
+    <h5 class="mb-3">Etkinlik Listesi</h5>
     <?php if (!$events): ?>
-      <p class="text-muted">Bu salona ait düğün bulunmuyor.</p>
+      <p class="text-muted">Bu salona ait etkinlik bulunmuyor.</p>
     <?php else: ?>
       <div class="table-responsive">
         <table class="table align-middle">
