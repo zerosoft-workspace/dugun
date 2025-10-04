@@ -175,7 +175,7 @@ function site_create_event(int $venue_id, ?int $dealer_id, array $package, array
   } catch (Throwable $e) {
     // Eski şema desteği için dealer ve user alanlarını çıkarıp tekrar dene
     $columnsFallback = "venue_id,title,slug,is_active,couple_panel_key,theme_primary,theme_accent,event_date,created_at,couple_username,couple_password_hash,couple_force_reset";
-    $placeholdersFallback = "?,?,?,?,?,?,?,?,?,?,?,?,?";
+    $placeholdersFallback = "?,?,?,?,?,?,?,?,?,?,?,?";
     $valuesFallback = [
       $venue_id,
       $title,
