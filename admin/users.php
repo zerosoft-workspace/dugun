@@ -4,6 +4,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/auth.php';
+require_once __DIR__.'/partials/ui.php';
 
 require_admin();
 install_schema();
@@ -141,35 +142,28 @@ if ($detail_id) {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?=h(APP_NAME)?> — Kullanıcılar & Ödemeler</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<?=admin_base_styles()?>
 <style>
-  :root{ --zs:#0ea5b5; --ink:#0f172a; --muted:#64748b; --soft:#f6fbfd; }
-  body{ background:linear-gradient(180deg,#eef8fb,#fff) no-repeat; color:var(--ink) }
-  .card-lite{ border:1px solid #e8eff5; border-radius:18px; background:#fff; box-shadow:0 6px 20px rgba(2,6,23,.05) }
-  .btn-zs{ background:var(--zs); border:none; color:#fff; border-radius:12px; padding:.55rem 1rem; font-weight:600 }
-  .btn-zs-outline{ background:#fff; border:1px solid var(--zs); color:var(--zs); border-radius:12px; font-weight:600 }
-  .muted{ color:var(--muted) }
-  .badge-soft{ background:#eef5ff; color:#334155 }
+  .card-lite{ border-radius:20px; border:1px solid rgba(148,163,184,.16); box-shadow:0 18px 45px -28px rgba(15,23,42,.4); }
+  .btn-zs{ background:var(--brand); border:none; color:#fff; border-radius:12px; padding:.55rem 1rem; font-weight:600; }
+  .btn-zs:hover{ background:var(--brand-dark); color:#fff; }
+  .btn-zs-outline{ background:#fff; border:1px solid rgba(14,165,181,.55); color:var(--brand); border-radius:12px; font-weight:600; }
+  .btn-zs-outline:hover{ background:rgba(14,165,181,.12); color:var(--brand-dark); }
+  .muted{ color:var(--muted); }
+  .badge-soft{ background:rgba(14,165,181,.14); color:var(--brand-dark); border-radius:999px; padding:.3rem .7rem; font-weight:600; }
   @media print{
-    .no-print{ display:none !important }
-    body{ background:#fff }
-    .card-lite{ border:none; box-shadow:none }
-    table{ font-size:12px }
+    .admin-header, .admin-hero, .no-print{ display:none !important; }
+    body.admin-body{ background:#fff; }
+    .card-lite{ border:none; box-shadow:none; }
+    table{ font-size:12px; }
   }
 </style>
 </head>
-<body>
-<nav class="navbar bg-white border-bottom no-print">
-  <div class="container">
-    <a class="navbar-brand fw-semibold" href="<?=h(BASE_URL)?>"><?=h(APP_NAME)?></a>
-    <div class="small">
-      <a href="<?=h(BASE_URL)?>/admin/dashboard.php" class="text-decoration-none">Panel</a>
-      <span class="mx-2">•</span>
-      <a href="<?=h(BASE_URL)?>/admin/login.php?logout=1" class="text-decoration-none">Çıkış</a>
-    </div>
-  </div>
-</nav>
+<body class="admin-body">
+<?php render_admin_topnav('users', 'Çiftler & Ödemeler', 'Etkinlik hesaplarını, lisans sürelerini ve ödeme durumlarını inceleyin.'); ?>
 
-<div class="container py-4">
+<main class="admin-main">
+  <div class="container">
   <?php flash_box(); ?>
 
   <!-- Filtreler -->
@@ -360,6 +354,7 @@ if ($detail_id) {
       </div>
     <?php endif; ?>
   </div>
-</div>
+  </div>
+</main>
 </body>
 </html>
