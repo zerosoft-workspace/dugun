@@ -32,8 +32,8 @@ function relative_time($dt){
   return date('d.m.Y H:i', $ts);
 }
 function avatar_colors(string $seed): array {
-  $palette = ['#0ea5b5','#6366f1','#f97316','#ec4899','#14b8a6','#9333ea','#ef4444','#22d3ee'];
-  $text = ['#fff','#fff','#fff','#fff','#073042','#fff','#fff','#0f172a'];
+  $palette = ['#0ea5b5','#0b8d9b','#13b8c9','#0a6c78'];
+  $text = ['#ffffff','#ffffff','#044047','#e6fffb'];
   $idx = hexdec(substr($seed,0,2)) % count($palette);
   return [$palette[$idx], $text[$idx] ?? '#fff'];
 }
@@ -119,6 +119,11 @@ $st->execute([$event_id]);
 $ev = $st->fetch();
 if (!$ev || (int)$ev['is_active']!==1){ http_response_code(404); exit('Etkinlik bulunamadı veya pasif.'); }
 
+$eventTimestamp = !empty($ev['event_date']) ? strtotime($ev['event_date']) : null;
+$uploadDeadline = $eventTimestamp ? strtotime('+10 days', $eventTimestamp) : null;
+if($uploadDeadline === false){ $uploadDeadline = null; }
+$uploadsLocked  = ($uploadDeadline !== null && $uploadDeadline !== false && time() > $uploadDeadline);
+
 $VID      = (int)$ev['venue_id'];
 $TITLE    = $ev['guest_title'] ?: 'BİKARE Etkinliğimize Hoş Geldiniz';
 $SUBTITLE = $ev['guest_subtitle'] ?: 'En güzel anlarınızı bizimle paylaşın';
@@ -157,6 +162,9 @@ if($_SERVER['REQUEST_METHOD']==='POST'){
 
   if($action === 'upload'){
     $errors=[]; $okCount=0; $verificationFlash=null;
+    if($uploadsLocked){
+      $errors[]='Bu etkinlik için yüklemeler kapatıldı.';
+    }
     $p_token = trim($_POST['t']??'');
     if(!token_valid($event_id,$p_token)){
       $errors[]='Güvenlik anahtarı zaman aşımına uğradı. Lütfen QR’ı yeniden okutun.';
@@ -606,36 +614,46 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 .gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:28px; }
 @media(min-width:768px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(320px,1fr)); } }
 @media(min-width:1400px){ .gallery-grid{ grid-template-columns:repeat(auto-fill, minmax(360px,1fr)); } }
-.gallery-item{ display:flex; flex-direction:column; border-radius:26px; overflow:hidden; background:linear-gradient(172deg, rgba(6,66,82,.94) 0%, rgba(8,104,124,.88) 45%, rgba(12,146,170,.82) 100%); border:1px solid rgba(14,165,181,.35); box-shadow:0 28px 60px rgba(4,31,45,.28); color:#f1fbfd; position:relative; transition:transform .25s ease, box-shadow .25s ease; }
-.gallery-item:hover{ transform:translateY(-6px); box-shadow:0 32px 70px rgba(4,31,45,.35); }
-.gallery-media{ position:relative; width:100%; background:rgba(2,27,36,.7); display:flex; align-items:center; justify-content:center; padding:10px; }
-.gallery-media img,.gallery-media video{ width:100%; height:auto; max-height:420px; display:block; object-fit:contain; border-radius:18px; box-shadow:0 18px 38px rgba(1,14,20,.45); }
-.gallery-header{ display:flex; align-items:center; gap:14px; padding:18px 22px; background:rgba(3,23,31,.45); border-bottom:1px solid rgba(255,255,255,.08); }
-.gallery-author{ font-weight:700; font-size:15px; color:#fff; letter-spacing:.02em; }
-.avatar{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; letter-spacing:.5px; box-shadow:0 8px 18px rgba(4,31,45,.35); border:2px solid rgba(255,255,255,.2); }
-.gallery-actions{ display:flex; align-items:center; justify-content:space-between; padding:14px 22px 12px; gap:18px; background:rgba(3,23,31,.45); border-top:1px solid rgba(255,255,255,.08); }
+.gallery-item{ display:flex; flex-direction:column; border-radius:26px; overflow:hidden; background:#ffffff; border:1px solid rgba(14,165,181,.22); box-shadow:0 24px 48px rgba(14,165,181,.12); color:var(--ink); position:relative; transition:transform .25s ease, box-shadow .25s ease; }
+.gallery-item:hover{ transform:translateY(-6px); box-shadow:0 28px 60px rgba(14,165,181,.18); }
+.gallery-media{ position:relative; width:100%; background:#f1fbfc; display:flex; align-items:center; justify-content:center; padding:10px; }
+.gallery-media img,.gallery-media video{ width:100%; height:auto; max-height:380px; display:block; object-fit:contain; border-radius:18px; box-shadow:0 16px 34px rgba(14,165,181,.15); }
+.gallery-header{ display:flex; align-items:center; gap:14px; padding:18px 22px; background:#f3fbfc; border-bottom:1px solid rgba(14,165,181,.16); }
+.gallery-author{ font-weight:700; font-size:15px; color:#0f172a; letter-spacing:.02em; }
+.avatar{ width:46px; height:46px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; letter-spacing:.5px; box-shadow:0 8px 18px rgba(14,165,181,.18); border:2px solid rgba(14,165,181,.25); }
+.gallery-actions{ display:flex; align-items:center; justify-content:space-between; padding:14px 22px 12px; gap:18px; background:#f7fdfd; border-top:1px solid rgba(14,165,181,.16); }
 .action-buttons{ display:flex; align-items:center; gap:12px; }
-.icon-btn{ border:none; background:rgba(255,255,255,.12); border-radius:999px; padding:9px 18px; display:flex; align-items:center; gap:8px; font-weight:600; color:#e0f6f9; cursor:pointer; transition:background .2s ease, color .2s ease; }
+.icon-btn{ border:none; background:rgba(14,165,181,.12); border-radius:999px; padding:9px 18px; display:flex; align-items:center; gap:8px; font-weight:600; color:#0b5f6c; cursor:pointer; transition:background .2s ease, color .2s ease; }
 .icon-btn span{ display:inline-flex; align-items:center; }
 .icon-btn .like-count{ font-variant-numeric:tabular-nums; }
-.icon-btn.active{ background:rgba(255,255,255,.22); color:#fff; }
-.icon-btn:hover{ background:rgba(255,255,255,.26); color:#fff; }
+.icon-btn.active{ background:#0ea5b5; color:#fff; }
+.icon-btn:hover{ background:rgba(14,165,181,.2); color:#053f49; }
 .icon-btn:disabled{ cursor:not-allowed; opacity:.55; }
-.gallery-actions .btn{ border-radius:999px; border:1px solid rgba(255,255,255,.28); color:#fff; background:transparent; font-weight:600; }
-.gallery-actions .btn:hover{ background:rgba(255,255,255,.18); color:#fff; }
-.gallery-meta{ font-size:13px; color:rgba(226,248,250,.8); }
-.gallery-body{ padding:16px 22px 24px; background:rgba(3,23,31,.32); color:#f1fbfd; }
-.gallery-body p{ color:rgba(226,248,250,.88); }
-.gallery-body .smallmuted{ color:rgba(226,248,250,.82); }
-.comment{ padding:12px 16px; border-radius:18px; background:rgba(255,255,255,.12); margin-top:10px; color:#f1fbfd; }
-.gallery-item .comment strong{ display:block; font-size:13px; color:#fff; }
-.gallery-item .comment p{ margin:6px 0 0; font-size:13px; color:rgba(226,248,250,.88); }
-.gallery-item .comment .smallmuted{ color:rgba(226,248,250,.65); }
-.gallery-item .comment.smallmuted{ color:rgba(226,248,250,.82); }
+.gallery-actions .btn{ border-radius:999px; border:1px solid rgba(14,165,181,.35); color:#0a4d58; background:transparent; font-weight:600; }
+.gallery-actions .btn:hover{ background:#0ea5b5; color:#fff; }
+.gallery-meta{ font-size:13px; color:#537082; }
+.gallery-body{ padding:16px 22px 24px; background:#ffffff; color:var(--ink); }
+.gallery-body p{ color:#365562; }
+.gallery-body .smallmuted{ color:#57758a; }
+.comment{ padding:12px 16px; border-radius:18px; background:rgba(14,165,181,.12); margin-top:0; color:#0a4550; }
+.gallery-item .comment strong{ display:block; font-size:13px; color:#0a4550; }
+.gallery-item .comment p{ margin:6px 0 0; font-size:13px; color:#0b5f6c; }
+.gallery-item .comment .smallmuted{ color:#57758a; }
+.gallery-item .comment.smallmuted{ color:#57758a; }
 .comment-form textarea{ resize:vertical; border-radius:16px; }
-.gallery-item .comment-form textarea{ background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#fff; }
-.gallery-item .comment-form textarea::placeholder{ color:rgba(226,248,250,.6); }
-.gallery-item .comment-form textarea:focus{ background:rgba(3,23,31,.6); border-color:rgba(255,255,255,.45); box-shadow:0 0 0 .25rem rgba(14,165,181,.35); }
+.gallery-item .comment-form textarea{ background:#f7fdfd; border-color:rgba(14,165,181,.2); color:var(--ink); }
+.gallery-item .comment-form textarea::placeholder{ color:#7fa7b3; }
+.gallery-item .comment-form textarea:focus{ background:#ecfcff; border-color:rgba(14,165,181,.5); box-shadow:0 0 0 .25rem rgba(14,165,181,.25); }
+.comment-form{ display:flex; flex-direction:column; gap:10px; }
+.comment-form .btn{ align-self:flex-end; }
+.comment-section{ margin-top:16px; padding-top:12px; border-top:1px solid rgba(14,165,181,.15); }
+.comment-header{ display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.comment-toggle{ border:none; background:rgba(14,165,181,.12); color:#0b5f6c; font-weight:600; padding:6px 14px; border-radius:999px; cursor:pointer; transition:background .2s ease, color .2s ease; }
+.comment-toggle:hover{ background:rgba(14,165,181,.2); color:#053f49; }
+.comment-body{ margin-top:14px; display:flex; flex-direction:column; gap:14px; }
+.comment-section.collapsed .comment-body{ display:none; }
+.comment-list{ display:flex; flex-direction:column; gap:10px; }
+.comment-body .icon-btn{ align-self:flex-start; }
 .note-card textarea{ min-height:140px; }
 .form-feedback{ color:var(--zs); font-weight:600; }
 .form-feedback.error{ color:#ef4444; }
@@ -704,6 +722,9 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
       </div>
       <div class="text-end smallmuted">
         <div>Etkinlik Tarihi: <?= $ev['event_date'] ? date('d.m.Y', strtotime($ev['event_date'])) : 'Belirtilmedi' ?></div>
+        <?php if($uploadDeadline): ?>
+          <div>Yükleme Süresi: <?= date('d.m.Y', $uploadDeadline) ?><?= $uploadsLocked ? ' • Kapalı' : '' ?></div>
+        <?php endif; ?>
         <div>Misafir bağlantısı bu sayfadır.</div>
       </div>
     </div>
@@ -713,38 +734,42 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
       <div class="card-lite upload-card">
         <h5 class="mb-3">Anınızı Yükleyin</h5>
         <p class="smallmuted mb-4">Fotoğraflar, videolar ve GIF’ler yüksek kalitede saklanır. Yükledikten sonra topluluk beğenebilir, yorum yapabilir ve paylaşabilir.</p>
-        <form method="post" enctype="multipart/form-data" id="upForm" class="vstack gap-4">
+        <?php if($uploadsLocked): ?>
+          <div class="alert alert-warning" role="alert">Bu etkinlik için yüklemeler etkinlik tarihinden 10 gün sonra otomatik olarak kapanır. Yeni içerik ekleyemezsiniz.</div>
+        <?php endif; ?>
+        <form method="post" enctype="multipart/form-data" id="upForm" class="vstack gap-4" <?= $uploadsLocked ? 'data-locked="1"' : '' ?>>
           <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
           <input type="hidden" name="do" value="upload">
           <input type="hidden" name="t" value="<?=h($token)?>">
           <div class="row g-3">
             <div class="col-md-6">
               <label class="form-label">Adınız Soyadınız *</label>
-              <input class="form-control" name="guest_name" placeholder="Ör. Ayşe Yılmaz" required <?= !$token_ok?'disabled':'' ?>>
+              <input class="form-control" name="guest_name" placeholder="Ör. Ayşe Yılmaz" required <?= (!$token_ok || $uploadsLocked)?'disabled':'' ?>>
             </div>
             <div class="col-md-6">
               <label class="form-label">E-posta (opsiyonel)</label>
-              <input class="form-control" type="email" name="guest_email" placeholder="ornek@mail.com" <?= !$token_ok?'disabled':'' ?>>
+              <input class="form-control" type="email" name="guest_email" placeholder="ornek@mail.com" <?= (!$token_ok || $uploadsLocked)?'disabled':'' ?>>
               <div class="form-text">Düğün sonrasında size gönderilecek kullanıcı adı ve şifreniz için e-posta adresinizi paylaşabilirsiniz.</div>
             </div>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" name="marketing_opt_in" value="1" id="marketingOpt" <?= !$token_ok?'disabled':'' ?>>
+            <input class="form-check-input" type="checkbox" name="marketing_opt_in" value="1" id="marketingOpt" <?= (!$token_ok || $uploadsLocked)?'disabled':'' ?>>
             <label class="form-check-label" for="marketingOpt">BİKARE’den kampanya ve yenilik bildirimleri almak istiyorum.</label>
           </div>
-          <div class="dropzone" id="drop" <?= !$token_ok?'data-disabled="1"':'' ?>>
+          <div class="dropzone" id="drop" <?= (!$token_ok || $uploadsLocked)?'data-disabled="1"':'' ?>>
             <p class="m-0">
               <strong>Dosyalarınızı buraya sürükleyin</strong> veya
               <label class="text-decoration-underline" style="cursor:pointer">cihazınızdan seçin
-                <input type="file" name="files[]" id="fileI" accept="<?=implode(',',array_keys(ALLOWED_MIMES))?>" multiple hidden <?= !$token_ok?'disabled':'' ?>>
+                <input type="file" name="files[]" id="fileI" accept="<?=implode(',',array_keys(ALLOWED_MIMES))?>" multiple hidden <?= (!$token_ok || $uploadsLocked)?'disabled':'' ?>>
               </label>
             </p>
             <div class="form-text mt-2">İzinli formatlar: jpg, png, webp, gif, mp4, mov, webm. Maksimum <?=round(MAX_UPLOAD_BYTES/1048576)?> MB / dosya.</div>
           </div>
           <div id="list" class="smallmuted"></div>
           <div class="d-grid d-sm-flex align-items-center gap-3">
-            <button class="btn btn-zs" <?= !$token_ok?'disabled':'' ?>>Anımı Paylaş</button>
+            <button class="btn btn-zs" <?= (!$token_ok || $uploadsLocked)?'disabled':'' ?>>Anımı Paylaş</button>
             <?php if(!$token_ok): ?><span class="text-danger small">Güvenlik anahtarınızın süresi doldu. Lütfen QR kodu yeniden okutun.</span><?php endif; ?>
+            <?php if($uploadsLocked): ?><span class="text-danger small">Yükleme süresi sona erdi.</span><?php endif; ?>
           </div>
         </form>
       </div>
@@ -838,37 +863,44 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
                 <?php endif; ?>
               </div>
               <div class="gallery-body">
-                <div class="smallmuted">Yorumlar (<span class="comment-count" data-upload="<?=$u['id']?>"><?=$commentCount?></span>)</div>
-                <div class="comment-list" data-upload="<?=$u['id']?>">
-                  <?php foreach($comments as $c): ?>
-                    <?=render_comment_block($c)?>
-                  <?php endforeach; ?>
+                <div class="comment-section collapsed" data-upload="<?=$u['id']?>">
+                  <div class="comment-header">
+                    <div class="comment-meta smallmuted">Yorumlar (<span class="comment-count" data-upload="<?=$u['id']?>"><?=$commentCount?></span>)</div>
+                    <button class="comment-toggle" type="button" data-upload="<?=$u['id']?>" data-label-collapsed="<?=h($commentCount>0 ? 'Yorumları Göster' : 'Yorum Yaz')?>" data-label-expanded="<?=h('Yorumları Gizle')?>"><?= $commentCount>0 ? 'Yorumları Göster' : 'Yorum Yaz' ?></button>
+                  </div>
+                  <div class="comment-body">
+                    <div class="comment-list" data-upload="<?=$u['id']?>">
+                      <?php foreach($comments as $c): ?>
+                        <?=render_comment_block($c)?>
+                      <?php endforeach; ?>
+                    </div>
+                    <?php if($profileVerified): ?>
+                      <form method="post" class="comment-form ajax-comment" data-upload="<?=$u['id']?>">
+                        <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
+                        <input type="hidden" name="do" value="comment">
+                        <input type="hidden" name="upload_id" value="<?=$u['id']?>">
+                        <textarea class="form-control" name="comment_body" rows="2" placeholder="Güzel bir not bırak..." required></textarea>
+                        <div class="text-end mt-2"><button class="btn btn-sm btn-zs">Yorumu Gönder</button></div>
+                      </form>
+                      <?php
+                        $isOwnUpload = $u['profile_id'] && isset($guestProfile['id']) && (int)$u['profile_id'] === (int)$guestProfile['id'];
+                        $canMessageGuest = !$isOwnUpload && (int)$u['profile_id'] > 0;
+                        $targetName = $u['profile_display_name'] ?: ($u['guest_name'] ?: 'Misafir');
+                      ?>
+                      <?php if($canMessageGuest): ?>
+                        <button type="button" class="icon-btn message-open" data-target-profile="<?=$u['profile_id']?>" data-target-name="<?=h($targetName)?>" data-upload-id="<?=$u['id']?>">💬 Mesaj Gönder</button>
+                      <?php elseif($isOwnUpload): ?>
+                        <div class="comment smallmuted">Bu içerik size ait. Sohbet alanından diğer misafirlerle iletişim kurabilirsiniz.</div>
+                      <?php else: ?>
+                        <div class="comment smallmuted">Bu misafir henüz iletişim bilgisi paylaşmadı.</div>
+                      <?php endif; ?>
+                    <?php elseif($guestProfile && !$profileVerified): ?>
+                      <div class="comment">Yorum yapabilmek için e-posta adresinizi doğrulayın.</div>
+                    <?php else: ?>
+                      <div class="comment">Yorum yapmak için önce e-posta adresinizi paylaşarak içerik yükleyin.</div>
+                    <?php endif; ?>
+                  </div>
                 </div>
-                <?php if($profileVerified): ?>
-                  <form method="post" class="comment-form mt-3 ajax-comment" data-upload="<?=$u['id']?>">
-                    <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
-                    <input type="hidden" name="do" value="comment">
-                    <input type="hidden" name="upload_id" value="<?=$u['id']?>">
-                    <textarea class="form-control" name="comment_body" rows="2" placeholder="Güzel bir not bırak..." required></textarea>
-                    <div class="text-end mt-2"><button class="btn btn-sm btn-zs">Yorumu Gönder</button></div>
-                  </form>
-                  <?php
-                    $isOwnUpload = $u['profile_id'] && isset($guestProfile['id']) && (int)$u['profile_id'] === (int)$guestProfile['id'];
-                    $canMessageGuest = !$isOwnUpload && (int)$u['profile_id'] > 0;
-                    $targetName = $u['profile_display_name'] ?: ($u['guest_name'] ?: 'Misafir');
-                  ?>
-                  <?php if($canMessageGuest): ?>
-                    <button type="button" class="icon-btn message-open mt-3" data-target-profile="<?=$u['profile_id']?>" data-target-name="<?=h($targetName)?>" data-upload-id="<?=$u['id']?>">💬 Mesaj Gönder</button>
-                  <?php elseif($isOwnUpload): ?>
-                    <div class="comment mt-3 smallmuted">Bu içerik size ait. Sohbet alanından diğer misafirlerle iletişim kurabilirsiniz.</div>
-                  <?php else: ?>
-                    <div class="comment mt-3 smallmuted">Bu misafir henüz iletişim bilgisi paylaşmadı.</div>
-                  <?php endif; ?>
-                <?php elseif($guestProfile && !$profileVerified): ?>
-                  <div class="comment mt-3">Yorum yapabilmek için e-posta adresinizi doğrulayın.</div>
-                <?php else: ?>
-                  <div class="comment mt-3">Yorum yapmak için önce e-posta adresinizi paylaşarak içerik yükleyin.</div>
-                <?php endif; ?>
               </div>
             </div>
             <?php endforeach; ?>
@@ -1054,15 +1086,28 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:'Inter
 })();
 
 const dz=document.getElementById('drop'), fi=document.getElementById('fileI'), lst=document.getElementById('list'), fm=document.getElementById('upForm');
-if(dz && !dz.dataset.disabled){
+const uploadsLocked = fm?.dataset.locked === '1';
+if(dz && !dz.dataset.disabled && !uploadsLocked){
   ['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag');}));
   ['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag');}));
   dz.addEventListener('drop',e=>{ const fs=e.dataTransfer.files; if(fs&&fi){ fi.files=fs; renderList(fs); } });
 }
-fi?.addEventListener('change',e=>renderList(e.target.files));
+fi?.addEventListener('change',e=>{ if(uploadsLocked){ e.target.value=''; return; } renderList(e.target.files); });
 function renderList(files){ if(!files||!files.length){ lst.innerHTML=''; return; } let out='<ul class="m-0 ps-3">'; for(let i=0;i<files.length;i++){ const f=files[i]; out+=`<li>${esc(f.name)} — ${(f.size/1048576).toFixed(1)} MB</li>`; } lst.innerHTML=out+'</ul>'; }
 function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));}
-fm?.addEventListener('submit',e=>{ const name=fm.querySelector('[name=guest_name]').value.trim(); if(!name){e.preventDefault(); alert('Lütfen adınızı yazın.');} const fs=fi?.files||[]; if(!fs.length){e.preventDefault(); alert('Lütfen dosya seçin.');} });
+fm?.addEventListener('submit',e=>{ if(uploadsLocked){ e.preventDefault(); alert('Bu etkinlik için yüklemeler kapatıldı.'); return; } const name=fm.querySelector('[name=guest_name]').value.trim(); if(!name){e.preventDefault(); alert('Lütfen adınızı yazın.');} const fs=fi?.files||[]; if(!fs.length){e.preventDefault(); alert('Lütfen dosya seçin.');} });
+
+document.querySelectorAll('.comment-section').forEach(section=>{
+  const toggle=section.querySelector('.comment-toggle');
+  if(!toggle) return;
+  const collapsedLabel=toggle.dataset.labelCollapsed || 'Yorumları Göster';
+  const expandedLabel=toggle.dataset.labelExpanded || 'Yorumları Gizle';
+  toggle.textContent=collapsedLabel;
+  toggle.addEventListener('click',()=>{
+    const isCollapsed=section.classList.toggle('collapsed');
+    toggle.textContent=isCollapsed?collapsedLabel:expandedLabel;
+  });
+});
 
 const csrfToken='<?=h(csrf_token())?>';
 const shareButtons=document.querySelectorAll('.share-btn');
@@ -1148,13 +1193,21 @@ document.querySelectorAll('.ajax-comment').forEach(form=>{
     submit?.setAttribute('disabled','disabled');
     try{
       const data=await sendAjax(form);
-      const container=form.closest('.gallery-body');
-      const list=container?.querySelector('.comment-list');
+      const section=form.closest('.comment-section');
+      const list=section?.querySelector('.comment-list');
       if(list && data.html){ list.insertAdjacentHTML('beforeend', data.html); }
-      const countEl=container?.querySelector('.comment-count');
+      const countEl=section?.querySelector('.comment-count');
       if(countEl && typeof data.count!=='undefined'){ countEl.textContent=data.count; }
       const textarea=form.querySelector('textarea');
       if(textarea) textarea.value='';
+      if(section){
+        section.classList.remove('collapsed');
+        const toggle=section.querySelector('.comment-toggle');
+        if(toggle){
+          const expandedLabel=toggle.dataset.labelExpanded || 'Yorumları Gizle';
+          toggle.textContent=expandedLabel;
+        }
+      }
       showToast('Yorumun paylaşıldı!');
     }catch(err){
       showToast(err.message || 'Yorum gönderilemedi.');
