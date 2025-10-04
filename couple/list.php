@@ -50,7 +50,7 @@ if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='zip'){
   $rows = $st->fetchAll();
   if(!$rows){ flash('err','Seçili öğe bulunamadı.'); redirect($_SERVER['REQUEST_URI']); }
 
-  $zipName = 'wedding_'.date('Ymd_His').'.zip';
+  $zipName = 'bikare_'.date('Ymd_His').'.zip';
   $tmp = sys_get_temp_dir().'/'.$zipName;
   $zip = new ZipArchive();
   if($zip->open($tmp, ZipArchive::CREATE|ZipArchive::OVERWRITE)!==true){ flash('err','ZIP oluşturulamadı.'); redirect($_SERVER['REQUEST_URI']); }

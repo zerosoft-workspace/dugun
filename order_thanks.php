@@ -36,9 +36,6 @@ unset($_SESSION['lead_success'], $_SESSION['order_summary']);
         <ul class="list-unstyled small text-muted mb-3">
           <li><strong>Etkinlik:</strong> <?=h($summary['event_title'])?></li>
           <li><strong>Misafir bağlantısı:</strong><br><a href="<?=h($summary['upload_url'])?>" target="_blank" rel="noopener"><?=h($summary['upload_url'])?></a></li>
-          <?php if (!empty($summary['qr_dynamic'])): ?>
-            <li class="mt-2"><strong>Kalıcı QR adresi:</strong><br><a href="<?=h($summary['qr_dynamic'])?>" target="_blank" rel="noopener"><?=h($summary['qr_dynamic'])?></a></li>
-          <?php endif; ?>
           <?php if (!empty($summary['login_url'])): ?>
             <li class="mt-2"><strong>Çift paneli:</strong><br><a href="<?=h($summary['login_url'])?>" target="_blank" rel="noopener"><?=h($summary['login_url'])?></a></li>
           <?php endif; ?>

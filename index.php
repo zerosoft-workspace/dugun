@@ -84,15 +84,15 @@ unset($_SESSION['lead_success']);
       <div class="col-lg-6">
         <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Yeni nesil misafir paylaşımı</span>
         <h1 class="fw-bold display-5 mt-4 mb-3">Tek QR kodla tüm fotoğraf ve videoları toplayın</h1>
-        <p class="lead mb-4">Wedding Share, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak çift panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
+        <p class="lead mb-4">BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak çift panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
         <div class="d-flex flex-wrap gap-3">
           <a class="btn btn-light text-dark fw-semibold" href="#paketler">Paketleri İncele</a>
           <a class="btn btn-outline-light fw-semibold" href="#lead-form">Hemen Başlayın</a>
         </div>
       </div>
       <div class="col-lg-6 hero-visual">
-        <img src="https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=format&fit=crop&w=820&q=80" alt="Düğün kutlaması" class="img-fluid">
-        <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&w=520&q=80" alt="Etkinlikten kare" class="img-fluid">
+        <img src="https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80" alt="Düğün kutlaması" class="img-fluid">
+        <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80" alt="Etkinlikten kare" class="img-fluid">
       </div>
     </div>
     <div class="row mt-5 g-4 position-relative" style="z-index:2;">
@@ -151,7 +151,7 @@ unset($_SESSION['lead_success']);
   <section class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-6">
-        <h2 class="fw-bold mb-3">Wedding Share nasıl çalışır?</h2>
+        <h2 class="fw-bold mb-3">BİKARE nasıl çalışır?</h2>
         <p class="muted">Basit 3 adımda etkinliğinizi dijitalleştiriyoruz. Kurulum ve teknik detaylarla vakit kaybetmenize gerek yok.</p>
       </div>
       <div class="col-lg-6 d-flex flex-column gap-3">
@@ -210,9 +210,9 @@ unset($_SESSION['lead_success']);
         <p class="muted">Misafirleriniz sadece düğünlerde değil; nişan, kına, doğum günü ve kurumsal etkinliklerde de QR kodunuzla içerik paylaşabilir.</p>
       </div>
       <div class="col-lg-7 gallery-grid">
-        <img src="https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=format&fit=crop&w=600&q=80" alt="Düğün davetlileri">
-        <img src="https://images.unsplash.com/photo-1530023367847-a683933f4177?auto=format&fit=crop&w=600&q=80" alt="Nişan etkinliği">
-        <img src="https://images.unsplash.com/photo-1525182008055-f88b95ff7980?auto=format&fit=crop&w=600&q=80" alt="Kurumsal etkinlik">
+        <img src="https://images.unsplash.com/photo-1603015444030-0e4d0a568d2e?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Düğün davetlileri">
+        <img src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Kurumsal etkinlik">
+        <img src="https://images.unsplash.com/photo-1525253013412-55c1a69a5738?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Yemek organizasyonu">
       </div>
     </div>
   </section>
@@ -228,7 +228,7 @@ unset($_SESSION['lead_success']);
       </div>
       <div class="col-md-6">
         <div class="testimonial h-100">
-          <p class="mb-3">"Kurumsal lansmanımızda katılımcıların videolarını toplamak bu kadar kolay olmamıştı. Wedding Share ekibi her detayla ilgilendi."</p>
+          <p class="mb-3">"Kurumsal lansmanımızda katılımcıların videolarını toplamak bu kadar kolay olmamıştı. BİKARE ekibi her detayla ilgilendi."</p>
           <div class="fw-semibold">Berna U.</div>
           <div class="small text-muted">Etkinlik Ajansı Sahibi</div>
         </div>

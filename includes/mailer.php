@@ -4,7 +4,7 @@ require_once __DIR__.'/../config.php';
 /*
 config.php içine şunlar tanımlı olmalı:
 const MAIL_FROM = 'no-reply@SIZINDOMAIN.com';
-const MAIL_FROM_NAME = 'Wedding Share';
+const MAIL_FROM_NAME = 'BİKARE';
 const SMTP_HOST = 'smtp.sizindomain.com';
 const SMTP_PORT = 587;          // 587 (TLS) ya da 465 (SSL)
 const SMTP_USER = 'smtp-kullanici@SIZINDOMAIN.com';

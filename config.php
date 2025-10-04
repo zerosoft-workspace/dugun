@@ -5,7 +5,7 @@ const DB_NAME   = 'u111878875_foto';
 const DB_USER   = 'u111878875_foto';
 const DB_PASS   = 'Zero671901*';
 const BASE_URL  = 'https://drive.demozerosoft.com.tr'; // kök URL (sonda / yok)
-const APP_NAME  = 'Wedding Share';
+const APP_NAME  = 'BİKARE';
 const SECRET_KEY = 'CHANGE_THIS_LONG_RANDOM_SECRET_32+CHARS';
 
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25 MB
@@ -15,7 +15,7 @@ const ALLOWED_MIMES = [
   
 ];
 const MAIL_FROM = 'test@zerosoft.com.tr';
-const MAIL_FROM_NAME = 'Wedding Share';
+const MAIL_FROM_NAME = 'BİKARE';
 const SMTP_HOST = 'smtp.hostinger.com';
 const SMTP_PORT = 465;
 const SMTP_USER = 'test@zerosoft.com.tr';

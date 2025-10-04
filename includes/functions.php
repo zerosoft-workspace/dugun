@@ -105,7 +105,9 @@ function send_mail_simple(string $to, string $subject, string $html){
   $headers  = "MIME-Version: 1.0\r\n";
   $headers .= "Content-type:text/html;charset=UTF-8\r\n";
   $fromHost = parse_url(BASE_URL, PHP_URL_HOST) ?: 'localhost';
-  $headers .= "From: ".APP_NAME." <no-reply@".$fromHost.">\r\n";
+  $fromName = defined('MAIL_FROM_NAME') && MAIL_FROM_NAME ? MAIL_FROM_NAME : APP_NAME;
+  $fromAddr = defined('MAIL_FROM') && MAIL_FROM ? MAIL_FROM : 'no-reply@'.$fromHost;
+  $headers .= "From: ".$fromName." <".$fromAddr.">\r\n";
   return @mail($to, $subject, $html, $headers);
 }
 

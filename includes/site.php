@@ -766,38 +766,50 @@ function site_finalize_order(int $order_id, array $options = []): array {
   return $result;
 }
 
+function site_email_template(string $headline, string $contentHtml): string {
+  $brand = h(APP_NAME);
+  return '<div style="background:#f4f7fb;padding:32px 0;font-family:\'Inter\',Arial,sans-serif;color:#0f172a;">'
+    .'<div style="max-width:640px;margin:0 auto;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 18px 45px rgba(15,118,110,0.18);">'
+    .'<div style="background:linear-gradient(135deg,#0ea5b5,#6366f1);padding:32px 40px;color:#ffffff;">'
+    .'<div style="font-size:13px;letter-spacing:1px;text-transform:uppercase;opacity:0.85;">'.$brand.'</div>'
+    .'<h1 style="margin:12px 0 0;font-size:26px;">'.h($headline).'</h1>'
+    .'</div>'
+    .'<div style="padding:36px 40px;font-size:15px;line-height:1.6;">'.$contentHtml.'</div>'
+    .'<div style="padding:18px 40px 28px;font-size:12px;color:#64748b;background:#f8fafc;">'
+    .'Bu e-posta '.$brand.' tarafından otomatik olarak gönderildi. Sorularınız için <a href="mailto:support@demozerosoft.com.tr" style="color:#0ea5b5;text-decoration:none;">support@demozerosoft.com.tr</a> adresine ulaşabilirsiniz.'
+    .'</div>'
+    .'</div>'
+    .'</div>';
+}
+
 function site_send_customer_order_mail(array $result): void {
   $event = $result['event'];
   $customer = $result['customer'];
   $package = $result['package'];
   $plainPassword = $event['plain_password'] ?? null;
   $uploadUrl = $event['upload_url'];
-  $dynamicUrl = $event['qr_dynamic_url'];
   $qrImage = $event['qr_image_url'];
   $loginUrl = $event['login_url'];
 
-  $html = '<h2>'.h(APP_NAME).' — Etkinliğiniz Hazır</h2>'
-    .'<p>Merhaba '.h($customer['name']).',</p>'
-    .'<p>Ödemeniz onaylandı ve etkinlik paneliniz oluşturuldu.</p>'
-    .'<ul>'
-    .'<li><strong>Giriş adresi:</strong> <a href="'.h($loginUrl).'">'.h($loginUrl).'</a></li>'
-    .'<li><strong>Kullanıcı adı:</strong> '.h($customer['email']).'</li>';
+  $rows = ''
+    .'<tr><td style="padding:6px 0;color:#6b7280;">Misafir bağlantısı</td><td style="padding:6px 0;text-align:right;"><a href="'.h($uploadUrl).'" style="color:#0ea5b5;text-decoration:none;">'.h($uploadUrl).'</a></td></tr>'
+    .'<tr><td style="padding:6px 0;color:#6b7280;">Panel adresi</td><td style="padding:6px 0;text-align:right;"><a href="'.h($loginUrl).'" style="color:#0ea5b5;text-decoration:none;">'.h($loginUrl).'</a></td></tr>'
+    .'<tr><td style="padding:6px 0;color:#6b7280;">E-posta</td><td style="padding:6px 0;text-align:right;">'.h($customer['email']).'</td></tr>';
   if ($plainPassword) {
-    $html .= '<li><strong>Geçici şifre:</strong> '.h($plainPassword).'</li>';
+    $rows .= '<tr><td style="padding:6px 0;color:#6b7280;">Geçici şifre</td><td style="padding:6px 0;text-align:right;font-weight:600;">'.h($plainPassword).'</td></tr>';
   }
-  $html .= '</ul>'
-    .'<p>Misafir yükleme bağlantınız: <a href="'.h($uploadUrl).'">'.h($uploadUrl).'</a></p>';
-  if ($dynamicUrl) {
-    $html .= '<p>Kalıcı QR yönlendirme adresiniz: <a href="'.h($dynamicUrl).'">'.h($dynamicUrl).'</a></p>';
-  }
+  $body = '<p>Merhaba '.h($customer['name']).',</p>'
+    .'<p>Ödemeniz alındı ve etkinlik paneliniz dakikalar içinde hazırlandı. Aşağıdaki bağlantılardan BİKARE deneyiminizi başlatabilirsiniz.</p>'
+    .'<table style="width:100%;margin:20px 0;border-collapse:collapse;font-size:14px;">'.$rows.'</table>'
+    .'<p>Seçtiğiniz paket: <strong>'.h($package['name']).'</strong> — '.h(format_currency((int)$package['price_cents'])).'</p>';
   if ($qrImage) {
-    $html .= '<p>QR kodu yazdırmak için aşağıdaki görseli kullanabilirsiniz:</p>'
-          . '<p><img src="'.h($qrImage).'" alt="QR Kod" width="220" height="220"></p>';
+    $body .= '<p style="margin-top:18px;">QR kod görselinizi baskı almak için kullanabilirsiniz:</p>'
+      .'<p style="text-align:center;"><img src="'.h($qrImage).'" alt="QR Kod" width="220" height="220" style="border-radius:12px;box-shadow:0 12px 35px rgba(14,165,181,0.28);"></p>';
   }
-  $html .= '<p>Paketiniz: '.h($package['name']).' — '.h(format_currency((int)$package['price_cents'])) .'</p>'
-         . '<p>Keyifli bir etkinlik dileriz!<br>'.h(APP_NAME).' Ekibi</p>';
+  $body .= '<p>Keyifli bir etkinlik dileriz!<br><strong>BİKARE Ekibi</strong></p>';
 
-  send_mail_simple($customer['email'], 'Wedding Share etkinliğiniz hazır', $html);
+  $html = site_email_template('Etkinliğiniz hazır', $body);
+  send_mail_simple($customer['email'], 'BİKARE etkinlik paneliniz hazır', $html);
 }
 
 function site_send_dealer_order_mail(array $result): void {
@@ -813,22 +825,27 @@ function site_send_dealer_order_mail(array $result): void {
   $loginUrl = $event['login_url'];
   $cashback = (int)$result['cashback_cents'];
 
-  $html = '<h2>Yeni Web Satışı</h2>'
-    .'<p><strong>Müşteri:</strong> '.h($customer['name']).'<br>'
-    .'<strong>E-posta:</strong> '.h($customer['email']).'<br>';
+  $rows = '<tr><td style="padding:6px 0;color:#6b7280;">Müşteri</td><td style="padding:6px 0;text-align:right;">'.h($customer['name']).'</td></tr>'
+    .'<tr><td style="padding:6px 0;color:#6b7280;">E-posta</td><td style="padding:6px 0;text-align:right;">'.h($customer['email']).'</td></tr>';
   if (!empty($customer['phone'])) {
-    $html .= '<strong>Telefon:</strong> '.h($customer['phone']).'<br>';
+    $rows .= '<tr><td style="padding:6px 0;color:#6b7280;">Telefon</td><td style="padding:6px 0;text-align:right;">'.h($customer['phone']).'</td></tr>';
   }
-  $html .= '<strong>Paket:</strong> '.h($package['name']).' — '.h(format_currency((int)$package['price_cents'])).'</p>'
-    .'<p><strong>Etkinlik paneli:</strong> <a href="'.h($loginUrl).'">'.h($loginUrl).'</a><br>'
-    .'<strong>Misafir yükleme:</strong> <a href="'.h($uploadUrl).'">'.h($uploadUrl).'</a></p>';
+  $rows .= '<tr><td style="padding:6px 0;color:#6b7280;">Paket</td><td style="padding:6px 0;text-align:right;">'.h($package['name']).'</td></tr>'
+    .'<tr><td style="padding:6px 0;color:#6b7280;">Panel adresi</td><td style="padding:6px 0;text-align:right;"><a href="'.h($loginUrl).'" style="color:#0ea5b5;text-decoration:none;">'.h($loginUrl).'</a></td></tr>'
+    .'<tr><td style="padding:6px 0;color:#6b7280;">Misafir bağlantısı</td><td style="padding:6px 0;text-align:right;"><a href="'.h($uploadUrl).'" style="color:#0ea5b5;text-decoration:none;">'.h($uploadUrl).'</a></td></tr>';
   if ($dynamicUrl) {
-    $html .= '<p><strong>QR 301 adresi:</strong> <a href="'.h($dynamicUrl).'">'.h($dynamicUrl).'</a></p>';
+    $rows .= '<tr><td style="padding:6px 0;color:#6b7280;">Kalıcı QR yönlendirmesi</td><td style="padding:6px 0;text-align:right;"><a href="'.h($dynamicUrl).'" style="color:#0ea5b5;text-decoration:none;">'.h($dynamicUrl).'</a></td></tr>';
   }
   if ($cashback > 0) {
-    $html .= '<p><strong>Cashback:</strong> '.h(format_currency($cashback)).' hesabınıza tanımlandı.</p>';
+    $rows .= '<tr><td style="padding:6px 0;color:#6b7280;">Cashback</td><td style="padding:6px 0;text-align:right;font-weight:600;">'.h(format_currency($cashback)).'</td></tr>';
   }
-  $html .= '<p>Referans satışınız için teşekkür ederiz.</p>';
 
-  send_mail_simple($dealer['email'], 'Referans satışınız tamamlandı', $html);
+  $body = '<p>Merhaba '.h($dealer['name']).',</p>'
+    .'<p>Referans kodunuzla yeni bir BİKARE siparişi tamamlandı. Etkinlik bilgileri aşağıdadır.</p>'
+    .'<table style="width:100%;margin:20px 0;border-collapse:collapse;font-size:14px;">'.$rows.'</table>'
+    .'<p>Ekibimiz desteğe her zaman hazır. İş ortaklığınız için teşekkür ederiz.</p>'
+    .'<p><strong>BİKARE Bayi Destek</strong></p>';
+
+  $html = site_email_template('Yeni web siparişiniz var', $body);
+  send_mail_simple($dealer['email'], 'BİKARE referans siparişiniz tamamlandı', $html);
 }
