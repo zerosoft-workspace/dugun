@@ -13,8 +13,8 @@ if (!function_exists('admin_base_styles')) {
         --admin-muted:#64748b;
         --admin-bg:#eef2f9;
         --admin-surface:#ffffff;
-        --admin-sidebar:#0f172a;
-        --admin-sidebar-accent:#1e3a8a;
+        --admin-sidebar:#0ea5b5;
+        --admin-sidebar-accent:#0b8b98;
         /* Eski değişkenlerle uyumluluk */
         --brand:var(--admin-brand);
         --brand-dark:var(--admin-brand-dark);
@@ -39,8 +39,8 @@ if (!function_exists('admin_base_styles')) {
 
       .admin-sidebar {
         width:280px;
-        background:linear-gradient(160deg,var(--admin-sidebar) 0%,var(--admin-sidebar-accent) 85%);
-        color:#f8fafc;
+        background:linear-gradient(165deg,var(--admin-sidebar) 0%,var(--admin-sidebar-accent) 92%);
+        color:#f0fdfd;
         display:flex;
         flex-direction:column;
         padding:28px 22px 32px;
@@ -83,10 +83,11 @@ if (!function_exists('admin_base_styles')) {
         gap:12px;
         padding:10px 12px;
         border-radius:12px;
-        color:rgba(248,250,252,.8);
+        color:rgba(255,255,255,.82);
         font-weight:500;
         text-decoration:none;
         transition:all .2s ease;
+        pointer-events:auto;
       }
 
       .sidebar-link i {
@@ -101,16 +102,20 @@ if (!function_exists('admin_base_styles')) {
       }
 
       .sidebar-link.active {
-        background:#fff;
-        color:var(--admin-brand);
-        box-shadow:0 15px 30px -18px rgba(15,23,42,.65);
+        background:rgba(255,255,255,.22);
+        color:#fff;
+        box-shadow:0 18px 34px -22px rgba(10,126,142,.65);
+      }
+
+      .sidebar-link.active i {
+        color:#fff;
       }
 
       .sidebar-footer {
         margin-top:2rem;
         padding:14px 16px;
         border-radius:14px;
-        background:rgba(255,255,255,.09);
+        background:rgba(255,255,255,.16);
         font-size:.85rem;
         line-height:1.5;
       }
@@ -420,7 +425,7 @@ CSS;
     echo '</nav>';
     echo '<div class="sidebar-footer">';
     echo '<strong>Destek</strong>';
-    echo 'Zerosoft ekibi ile iletişime geçmek için <a class="text-white text-decoration-underline" href="mailto:'.h($supportEmail).'">'.h($supportEmail).'</a> adresine yazabilirsiniz.';
+    echo 'Zerosoft ekibi ile iletişime geçmek için <a class="text-white text-decoration-none fw-semibold" href="mailto:'.h($supportEmail).'">'.h($supportEmail).'</a> adresine yazabilirsiniz.';
     echo '</div>';
     echo '</aside>';
 
