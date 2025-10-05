@@ -20,11 +20,36 @@ function representative_normalize_row(array $row): array {
   return $row;
 }
 
+function representative_sanitize_commission_rate($value, ?float $fallback = null): float {
+  if ($value === null || $value === '') {
+    return $fallback !== null ? (float)$fallback : 0.0;
+  }
+  if (!is_numeric($value)) {
+    $rate = $fallback !== null ? (float)$fallback : 0.0;
+  } else {
+    $rate = (float)$value;
+  }
+  if ($rate < 0) {
+    $rate = 0.0;
+  }
+  if ($rate > 100) {
+    $rate = 100.0;
+  }
+  return (float)$rate;
+}
+
 function representative_hydrate_assignments(array $rep): array {
   if (($rep['id'] ?? 0) <= 0) {
     return $rep;
   }
   $dealers = representative_assigned_dealers((int)$rep['id']);
+  $defaultRate = isset($rep['commission_rate']) ? (float)$rep['commission_rate'] : null;
+  foreach ($dealers as &$dealer) {
+    if (!isset($dealer['commission_rate']) || $dealer['commission_rate'] === null) {
+      $dealer['commission_rate'] = $defaultRate;
+    }
+  }
+  unset($dealer);
   $rep['dealers'] = $dealers;
   $rep['dealer_ids'] = array_map(fn($dealer) => (int)$dealer['id'], $dealers);
   if (!empty($dealers)) {
@@ -84,7 +109,7 @@ function representative_assigned_dealers(int $representative_id): array {
   if ($representative_id <= 0) {
     return [];
   }
-  $sql = "SELECT d.id, d.name, d.company, d.status, d.code, a.assigned_at
+  $sql = "SELECT d.id, d.name, d.company, d.status, d.code, a.assigned_at, a.commission_rate
           FROM dealer_representative_assignments a
           INNER JOIN dealers d ON d.id = a.dealer_id
           WHERE a.representative_id=?
@@ -100,6 +125,7 @@ function representative_assigned_dealers(int $representative_id): array {
       'status' => $row['status'] ?? null,
       'code' => $row['code'] ?? null,
       'assigned_at' => $row['assigned_at'] ?? null,
+      'commission_rate' => isset($row['commission_rate']) ? (float)$row['commission_rate'] : null,
     ];
   }
   return $rows;
@@ -198,6 +224,10 @@ function representative_for_dealer(int $dealer_id): ?array {
       $rep['dealer_company'] = $dealer['company'] ?? null;
       $rep['dealer_status'] = $dealer['status'] ?? null;
       $rep['dealer_code'] = $dealer['code'] ?? null;
+      if (isset($dealer['commission_rate']) && $dealer['commission_rate'] !== null) {
+        $rep['commission_rate'] = (float)$dealer['commission_rate'];
+        $rep['dealer_commission_rate'] = (float)$dealer['commission_rate'];
+      }
       $rep['assigned_at'] = $dealer['assigned_at'] ?? ($row['assignment_date'] ?? null);
       break;
     }
@@ -205,12 +235,22 @@ function representative_for_dealer(int $dealer_id): ?array {
   return $rep;
 }
 
-function representative_update_assignments(int $representative_id, array $dealer_ids): void {
+function representative_update_assignments(int $representative_id, array $dealer_ids, ?array $commission_rates = null): void {
   $rep = representative_fetch_raw($representative_id);
   if (!$rep) {
     throw new InvalidArgumentException('Temsilci kaydı bulunamadı.');
   }
   $dealer_ids = array_values(array_unique(array_filter(array_map('intval', $dealer_ids), fn($id) => $id > 0)));
+  $rateMap = [];
+  if ($commission_rates) {
+    foreach ($commission_rates as $dealerId => $rate) {
+      $dealerId = (int)$dealerId;
+      if ($dealerId <= 0) {
+        continue;
+      }
+      $rateMap[$dealerId] = representative_sanitize_commission_rate($rate, $rep['commission_rate'] ?? null);
+    }
+  }
   $pdo = pdo();
   $pdo->beginTransaction();
   try {
@@ -248,8 +288,20 @@ function representative_update_assignments(int $representative_id, array $dealer
     }
 
     foreach ($toAdd as $dealer_id) {
-      $pdo->prepare('INSERT INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at) VALUES (?,?,?)')
-          ->execute([$representative_id, $dealer_id, now()]);
+      $rate = $rateMap[$dealer_id] ?? ($rep['commission_rate'] ?? 0.0);
+      $pdo->prepare('INSERT INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at, commission_rate) VALUES (?,?,?,?)')
+          ->execute([$representative_id, $dealer_id, now(), number_format($rate, 2, '.', '')]);
+    }
+
+    if ($rateMap) {
+      $update = $pdo->prepare('UPDATE dealer_representative_assignments SET commission_rate=? WHERE representative_id=? AND dealer_id=?');
+      foreach ($dealer_ids as $dealer_id) {
+        if (!array_key_exists($dealer_id, $rateMap)) {
+          continue;
+        }
+        $rate = number_format($rateMap[$dealer_id], 2, '.', '');
+        $update->execute([$rate, $representative_id, $dealer_id]);
+      }
     }
 
     representative_refresh_primary_assignment($representative_id, $pdo);
@@ -276,6 +328,38 @@ function representative_refresh_primary_assignment(int $representative_id, ?PDO 
       $pdo->prepare('UPDATE dealer_representatives SET dealer_id=?, updated_at=? WHERE id=?')
           ->execute([$primaryDealerId, now(), $representative_id]);
     } catch (Throwable $ignored) {}
+  }
+}
+
+function representative_update_assignment_rates(int $representative_id, array $rates): void {
+  $rep = representative_fetch_raw($representative_id);
+  if (!$rep) {
+    throw new InvalidArgumentException('Temsilci kaydı bulunamadı.');
+  }
+  if (!$rates) {
+    return;
+  }
+  $pdo = pdo();
+  $pdo->beginTransaction();
+  try {
+    $check = $pdo->prepare('SELECT 1 FROM dealer_representative_assignments WHERE representative_id=? AND dealer_id=? LIMIT 1');
+    $update = $pdo->prepare('UPDATE dealer_representative_assignments SET commission_rate=? WHERE representative_id=? AND dealer_id=?');
+    foreach ($rates as $dealerId => $rate) {
+      $dealerId = (int)$dealerId;
+      if ($dealerId <= 0) {
+        continue;
+      }
+      $check->execute([$representative_id, $dealerId]);
+      if (!$check->fetchColumn()) {
+        continue;
+      }
+      $normalized = representative_sanitize_commission_rate($rate, $rep['commission_rate'] ?? null);
+      $update->execute([number_format($normalized, 2, '.', ''), $representative_id, $dealerId]);
+    }
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
   }
 }
 
@@ -456,7 +540,7 @@ function representative_create_commission_for_topup(int $topup_id, int $dealer_i
       ]);
 }
 
-function representative_commission_totals(int $representative_id): array {
+function representative_commission_totals(int $representative_id, ?int $dealer_id = null): array {
   $summary = [
     'pending_amount' => 0,
     'paid_amount' => 0,
@@ -464,8 +548,19 @@ function representative_commission_totals(int $representative_id): array {
     'paid_count' => 0,
     'total_amount' => 0,
   ];
-  $st = pdo()->prepare('SELECT status, COUNT(*) AS c, COALESCE(SUM(commission_cents),0) AS total FROM dealer_representative_commissions WHERE representative_id=? GROUP BY status');
-  $st->execute([$representative_id]);
+  $sql = 'SELECT c.status, COUNT(*) AS c, COALESCE(SUM(c.commission_cents),0) AS total FROM dealer_representative_commissions c';
+  $params = [$representative_id];
+  if ($dealer_id) {
+    $sql .= ' INNER JOIN dealer_topups t ON t.id = c.dealer_topup_id';
+  }
+  $sql .= ' WHERE c.representative_id=?';
+  if ($dealer_id) {
+    $sql .= ' AND t.dealer_id=?';
+    $params[] = $dealer_id;
+  }
+  $sql .= ' GROUP BY c.status';
+  $st = pdo()->prepare($sql);
+  $st->execute($params);
   foreach ($st as $row) {
     $status = $row['status'] ?? '';
     $total = (int)($row['total'] ?? 0);
@@ -482,16 +577,25 @@ function representative_commission_totals(int $representative_id): array {
   return $summary;
 }
 
-function representative_recent_commissions(int $representative_id, int $limit = 20): array {
+function representative_recent_commissions(int $representative_id, int $limit = 20, ?int $dealer_id = null): array {
   $limit = max(1, $limit);
-  $st = pdo()->prepare("SELECT c.*, t.amount_cents AS topup_amount, t.status AS topup_status, t.completed_at
+  $sql = "SELECT c.*, t.amount_cents AS topup_amount, t.status AS topup_status, t.completed_at, t.dealer_id
     FROM dealer_representative_commissions c
     INNER JOIN dealer_topups t ON t.id = c.dealer_topup_id
-    WHERE c.representative_id=?
-    ORDER BY c.created_at DESC
-    LIMIT ?");
+    WHERE c.representative_id=?";
+  $st = null;
+  if ($dealer_id) {
+    $sql .= ' AND t.dealer_id=?';
+  }
+  $sql .= ' ORDER BY c.created_at DESC LIMIT ?';
+  $st = pdo()->prepare($sql);
   $st->bindValue(1, $representative_id, PDO::PARAM_INT);
-  $st->bindValue(2, $limit, PDO::PARAM_INT);
+  $position = 2;
+  if ($dealer_id) {
+    $st->bindValue($position, $dealer_id, PDO::PARAM_INT);
+    $position++;
+  }
+  $st->bindValue($position, $limit, PDO::PARAM_INT);
   $st->execute();
   $rows = [];
   foreach ($st as $row) {
@@ -507,24 +611,33 @@ function representative_recent_commissions(int $representative_id, int $limit = 
       'paid_at' => $row['paid_at'] ?? null,
       'topup_status' => $row['topup_status'] ?? null,
       'topup_completed_at' => $row['completed_at'] ?? null,
+      'dealer_id' => isset($row['dealer_id']) ? (int)$row['dealer_id'] : null,
     ];
   }
   return $rows;
 }
 
-function representative_completed_topups(int $representative_id, int $limit = 20): array {
+function representative_completed_topups(int $representative_id, int $limit = 20, ?int $dealer_id = null): array {
   $limit = max(1, $limit);
-  $sql = "SELECT t.id, t.amount_cents, t.status, t.completed_at, t.created_at, c.commission_cents, c.status AS commission_status
+  $sql = "SELECT t.id, t.amount_cents, t.status, t.completed_at, t.created_at, t.dealer_id, a.commission_rate,
+                 c.commission_cents, c.status AS commission_status
           FROM dealer_representative_assignments a
           INNER JOIN dealer_topups t ON t.dealer_id = a.dealer_id
           LEFT JOIN dealer_representative_commissions c ON c.dealer_topup_id = t.id AND c.representative_id = a.representative_id
-          WHERE a.representative_id=? AND t.status=?
-          ORDER BY COALESCE(t.completed_at, t.created_at) DESC
-          LIMIT ?";
+          WHERE a.representative_id=? AND t.status=?";
+  if ($dealer_id) {
+    $sql .= ' AND t.dealer_id=?';
+  }
+  $sql .= ' ORDER BY COALESCE(t.completed_at, t.created_at) DESC LIMIT ?';
   $st = pdo()->prepare($sql);
   $st->bindValue(1, $representative_id, PDO::PARAM_INT);
   $st->bindValue(2, 'completed', PDO::PARAM_STR);
-  $st->bindValue(3, $limit, PDO::PARAM_INT);
+  $position = 3;
+  if ($dealer_id) {
+    $st->bindValue($position, $dealer_id, PDO::PARAM_INT);
+    $position++;
+  }
+  $st->bindValue($position, $limit, PDO::PARAM_INT);
   $st->execute();
   $rows = [];
   foreach ($st as $row) {
@@ -534,8 +647,10 @@ function representative_completed_topups(int $representative_id, int $limit = 20
       'status' => $row['status'] ?? 'completed',
       'completed_at' => $row['completed_at'] ?? null,
       'created_at' => $row['created_at'] ?? null,
-      'commission_cents' => isset($row['commission_cents']) ? (int)$row['commission_cents'] : 0,
-      'commission_status' => $row['commission_status'] ?? 'pending',
+      'commission_cents' => isset($row['commission_cents']) ? (int)$row['commission_cents'] : null,
+      'commission_status' => $row['commission_status'] ?? null,
+      'dealer_id' => isset($row['dealer_id']) ? (int)$row['dealer_id'] : null,
+      'assignment_commission_rate' => isset($row['commission_rate']) ? (float)$row['commission_rate'] : null,
     ];
   }
   return $rows;

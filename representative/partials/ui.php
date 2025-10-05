@@ -432,8 +432,8 @@ if (!function_exists('representative_base_styles')) {
     echo '</div>';
     echo '<nav class="rep-nav">';
     echo '<a class="rep-nav-link'.($activeNav === 'dashboard' ? ' active' : '').'" href="dashboard.php"><i class="bi bi-grid"></i><span>Ana Sayfa</span></a>';
-    echo '<a class="rep-nav-link'.($activeNav === 'crm' ? ' active' : '').'" href="dashboard.php#crm"><i class="bi bi-kanban"></i><span>CRM Akışı</span></a>';
-    echo '<a class="rep-nav-link'.($activeNav === 'commissions' ? ' active' : '').'" href="dashboard.php#commissions"><i class="bi bi-cash-coin"></i><span>Komisyonlar</span></a>';
+    echo '<a class="rep-nav-link'.($activeNav === 'crm' ? ' active' : '').'" href="crm.php"><i class="bi bi-kanban"></i><span>CRM</span></a>';
+    echo '<a class="rep-nav-link'.($activeNav === 'commissions' ? ' active' : '').'" href="commissions.php"><i class="bi bi-cash-coin"></i><span>Komisyonlar</span></a>';
     echo '</nav>';
     echo '<div class="rep-sidebar-meta">';
     echo '<div>'.h(date('d.m.Y')).' itibarıyla güncel.</div>';

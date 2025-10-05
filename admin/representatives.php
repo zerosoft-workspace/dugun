@@ -69,6 +69,20 @@ if ($action) {
       }
       redirect($_SERVER['PHP_SELF'].'?'.http_build_query($params));
     }
+    if ($action === 'update_rates') {
+      $repId = (int)($_POST['representative_id'] ?? 0);
+      $rates = $_POST['commission_rates'] ?? [];
+      if (!is_array($rates)) {
+        $rates = [];
+      }
+      representative_update_assignment_rates($repId, $rates);
+      flash('ok', 'Bayi bazlı komisyon oranları güncellendi.');
+      $params = ['id' => $repId];
+      if ($contextDealerId > 0) {
+        $params['dealer_id'] = $contextDealerId;
+      }
+      redirect($_SERVER['PHP_SELF'].'?'.http_build_query($params));
+    }
   } catch (Throwable $e) {
     flash('err', $e->getMessage());
     $params = [];
@@ -469,52 +483,71 @@ function representative_filters(array $base = []): string {
             </div>
           </form>
           <?php if (!empty($selectedRep['dealers'])): ?>
-            <div class="table-responsive mt-4">
-              <table class="table table-sm align-middle mb-0">
-                <thead>
-                  <tr><th>Bayi</th><th>Durum</th><th>Atama Tarihi</th></tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($selectedRep['dealers'] as $dealer): ?>
-                    <?php
-                      $status = $dealer['status'] ?? 'pending';
-                      switch ($status) {
-                        case 'active':
-                        case 'approved':
-                          $badgeClass = 'bg-success-subtle text-success';
-                          $statusLabel = 'Aktif';
-                          break;
-                        case 'pending':
-                          $badgeClass = 'bg-warning-subtle text-warning';
-                          $statusLabel = 'Beklemede';
-                          break;
-                        case 'inactive':
-                          $badgeClass = 'bg-secondary-subtle text-secondary';
-                          $statusLabel = 'Pasif';
-                          break;
-                        case 'suspended':
-                          $badgeClass = 'bg-danger-subtle text-danger';
-                          $statusLabel = 'Askıda';
-                          break;
-                        case 'blocked':
-                          $badgeClass = 'bg-danger-subtle text-danger';
-                          $statusLabel = 'Engelli';
-                          break;
-                        default:
-                          $badgeClass = 'bg-warning-subtle text-warning';
-                          $statusLabel = ucfirst($status);
-                          break;
-                      }
-                    ?>
-                    <tr>
-                      <td><?=h($dealer['name'])?></td>
-                      <td><span class="badge <?=$badgeClass?>"><?=h($statusLabel)?></span></td>
-                      <td><?= $dealer['assigned_at'] ? h(date('d.m.Y H:i', strtotime($dealer['assigned_at']))) : '—' ?></td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
+            <form method="post" class="mt-4">
+              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+              <input type="hidden" name="do" value="update_rates">
+              <input type="hidden" name="representative_id" value="<?=$selectedId?>">
+              <?php if ($dealerContextId > 0): ?>
+                <input type="hidden" name="context_dealer_id" value="<?=$dealerContextId?>">
+              <?php endif; ?>
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr><th>Bayi</th><th>Komisyon (%)</th><th>Durum</th><th>Atama Tarihi</th></tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($selectedRep['dealers'] as $dealer): ?>
+                      <?php
+                        $status = $dealer['status'] ?? 'pending';
+                        switch ($status) {
+                          case 'active':
+                          case 'approved':
+                            $badgeClass = 'bg-success-subtle text-success';
+                            $statusLabel = 'Aktif';
+                            break;
+                          case 'pending':
+                            $badgeClass = 'bg-warning-subtle text-warning';
+                            $statusLabel = 'Beklemede';
+                            break;
+                          case 'inactive':
+                            $badgeClass = 'bg-secondary-subtle text-secondary';
+                            $statusLabel = 'Pasif';
+                            break;
+                          case 'suspended':
+                            $badgeClass = 'bg-danger-subtle text-danger';
+                            $statusLabel = 'Askıda';
+                            break;
+                          case 'blocked':
+                            $badgeClass = 'bg-danger-subtle text-danger';
+                            $statusLabel = 'Engelli';
+                            break;
+                          default:
+                            $badgeClass = 'bg-warning-subtle text-warning';
+                            $statusLabel = ucfirst($status);
+                            break;
+                        }
+                        $dealerRate = $dealer['commission_rate'] ?? ($selectedRep['commission_rate'] ?? 0);
+                      ?>
+                      <tr>
+                        <td><?=h($dealer['name'])?></td>
+                        <td style="max-width:140px;">
+                          <div class="input-group input-group-sm">
+                            <input type="number" step="0.1" min="0" max="100" class="form-control" name="commission_rates[<?= (int)$dealer['id'] ?>]" value="<?=h(number_format((float)$dealerRate, 1, '.', ''))?>" required>
+                            <span class="input-group-text">%</span>
+                          </div>
+                        </td>
+                        <td><span class="badge <?=$badgeClass?>"><?=h($statusLabel)?></span></td>
+                        <td><?= $dealer['assigned_at'] ? h(date('d.m.Y H:i', strtotime($dealer['assigned_at']))) : '—' ?></td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+              <div class="d-flex justify-content-end align-items-center gap-3 mt-3">
+                <small class="text-muted">Komisyon oranlarını %0 ile %100 arası değerler olarak güncelleyebilirsiniz.</small>
+                <button class="btn btn-sm btn-brand" type="submit">Komisyonları Kaydet</button>
+              </div>
+            </form>
           <?php endif; ?>
         <?php endif; ?>
       </div>

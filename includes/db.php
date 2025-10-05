@@ -352,6 +352,7 @@ function install_schema(){
     representative_id INT NOT NULL,
     dealer_id INT NOT NULL,
     assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    commission_rate DECIMAL(5,2) NULL,
     PRIMARY KEY (representative_id, dealer_id),
     UNIQUE KEY uniq_assignment_dealer (dealer_id),
     INDEX idx_assignment_rep (representative_id),
@@ -360,8 +361,12 @@ function install_schema(){
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   try {
-    $migrateAssignments = $pdo->query("SELECT id, dealer_id, assigned_at, created_at FROM dealer_representatives WHERE dealer_id IS NOT NULL");
-    $insertAssignment = $pdo->prepare("INSERT IGNORE INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at) VALUES (?,?,?)");
+    pdo()->exec("ALTER TABLE dealer_representative_assignments ADD COLUMN commission_rate DECIMAL(5,2) NULL AFTER assigned_at");
+  } catch (Throwable $e) {}
+
+  try {
+    $migrateAssignments = $pdo->query("SELECT id, dealer_id, assigned_at, created_at, commission_rate FROM dealer_representatives WHERE dealer_id IS NOT NULL");
+    $insertAssignment = $pdo->prepare("INSERT IGNORE INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at, commission_rate) VALUES (?,?,?,?)");
     foreach ($migrateAssignments as $row) {
       $repId = (int)$row['id'];
       $dealerId = (int)$row['dealer_id'];
@@ -369,8 +374,16 @@ function install_schema(){
         continue;
       }
       $assignedAt = $row['assigned_at'] ?? ($row['created_at'] ?? now());
-      $insertAssignment->execute([$repId, $dealerId, $assignedAt]);
+      $rate = isset($row['commission_rate']) ? number_format((float)$row['commission_rate'], 2, '.', '') : null;
+      $insertAssignment->execute([$repId, $dealerId, $assignedAt, $rate]);
     }
+  } catch (Throwable $e) {}
+
+  try {
+    pdo()->exec("UPDATE dealer_representative_assignments a
+      INNER JOIN dealer_representatives r ON r.id = a.representative_id
+      SET a.commission_rate = r.commission_rate
+      WHERE a.commission_rate IS NULL");
   } catch (Throwable $e) {}
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representative_commissions(
@@ -423,6 +436,41 @@ function install_schema(){
     FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL,
     INDEX idx_lead_notes_lead (lead_id),
     INDEX idx_lead_notes_next (next_action_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_leads(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    representative_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NULL,
+    phone VARCHAR(64) NULL,
+    company VARCHAR(190) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'new',
+    source VARCHAR(64) NULL,
+    potential_value_cents INT NULL,
+    notes TEXT NULL,
+    last_contact_at DATETIME NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_rep_leads_rep (representative_id),
+    INDEX idx_rep_leads_status (representative_id, status),
+    INDEX idx_rep_leads_next (representative_id, next_action_at),
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_lead_notes(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    representative_id INT NOT NULL,
+    note TEXT NOT NULL,
+    contact_type VARCHAR(32) NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (lead_id) REFERENCES representative_leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
+    INDEX idx_rep_lead_notes_lead (lead_id),
+    INDEX idx_rep_lead_notes_next (representative_id, next_action_at)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* müşteri web siparişleri */
