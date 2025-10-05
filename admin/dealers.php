@@ -349,6 +349,19 @@ $buildDealerUrl = function(array $overrides = []) use ($statusFilter, $searchTer
   return $queryString ? ('?'.$queryString) : ($_SERVER['PHP_SELF'] ?? '#');
 };
 if ($selectedDealer) {
+  foreach ([
+    'billing_title' => '',
+    'tax_office' => '',
+    'tax_number' => '',
+    'billing_address' => '',
+    'invoice_email' => '',
+    'tax_document_path' => null,
+  ] as $field => $defaultValue) {
+    if (!array_key_exists($field, $selectedDealer)) {
+      $selectedDealer[$field] = $defaultValue;
+    }
+  }
+
   dealer_refresh_purchase_states($selectedId);
   $walletBalance = dealer_get_balance($selectedId);
   $walletTransactions = dealer_wallet_transactions($selectedId, 10);
