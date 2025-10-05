@@ -4,20 +4,21 @@ if (!function_exists('representative_base_styles')) {
     return <<<'CSS'
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+      @import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css');
 
       :root {
-        --rep-ink:#0f172a;
-        --rep-muted:#64748b;
         --rep-brand:#0ea5b5;
         --rep-brand-dark:#0b8b98;
+        --rep-ink:#0f172a;
+        --rep-muted:#64748b;
+        --rep-bg:#eef2f9;
         --rep-surface:#ffffff;
-        --rep-background:#f4f7fb;
       }
 
       body.rep-body {
         margin:0;
         min-height:100vh;
-        background:linear-gradient(180deg,var(--rep-background) 0%,#fff 100%);
+        background:var(--rep-bg);
         color:var(--rep-ink);
         font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
       }
@@ -25,217 +26,277 @@ if (!function_exists('representative_base_styles')) {
       .rep-app {
         min-height:100vh;
         display:flex;
+        background:var(--rep-bg);
+      }
+
+      .rep-sidebar {
+        width:270px;
+        background:linear-gradient(170deg,var(--rep-brand) 0%,var(--rep-brand-dark) 92%);
+        color:#f0fdfd;
+        display:flex;
         flex-direction:column;
-      }
-
-      .rep-header {
+        padding:28px 22px 32px;
+        box-shadow:0 30px 90px -50px rgba(15,23,42,.7);
         position:relative;
-        background:linear-gradient(135deg,rgba(14,165,181,.94),rgba(99,102,241,.9));
-        color:#fff;
-        padding:3.4rem 0 3.7rem;
-        overflow:hidden;
-        box-shadow:0 42px 120px -68px rgba(15,23,42,.85);
+        z-index:20;
       }
 
-      .rep-header::before,
-      .rep-header::after {
-        content:"";
-        position:absolute;
-        border-radius:50%;
-        background:rgba(255,255,255,.12);
-        filter:blur(0);
-        z-index:1;
-      }
-
-      .rep-header::before {
-        width:420px;
-        height:420px;
-        top:-180px;
-        right:-160px;
-      }
-
-      .rep-header::after {
-        width:260px;
-        height:260px;
-        bottom:-140px;
-        left:-120px;
-      }
-
-      .rep-header-inner {
-        max-width:1240px;
-        margin:0 auto;
-        padding:0 1.5rem;
-        display:flex;
-        flex-wrap:wrap;
-        align-items:flex-start;
-        justify-content:space-between;
-        gap:2.4rem;
-        position:relative;
-        z-index:2;
-      }
-
-      .rep-brand {
+      .rep-sidebar-header {
         display:flex;
         align-items:center;
-        gap:1rem;
+        gap:12px;
+        margin-bottom:2.4rem;
       }
 
-      .rep-brand span {
-        width:48px;
-        height:48px;
-        border-radius:16px;
-        background:rgba(255,255,255,.18);
-        display:flex;
-        align-items:center;
-        justify-content:center;
-        font-weight:700;
-        font-size:1.2rem;
-      }
-
-      .rep-brand strong {
-        display:block;
-        font-size:1.2rem;
-        letter-spacing:.3px;
-      }
-
-      .rep-brand small {
-        display:block;
-        font-size:.88rem;
-        color:rgba(255,255,255,.78);
-        font-weight:500;
-      }
-
-      .rep-header-main {
-        flex:1;
-        min-width:260px;
-      }
-
-      .rep-header-main h1 {
-        font-size:2rem;
-        font-weight:700;
-        margin:1.4rem 0 .6rem;
-        letter-spacing:-.01em;
-      }
-
-      .rep-header-main p {
-        margin:0;
-        max-width:560px;
-        font-size:1rem;
-        color:rgba(255,255,255,.85);
-        line-height:1.5;
-      }
-
-      .rep-dealer-pill {
-        margin-top:1.6rem;
+      .rep-sidebar-header span {
         display:inline-flex;
         align-items:center;
-        gap:.65rem;
-        padding:.55rem 1.1rem;
-        border-radius:999px;
-        background:rgba(255,255,255,.18);
-        color:#fff;
-        font-weight:600;
-        letter-spacing:.02em;
-      }
-
-      .rep-dealer-pill span {
-        font-weight:500;
-        opacity:.85;
-      }
-
-      .rep-dealer-pill--pending {
-        background:rgba(15,23,42,.2);
-        color:rgba(255,255,255,.78);
-      }
-
-      .rep-header-side {
-        display:flex;
-        flex-direction:column;
-        gap:1.2rem;
-        align-items:flex-end;
-        min-width:240px;
-      }
-
-      .rep-meta-card {
-        padding:1.2rem 1.4rem;
-        border-radius:20px;
-        background:rgba(255,255,255,.16);
-        box-shadow:0 34px 80px -40px rgba(15,23,42,.6);
-        display:flex;
-        gap:1rem;
-        align-items:center;
-        text-align:left;
-        min-width:240px;
-      }
-
-      .rep-avatar {
-        width:58px;
-        height:58px;
-        border-radius:18px;
-        background:rgba(255,255,255,.22);
-        display:flex;
-        align-items:center;
         justify-content:center;
+        width:44px;
+        height:44px;
+        border-radius:14px;
+        background:rgba(255,255,255,.18);
         font-weight:700;
-        font-size:1.35rem;
+        letter-spacing:.04em;
       }
 
-      .rep-meta-info strong {
+      .rep-sidebar-header strong {
         display:block;
         font-size:1.05rem;
       }
 
-      .rep-meta-info span {
+      .rep-sidebar-header small {
         display:block;
-        font-size:.85rem;
-        color:rgba(255,255,255,.85);
+        font-size:.82rem;
+        color:rgba(255,255,255,.82);
+        font-weight:500;
+      }
+
+      .rep-nav {
+        display:flex;
+        flex-direction:column;
+        gap:6px;
+        margin-bottom:auto;
+      }
+
+      .rep-nav-link {
+        display:flex;
+        align-items:center;
+        gap:12px;
+        padding:11px 12px;
+        border-radius:12px;
+        color:rgba(255,255,255,.82);
+        font-weight:500;
+        text-decoration:none;
+        transition:all .2s ease;
+      }
+
+      .rep-nav-link i {
+        font-size:1.05rem;
+      }
+
+      .rep-nav-link:hover,
+      .rep-nav-link:focus {
+        background:rgba(255,255,255,.16);
+        color:#fff;
+      }
+
+      .rep-nav-link.active {
+        background:#fff;
+        color:var(--rep-ink);
+        box-shadow:0 18px 40px -32px rgba(15,23,42,.6);
+      }
+
+      .rep-sidebar-meta {
+        margin-top:2.2rem;
+        border-top:1px solid rgba(255,255,255,.18);
+        padding-top:1.4rem;
+        font-size:.8rem;
+        color:rgba(255,255,255,.7);
+        line-height:1.6;
+      }
+
+      .rep-main {
+        flex:1;
+        display:flex;
+        flex-direction:column;
+        min-width:0;
+      }
+
+      .rep-topbar {
+        background:var(--rep-surface);
+        padding:1.75rem 2.25rem;
+        box-shadow:0 22px 48px -32px rgba(15,23,42,.25);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:1.6rem;
+        position:sticky;
+        top:0;
+        z-index:10;
+      }
+
+      .rep-topbar-info {
+        display:flex;
+        flex-direction:column;
+        gap:.45rem;
+      }
+
+      .rep-topbar-info h1 {
+        margin:0;
+        font-size:1.65rem;
+        font-weight:700;
+      }
+
+      .rep-topbar-info p {
+        margin:0;
+        color:var(--rep-muted);
+        font-size:.92rem;
+        max-width:620px;
+      }
+
+      .rep-topbar-actions {
+        display:flex;
+        align-items:center;
+        gap:1rem;
+        flex-wrap:wrap;
+        justify-content:flex-end;
+      }
+
+      .rep-user-card {
+        display:flex;
+        align-items:center;
+        gap:.85rem;
+        background:linear-gradient(160deg,rgba(14,165,181,.14),rgba(14,165,181,.05));
+        border-radius:16px;
+        padding:.75rem 1rem;
+        border:1px solid rgba(14,165,181,.22);
+      }
+
+      .rep-avatar {
+        width:48px;
+        height:48px;
+        border-radius:14px;
+        background:rgba(14,165,181,.16);
+        color:var(--rep-brand-dark);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        font-weight:700;
+        font-size:1.05rem;
+      }
+
+      .rep-user-card strong {
+        display:block;
+        font-size:.98rem;
+      }
+
+      .rep-user-card span {
+        display:block;
+        font-size:.78rem;
+        color:var(--rep-muted);
       }
 
       .rep-logout {
         display:inline-flex;
         align-items:center;
-        gap:.55rem;
-        border-radius:14px;
-        padding:.65rem 1.2rem;
+        gap:.45rem;
+        border-radius:12px;
+        padding:.65rem 1.1rem;
         font-weight:600;
-        background:#fff;
-        color:#0f172a;
+        background:var(--rep-brand);
+        color:#fff;
         border:none;
-        box-shadow:0 18px 50px -32px rgba(15,23,42,.6);
         text-decoration:none;
+        box-shadow:0 16px 36px -26px rgba(14,165,181,.6);
       }
 
       .rep-logout:hover {
-        background:#f1f5f9;
-        color:#0f172a;
+        background:var(--rep-brand-dark);
+        color:#fff;
         text-decoration:none;
+      }
+
+      .rep-selector {
+        display:flex;
+        align-items:center;
+        gap:.65rem;
+        background:#f1f5f9;
+        border-radius:12px;
+        padding:.35rem .75rem;
+        border:1px solid rgba(148,163,184,.25);
+        max-width:320px;
+      }
+
+      .rep-selector i {
+        color:var(--rep-brand-dark);
+        font-size:1.05rem;
+      }
+
+      .rep-selector select {
+        border:none;
+        background:transparent;
+        font-weight:600;
+        color:var(--rep-ink);
+        font-size:.95rem;
+        flex:1;
+      }
+
+      .rep-selector select:focus {
+        outline:none;
+        box-shadow:none;
+      }
+
+      .rep-selector select option {
+        color:#0f172a;
+      }
+
+      .rep-selector-wrapper {
+        margin-top:.3rem;
+      }
+
+      .rep-dealer-pill {
+        display:inline-flex;
+        align-items:center;
+        gap:.45rem;
+        padding:.4rem .85rem;
+        border-radius:999px;
+        background:rgba(14,165,181,.12);
+        color:var(--rep-brand-dark);
+        font-weight:600;
+        font-size:.82rem;
+      }
+
+      .rep-dealer-pill--pending {
+        background:rgba(148,163,184,.16);
+        color:var(--rep-muted);
       }
 
       .rep-content {
         flex:1;
-        position:relative;
-        z-index:2;
-        margin-top:-72px;
+        display:flex;
+        flex-direction:column;
       }
 
-      .rep-shell {
-        max-width:1240px;
-        margin:0 auto;
-        padding:0 1.5rem 3.8rem;
+      .rep-container {
         width:100%;
+        max-width:1240px;
+        padding:2.25rem 2.25rem 3.2rem;
+        margin:0 auto;
       }
 
-      .rep-shell > .alert {
-        border-radius:16px;
+      .rep-container > .alert {
+        border-radius:14px;
         border:none;
-        box-shadow:0 20px 44px -28px rgba(15,23,42,.35);
+        box-shadow:0 18px 40px -28px rgba(15,23,42,.28);
       }
 
       .rep-footer {
-        padding:2.5rem 1.5rem;
-        background:#0f172a;
-        color:rgba(241,245,249,.86);
-        margin-top:auto;
+        padding:1.8rem 2.25rem;
+        background:var(--rep-surface);
+        border-top:1px solid rgba(148,163,184,.18);
+        color:var(--rep-muted);
+        font-size:.84rem;
       }
 
       .rep-footer-inner {
@@ -245,54 +306,87 @@ if (!function_exists('representative_base_styles')) {
         justify-content:space-between;
         align-items:center;
         gap:1rem;
-        font-size:.85rem;
+        flex-wrap:wrap;
       }
 
       .rep-footer-inner a {
-        color:rgba(14,165,181,.85);
+        color:var(--rep-brand-dark);
         font-weight:600;
         text-decoration:none;
       }
 
       .rep-footer-inner a:hover {
-        color:#38bdf8;
+        color:#0284c7;
       }
 
       @media (max-width: 992px) {
-        .rep-header {
-          padding:2.8rem 0 3.2rem;
+        .rep-app {
+          flex-direction:column;
         }
 
-        .rep-header-side {
-          align-items:flex-start;
+        .rep-sidebar {
+          width:100%;
+          flex-direction:row;
+          align-items:center;
+          gap:1.2rem;
+          padding:20px 22px;
+          position:sticky;
+          top:0;
+          z-index:30;
+        }
+
+        .rep-nav {
+          flex-direction:row;
+          flex-wrap:wrap;
+          margin-bottom:0;
+        }
+
+        .rep-nav-link {
+          padding:10px 14px;
+        }
+
+        .rep-sidebar-meta {
+          display:none;
+        }
+
+        .rep-main {
           width:100%;
         }
+      }
 
-        .rep-logout {
-          align-self:flex-start;
+      @media (max-width: 768px) {
+        .rep-topbar {
+          flex-direction:column;
+          align-items:flex-start;
+        }
+
+        .rep-topbar-actions {
+          width:100%;
+          justify-content:space-between;
+        }
+
+        .rep-container {
+          padding:1.8rem 1.4rem 2.6rem;
         }
       }
 
       @media (max-width: 576px) {
-        .rep-brand span {
-          width:42px;
-          height:42px;
+        .rep-user-card {
+          width:100%;
+          justify-content:flex-start;
         }
 
-        .rep-header-main h1 {
-          font-size:1.7rem;
+        .rep-topbar-actions {
+          flex-direction:column;
+          align-items:flex-start;
         }
 
-        .rep-content {
-          margin-top:-56px;
-        }
-
-        .rep-shell {
-          padding:0 1.1rem 3rem;
+        .rep-selector {
+          width:100%;
         }
 
         .rep-footer {
-          padding:2rem 1.2rem;
+          padding:1.6rem 1.4rem;
         }
       }
     </style>
@@ -308,6 +402,8 @@ if (!function_exists('representative_base_styles')) {
     $dealerSelector = $options['dealer_selector'] ?? null;
     $extraHead = $options['extra_head'] ?? '';
     $logoutUrl = $options['logout_url'] ?? 'login.php?logout=1';
+    $activeNav = $options['active_nav'] ?? 'dashboard';
+    $baseHost = parse_url(BASE_URL, PHP_URL_HOST) ?: 'dugun.com';
 
     $repName = $representative['name'] ?? '';
     $repEmail = $representative['email'] ?? '';
@@ -329,17 +425,29 @@ if (!function_exists('representative_base_styles')) {
     }
     echo '</head><body class="rep-body">';
     echo '<div class="rep-app">';
-    echo '<header class="rep-header">';
-    echo '<div class="rep-header-inner">';
-    echo '<div class="rep-header-main">';
-    echo '<div class="rep-brand">';
+    echo '<aside class="rep-sidebar">';
+    echo '<div class="rep-sidebar-header">';
     echo '<span>'.h(mb_strtoupper(mb_substr(APP_NAME, 0, 2, 'UTF-8'), 'UTF-8')).'</span>';
     echo '<div><strong>'.h(APP_NAME).'</strong><small>Temsilci Paneli</small></div>';
     echo '</div>';
+    echo '<nav class="rep-nav">';
+    echo '<a class="rep-nav-link'.($activeNav === 'dashboard' ? ' active' : '').'" href="dashboard.php"><i class="bi bi-grid"></i><span>Ana Sayfa</span></a>';
+    echo '<a class="rep-nav-link'.($activeNav === 'crm' ? ' active' : '').'" href="dashboard.php#crm"><i class="bi bi-kanban"></i><span>CRM Akışı</span></a>';
+    echo '<a class="rep-nav-link'.($activeNav === 'commissions' ? ' active' : '').'" href="dashboard.php#commissions"><i class="bi bi-cash-coin"></i><span>Komisyonlar</span></a>';
+    echo '</nav>';
+    echo '<div class="rep-sidebar-meta">';
+    echo '<div>'.h(date('d.m.Y')).' itibarıyla güncel.</div>';
+    $supportEmail = $repEmail !== '' ? $repEmail : 'destek@'.$baseHost;
+    echo '<div>Destek: <a href="mailto:'.h($supportEmail).'">'.h($supportEmail).'</a></div>';
+    echo '</div>';
+    echo '</aside>';
+    echo '<div class="rep-main">';
+    echo '<header class="rep-topbar">';
+    echo '<div class="rep-topbar-info">';
     echo '<h1>'.h($headerTitle).'</h1>';
     echo '<p>'.h($headerSubtitle).'</p>';
     if ($dealerSelector) {
-      echo $dealerSelector;
+      echo '<div class="rep-selector-wrapper">'.$dealerSelector.'</div>';
     } elseif ($dealerName) {
       echo '<div class="rep-dealer-pill"><i class="bi bi-building"></i><span>'.h($dealerName).'</span>';
       if ($dealerCompany) {
@@ -350,10 +458,10 @@ if (!function_exists('representative_base_styles')) {
       echo '<div class="rep-dealer-pill rep-dealer-pill--pending"><i class="bi bi-hourglass-split"></i><span>Atama bekleniyor</span></div>';
     }
     echo '</div>';
-    echo '<div class="rep-header-side">';
-    echo '<div class="rep-meta-card">';
+    echo '<div class="rep-topbar-actions">';
+    echo '<div class="rep-user-card">';
     echo '<div class="rep-avatar">'.h($repInitial).'</div>';
-    echo '<div class="rep-meta-info">';
+    echo '<div>';
     echo '<strong>'.h($repName !== '' ? $repName : APP_NAME.' Temsilcisi').'</strong>';
     if ($repEmail !== '') {
       echo '<span>'.h($repEmail).'</span>';
@@ -365,10 +473,9 @@ if (!function_exists('representative_base_styles')) {
     echo '</div>';
     echo '<a class="rep-logout" href="'.h($logoutUrl).'"><i class="bi bi-box-arrow-right"></i><span>Çıkış Yap</span></a>';
     echo '</div>';
-    echo '</div>';
     echo '</header>';
     echo '<main class="rep-content">';
-    echo '<div class="rep-shell">';
+    echo '<div class="rep-container">';
   }
 
   function representative_layout_end(): void {
@@ -380,6 +487,7 @@ if (!function_exists('representative_base_styles')) {
     echo '<a href="'.h(BASE_URL).'" target="_blank" rel="noopener">Site ana sayfasına dön</a>';
     echo '</div>';
     echo '</footer>';
+    echo '</div>';
     echo '</div>';
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>';
     echo '</body></html>';

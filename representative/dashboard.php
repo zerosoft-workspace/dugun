@@ -157,29 +157,23 @@ foreach ($leads as $lead) {
 
 $pageStyles = <<<'CSS'
 <style>
-  .card-lite{border-radius:22px;background:#fff;border:1px solid rgba(148,163,184,.16);box-shadow:0 28px 60px -42px rgba(15,23,42,.45);padding:2rem;}
+  .card-lite{border-radius:20px;background:var(--rep-surface);border:1px solid rgba(148,163,184,.18);box-shadow:0 26px 60px -42px rgba(15,23,42,.4);padding:1.9rem;}
   .card-lite + .card-lite{margin-top:1.6rem;}
+  .card-lite[id]{scroll-margin-top:120px;}
   .section-heading{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;}
-  .section-heading h5{font-weight:700;margin:0;}
-  .section-heading small{color:#64748b;}
-  .dealer-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .75rem;border-radius:999px;background:rgba(14,165,181,.16);color:#0b8b98;font-size:.78rem;font-weight:600;}
+  .section-heading h5{font-weight:700;margin:0;color:var(--rep-ink);}
+  .section-heading small{color:var(--rep-muted);font-weight:500;}
+  .dealer-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .75rem;border-radius:999px;background:rgba(14,165,181,.16);color:var(--rep-brand-dark);font-size:.78rem;font-weight:600;}
   .dealer-badge i{font-size:1rem;}
   .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.1rem;}
-  .summary-item{border-radius:20px;padding:1.15rem 1.25rem;background:linear-gradient(150deg,#fff,rgba(14,165,181,.08));border:1px solid rgba(148,163,184,.22);box-shadow:0 24px 54px -40px rgba(15,23,42,.45);}
-  .summary-item span{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.35rem;font-weight:600;}
-  .summary-item strong{font-size:1.45rem;color:#0f172a;display:block;}
+  .summary-item{border-radius:18px;padding:1.05rem 1.15rem;background:linear-gradient(150deg,#fff,rgba(14,165,181,.08));border:1px solid rgba(148,163,184,.18);box-shadow:0 24px 54px -44px rgba(15,23,42,.45);}
+  .summary-item span{display:block;font-size:.74rem;text-transform:uppercase;letter-spacing:.08em;color:var(--rep-muted);margin-bottom:.35rem;font-weight:600;}
+  .summary-item strong{font-size:1.4rem;color:var(--rep-ink);display:block;}
   .summary-item small{display:block;font-size:.78rem;color:#475569;margin-top:.25rem;}
-  .dealer-switcher{margin-top:1.6rem;display:flex;flex-direction:column;gap:.5rem;max-width:320px;}
-  .dealer-switcher__label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.75);font-weight:600;}
-  .dealer-switcher__field{display:flex;align-items:center;gap:.55rem;background:rgba(255,255,255,.14);border-radius:14px;padding:.45rem .75rem;}
-  .dealer-switcher__field i{color:#fff;font-size:1.1rem;}
-  .dealer-switcher__field select{flex:1;border:none;background:transparent;color:#fff;font-weight:600;font-size:.95rem;appearance:none;}
-  .dealer-switcher__field select:focus{outline:none;box-shadow:none;}
-  .dealer-switcher__field select option{color:#0f172a;}
   .crm-status-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.5rem;}
   .status-chip{display:flex;align-items:center;gap:.45rem;padding:.35rem .85rem;border-radius:999px;font-size:.78rem;font-weight:600;background:rgba(148,163,184,.16);color:#475569;}
-  .status-chip .count{font-size:.9rem;color:#0f172a;}
-  .status-chip--new{background:rgba(14,165,181,.18);color:#0b8b98;}
+  .status-chip .count{font-size:.9rem;color:var(--rep-ink);}
+  .status-chip--new{background:rgba(14,165,181,.18);color:var(--rep-brand-dark);}
   .status-chip--contacted{background:rgba(59,130,246,.16);color:#1d4ed8;}
   .status-chip--qualified{background:rgba(126,58,242,.16);color:#6d28d9;}
   .status-chip--follow-up{background:rgba(96,165,250,.16);color:#2563eb;}
@@ -190,24 +184,24 @@ $pageStyles = <<<'CSS'
   .status-chip--lost{background:rgba(248,113,113,.18);color:#b91c1c;}
   .crm-panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.05rem;margin-top:1.2rem;}
   .crm-panel{border:1px solid rgba(148,163,184,.2);border-radius:18px;padding:1.2rem;background:#f9fbfd;box-shadow:0 20px 48px -40px rgba(15,23,42,.3);}
-  .crm-panel h6{font-size:.9rem;margin:0 0 .9rem;font-weight:600;color:#0f172a;text-transform:uppercase;letter-spacing:.08em;}
+  .crm-panel h6{font-size:.9rem;margin:0 0 .9rem;font-weight:600;color:var(--rep-ink);text-transform:uppercase;letter-spacing:.08em;}
   .crm-panel ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.9rem;}
   .crm-panel li{display:flex;gap:.75rem;align-items:flex-start;}
-  .crm-panel .icon{width:36px;height:36px;border-radius:12px;background:rgba(14,165,181,.12);color:#0b8b98;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
-  .crm-panel .content strong{display:block;font-weight:600;color:#0f172a;}
+  .crm-panel .icon{width:36px;height:36px;border-radius:12px;background:rgba(14,165,181,.12);color:var(--rep-brand-dark);display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;}
+  .crm-panel .content strong{display:block;font-weight:600;color:var(--rep-ink);}
   .crm-panel .content span{display:block;font-size:.82rem;color:#475569;}
-  .crm-panel .content small{display:inline-flex;margin-top:.25rem;padding:.15rem .55rem;border-radius:999px;font-size:.7rem;background:#e2f4f7;color:#0b8b98;letter-spacing:.06em;text-transform:uppercase;}
+  .crm-panel .content small{display:inline-flex;margin-top:.25rem;padding:.15rem .55rem;border-radius:999px;font-size:.7rem;background:#e2f4f7;color:var(--rep-brand-dark);letter-spacing:.06em;text-transform:uppercase;}
   .crm-panel .empty{font-size:.85rem;color:#94a3b8;}
   .create-lead-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;}
   .create-lead-form .full-span{grid-column:1 / -1;}
-  .create-lead-form .form-control,.create-lead-form .form-select,.lead-update-form .form-control,.lead-update-form .form-select{border-radius:12px;font-size:.9rem;}
+  .create-lead-form .form-control,.create-lead-form .form-select,.lead-update-form .form-control,.lead-update-form .form-select{border-radius:12px;font-size:.9rem;border-color:rgba(148,163,184,.35);}
   .create-lead-form textarea{min-height:110px;}
   .crm-board{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(280px,1fr);gap:1.1rem;overflow-x:auto;padding-bottom:.5rem;margin-bottom:-.5rem;}
   .crm-board::-webkit-scrollbar{height:8px;}
   .crm-board::-webkit-scrollbar-thumb{background:rgba(148,163,184,.6);border-radius:999px;}
   .crm-column{background:#f8fafc;border:1px solid rgba(148,163,184,.18);border-radius:18px;padding:1.1rem;display:flex;flex-direction:column;gap:1rem;min-height:280px;box-shadow:0 22px 44px -34px rgba(15,23,42,.35);}
   .crm-column-header{display:flex;justify-content:space-between;align-items:center;}
-  .crm-column-header h6{margin:0;font-size:.95rem;font-weight:700;color:#0f172a;}
+  .crm-column-header h6{margin:0;font-size:.95rem;font-weight:700;color:var(--rep-ink);}
   .crm-column-header .count-badge{font-size:.8rem;font-weight:600;padding:.2rem .65rem;border-radius:999px;background:rgba(148,163,184,.24);color:#475569;}
   .crm-column.status-new{border-color:rgba(14,165,181,.35);}
   .crm-column.status-contacted{border-color:rgba(59,130,246,.35);}
@@ -218,24 +212,24 @@ $pageStyles = <<<'CSS'
   .crm-column.status-on-hold{border-color:rgba(148,163,184,.45);}
   .crm-column.status-won{border-color:rgba(34,197,94,.45);}
   .crm-column.status-lost{border-color:rgba(248,113,113,.4);}
-  .lead-card{background:#fff;border:1px solid rgba(148,163,184,.24);border-radius:16px;padding:1rem;display:flex;flex-direction:column;gap:.9rem;box-shadow:0 20px 44px -34px rgba(15,23,42,.35);}
-  .lead-card h6{margin:0;font-weight:700;color:#0f172a;}
+  .lead-card{background:#fff;border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:1rem;display:flex;flex-direction:column;gap:.9rem;box-shadow:0 20px 44px -34px rgba(15,23,42,.35);}
+  .lead-card h6{margin:0;font-weight:700;color:var(--rep-ink);}
   .lead-card .status-chip{margin-top:.3rem;}
   .lead-meta{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.35rem;font-size:.82rem;color:#475569;}
   .lead-meta li{display:flex;gap:.45rem;align-items:center;}
-  .lead-meta i{color:#0ea5b5;}
+  .lead-meta i{color:var(--rep-brand);}
   .lead-timestamps{display:flex;flex-direction:column;gap:.3rem;font-size:.75rem;color:#64748b;}
   .lead-update-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.75rem;}
   .lead-update-form .full-span{grid-column:1 / -1;}
-  .lead-update-form .form-label,.note-form .form-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#64748b;margin-bottom:.2rem;font-weight:600;}
+  .lead-update-form .form-label,.note-form .form-label{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--rep-muted);margin-bottom:.2rem;font-weight:600;}
   .note-timeline{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.65rem;}
-  .note-timeline li{border:1px solid rgba(148,163,184,.22);border-radius:14px;padding:.65rem;background:#fff;font-size:.82rem;color:#0f172a;}
+  .note-timeline li{border:1px solid rgba(148,163,184,.22);border-radius:14px;padding:.65rem;background:#fff;font-size:.82rem;color:var(--rep-ink);}
   .note-timeline .meta{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.35rem;font-size:.7rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;}
   .note-form textarea{min-height:90px;border-radius:12px;}
   .note-form .btn{font-size:.85rem;border-radius:12px;}
-  .empty-state{padding:2.5rem;border:2px dashed rgba(148,163,184,.3);border-radius:16px;text-align:center;color:#94a3b8;font-size:.95rem;background:#fff;}
+  .empty-state{padding:2.5rem;border:2px dashed rgba(148,163,184,.28);border-radius:16px;text-align:center;color:#94a3b8;font-size:.95rem;background:#fff;}
   .table thead{background:#f8fafc;}
-  .table th{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;border-bottom:none;}
+  .table th{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--rep-muted);border-bottom:none;}
   .badge-status{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .7rem;border-radius:999px;font-size:.75rem;font-weight:600;}
   .status-paid{background:rgba(34,197,94,.2);color:#166534;}
   .status-pending{background:rgba(250,204,21,.2);color:#854d0e;}
@@ -250,16 +244,13 @@ $dealerSelectorHtml = '';
 if (!empty($assignedDealers)) {
   ob_start();
   ?>
-  <form method="get" class="dealer-switcher">
-    <label for="dealer-switcher" class="dealer-switcher__label">Bayi seçimi</label>
-    <div class="dealer-switcher__field">
-      <i class="bi bi-building"></i>
-      <select id="dealer-switcher" name="dealer_id" onchange="this.form.submit()">
-        <?php foreach ($assignedDealers as $item): ?>
-          <option value="<?= (int)$item['id'] ?>" <?=$dealerId === (int)$item['id'] ? 'selected' : ''?>><?=h($item['name'])?></option>
-        <?php endforeach; ?>
-      </select>
-    </div>
+  <form method="get" class="rep-selector" id="dealer-switcher" autocomplete="off">
+    <i class="bi bi-building"></i>
+    <select name="dealer_id" aria-label="Bayi seçimi" onchange="this.form.submit()">
+      <?php foreach ($assignedDealers as $item): ?>
+        <option value="<?= (int)$item['id'] ?>" <?=$dealerId === (int)$item['id'] ? 'selected' : ''?>><?=h($item['name'])?></option>
+      <?php endforeach; ?>
+    </select>
   </form>
   <?php
   $dealerSelectorHtml = ob_get_clean();
@@ -292,7 +283,7 @@ if (!$dealer): ?>
     <p class="mb-0 text-muted">CRM ekranlarını ve komisyon özetlerini görüntüleyebilmek için sistem yöneticinizden bir bayi ataması yapılmasını isteyin.</p>
   </div>
 <?php else: ?>
-  <div class="card-lite mb-4">
+  <section class="card-lite mb-4" id="commissions">
     <div class="section-heading">
       <h5 class="mb-0">Komisyon özeti</h5>
       <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -324,9 +315,9 @@ if (!$dealer): ?>
         <small><?=h(count($assignedDealers))?> bayi ataması</small>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card-lite mb-4">
+  <section class="card-lite mb-4" id="crm">
     <div class="section-heading">
       <h5 class="mb-0">CRM özeti</h5>
       <span class="badge bg-light text-dark px-3 py-2 rounded-pill">Toplam Potansiyel: <?=$leadTotal?></span>
@@ -380,9 +371,9 @@ if (!$dealer): ?>
         <?php endif; ?>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="card-lite mb-4">
+  <section class="card-lite mb-4" id="crm-new">
     <div class="section-heading">
       <h5 class="mb-0">Yeni potansiyel kaydı</h5>
       <small class="text-muted">Yeni temasları hızlıca CRM'e ekleyin.</small>
@@ -431,9 +422,9 @@ if (!$dealer): ?>
         <button type="submit" class="btn btn-primary">Potansiyeli Oluştur</button>
       </div>
     </form>
-  </div>
+  </section>
 
-  <div class="card-lite mb-4">
+  <section class="card-lite mb-4" id="crm-board">
     <div class="section-heading">
       <h5 class="mb-0">Potansiyel CRM panosu</h5>
       <small class="text-muted">Durumlara göre gruplanmış potansiyeller</small>
@@ -552,9 +543,9 @@ if (!$dealer): ?>
         <?php endforeach; ?>
       </div>
     <?php endif; ?>
-  </div>
+  </section>
 
-  <div class="card-lite mb-4">
+  <section class="card-lite mb-4" id="topups">
     <div class="section-heading">
       <h5 class="mb-0">Tamamlanan yüklemeler</h5>
       <small class="text-muted">Komisyon durumlarınızı takip edin.</small>
@@ -579,9 +570,9 @@ if (!$dealer): ?>
         </tbody>
       </table>
     </div>
-  </div>
+  </section>
 
-  <div class="card-lite">
+  <section class="card-lite" id="commissions-history">
     <div class="section-heading">
       <h5 class="mb-0">Komisyon hareketleri</h5>
     </div>
@@ -605,7 +596,7 @@ if (!$dealer): ?>
         </tbody>
       </table>
     </div>
-  </div>
+  </section>
 <?php endif; ?>
 
 <?php representative_layout_end();
