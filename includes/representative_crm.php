@@ -6,6 +6,8 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/db.php';
 require_once __DIR__.'/functions.php';
 
+install_schema();
+
 const REP_LEAD_STATUS_NEW = 'new';
 const REP_LEAD_STATUS_CONTACTED = 'contacted';
 const REP_LEAD_STATUS_DISCOVERY = 'discovery';
@@ -15,6 +17,22 @@ const REP_LEAD_STATUS_PILOT = 'pilot';
 const REP_LEAD_STATUS_ON_HOLD = 'on_hold';
 const REP_LEAD_STATUS_WON = 'won';
 const REP_LEAD_STATUS_LOST = 'lost';
+
+function representative_crm_tables_ready(): bool {
+  static $ready = null;
+  if ($ready !== null) {
+    return $ready;
+  }
+
+  try {
+    install_schema();
+  } catch (Throwable $e) {
+    // kurulum hatalarını sessizce yok sayıyoruz, hazır kontrolü false dönebilir
+  }
+
+  $ready = table_exists('representative_leads') && table_exists('representative_lead_notes');
+  return $ready;
+}
 
 function representative_crm_status_options(): array {
   return [
@@ -60,6 +78,9 @@ function representative_crm_lead_create(int $representative_id, array $data): in
   if ($representative_id <= 0) {
     throw new InvalidArgumentException('Geçerli bir temsilci seçin.');
   }
+  if (!representative_crm_tables_ready()) {
+    throw new RuntimeException('CRM tabloları henüz oluşturulmadı. Lütfen sistem yöneticinizle iletişime geçin.');
+  }
   $name = trim($data['name'] ?? '');
   if ($name === '') {
     throw new InvalidArgumentException('Potansiyel müşteri adı zorunludur.');
@@ -103,6 +124,9 @@ function representative_crm_lead_create(int $representative_id, array $data): in
 }
 
 function representative_crm_lead_get(int $lead_id, int $representative_id): ?array {
+  if (!representative_crm_tables_ready()) {
+    return null;
+  }
   $st = pdo()->prepare('SELECT * FROM representative_leads WHERE id=? AND representative_id=? LIMIT 1');
   $st->execute([$lead_id, $representative_id]);
   $row = $st->fetch();
@@ -128,6 +152,9 @@ function representative_crm_lead_get(int $lead_id, int $representative_id): ?arr
 }
 
 function representative_crm_leads(int $representative_id): array {
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
   $st = pdo()->prepare('SELECT * FROM representative_leads WHERE representative_id=? ORDER BY created_at DESC');
   $st->execute([$representative_id]);
   $rows = [];
@@ -153,6 +180,9 @@ function representative_crm_leads(int $representative_id): array {
 }
 
 function representative_crm_lead_update(int $lead_id, int $representative_id, array $data): void {
+  if (!representative_crm_tables_ready()) {
+    throw new RuntimeException('CRM tabloları henüz hazır olmadığı için güncelleme yapılamadı.');
+  }
   $lead = representative_crm_lead_get($lead_id, $representative_id);
   if (!$lead) {
     throw new InvalidArgumentException('Kayıt bulunamadı.');
@@ -201,6 +231,9 @@ function representative_crm_lead_update(int $lead_id, int $representative_id, ar
 }
 
 function representative_crm_lead_notes(int $lead_id, int $representative_id): array {
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
   $st = pdo()->prepare('SELECT * FROM representative_lead_notes WHERE lead_id=? AND representative_id=? ORDER BY created_at DESC');
   $st->execute([$lead_id, $representative_id]);
   $rows = [];
@@ -219,6 +252,9 @@ function representative_crm_lead_notes(int $lead_id, int $representative_id): ar
 }
 
 function representative_crm_lead_add_note(int $lead_id, int $representative_id, string $note, ?string $contact_type = null, ?string $next_action_at = null): void {
+  if (!representative_crm_tables_ready()) {
+    throw new RuntimeException('CRM tabloları hazır olmadığı için not eklenemedi.');
+  }
   $lead = representative_crm_lead_get($lead_id, $representative_id);
   if (!$lead) {
     throw new InvalidArgumentException('Potansiyel müşteri bulunamadı.');
@@ -262,6 +298,9 @@ function representative_crm_lead_add_note(int $lead_id, int $representative_id, 
 function representative_crm_status_counts(int $representative_id): array {
   $summary = array_fill_keys(array_keys(representative_crm_status_options()), 0);
   $summary['total'] = 0;
+  if (!representative_crm_tables_ready()) {
+    return $summary;
+  }
   $st = pdo()->prepare('SELECT status, COUNT(*) AS c FROM representative_leads WHERE representative_id=? GROUP BY status');
   $st->execute([$representative_id]);
   foreach ($st as $row) {
@@ -278,6 +317,9 @@ function representative_crm_status_counts(int $representative_id): array {
 
 function representative_crm_upcoming_actions(int $representative_id, int $limit = 5): array {
   $limit = max(1, $limit);
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
   $st = pdo()->prepare('SELECT * FROM representative_leads WHERE representative_id=? AND next_action_at IS NOT NULL ORDER BY next_action_at ASC LIMIT ?');
   $st->bindValue(1, $representative_id, PDO::PARAM_INT);
   $st->bindValue(2, $limit, PDO::PARAM_INT);
@@ -297,6 +339,9 @@ function representative_crm_upcoming_actions(int $representative_id, int $limit 
 
 function representative_crm_recent_notes(int $representative_id, int $limit = 5): array {
   $limit = max(1, $limit);
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
   $sql = 'SELECT n.*, l.name AS lead_name, l.company AS lead_company
           FROM representative_lead_notes n
           INNER JOIN representative_leads l ON l.id = n.lead_id

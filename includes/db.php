@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240527_01');
+  define('APP_SCHEMA_VERSION', '20240609_01');
 }
 
 function pdo(): PDO {
@@ -67,7 +67,11 @@ function install_schema(){
       'guest_upload_comments',
       'guest_chat_messages',
       'guest_event_notes',
-      'guest_private_messages'
+      'guest_private_messages',
+      'dealer_representatives',
+      'dealer_representative_assignments',
+      'representative_leads',
+      'representative_lead_notes',
     ];
     foreach ($criticalTables as $table) {
       if (!table_exists($table)) {
