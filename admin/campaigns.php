@@ -104,12 +104,10 @@ $campaigns=$campaigns->fetchAll();
 </style>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('campaigns', 'Kampanya Yönetimi', 'Salon: '.$VNAME.' • Kampanyalar tüm etkinlik panellerinde gösterilir.'); ?>
-<main class="admin-main">
-  <div class="container">
+<?php admin_layout_start('campaigns', 'Kampanya Yönetimi', 'Salon: '.$VNAME.' • Kampanyalar tüm etkinlik panellerinde gösterilir.'); ?>
     <?php flash_box(); ?>
 
-    <div class="card-lite p-3 mb-4">
+    <div class="card-lite mb-4">
       <div class="d-flex justify-content-between align-items-center mb-2">
         <h5 class="m-0">Yeni Kampanya</h5>
         <span class="muted small">Eklediğiniz kampanyalar salonunuzdaki tüm etkinlik panellerine yansır.</span>
@@ -139,7 +137,7 @@ $campaigns=$campaigns->fetchAll();
       </form>
     </div>
 
-    <div class="card-lite p-3">
+    <div class="card-lite">
       <h5 class="mb-3">Aktif Kampanyalar</h5>
       <?php if (!$campaigns): ?>
         <div class="muted">Henüz kampanya eklenmedi.</div>
@@ -194,8 +192,7 @@ $campaigns=$campaigns->fetchAll();
         </div>
       <?php endif; ?>
     </div>
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

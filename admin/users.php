@@ -160,10 +160,8 @@ if ($detail_id) {
 </style>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('users', 'Etkinlik Hesapları', 'Etkinlik panellerini, lisans sürelerini ve ödeme durumlarını inceleyin.'); ?>
+<?php admin_layout_start('users', 'Etkinlik Hesapları', 'Etkinlik panellerini, lisans sürelerini ve ödeme durumlarını inceleyin.'); ?>
 
-<main class="admin-main">
-  <div class="container">
   <?php flash_box(); ?>
 
   <!-- Filtreler -->
@@ -354,7 +352,6 @@ if ($detail_id) {
       </div>
     <?php endif; ?>
   </div>
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 </body>
 </html>

@@ -333,10 +333,8 @@ $venueAssignments = dealer_fetch_venue_assignments();
 </style>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('dealers', 'Bayi Yönetimi', 'Bayileri yönetin, salon atayın ve lisans durumlarını takip edin.'); ?>
+<?php admin_layout_start('dealers', 'Bayi Yönetimi', 'Bayileri yönetin, salon atayın ve lisans durumlarını takip edin.'); ?>
 
-<main class="admin-main">
-  <div class="container">
   <?php flash_box(); ?>
   <div class="row g-4">
     <div class="col-lg-5">
@@ -804,8 +802,7 @@ $venueAssignments = dealer_fetch_venue_assignments();
       </div>
     </div>
   </div>
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){

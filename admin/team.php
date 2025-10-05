@@ -126,10 +126,8 @@ $admins = pdo()->query("SELECT id, name, email, role, created_at, last_login_at 
   </style>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('team', 'Yönetici Ekibi', 'Süperadmin ve admin rollerini yönetin, ekip arkadaşlarınızı davet edin.'); ?>
+<?php admin_layout_start('team', 'Yönetici Ekibi', 'Süperadmin ve admin rollerini yönetin, ekip arkadaşlarınızı davet edin.'); ?>
 
-<main class="admin-main">
-  <div class="container">
     <?php flash_box(); ?>
 
     <div class="row g-4">
@@ -234,7 +232,6 @@ $admins = pdo()->query("SELECT id, name, email, role, created_at, last_login_at 
         </div>
       </div>
     </div>
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 </body>
 </html>

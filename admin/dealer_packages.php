@@ -106,9 +106,7 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
 </style>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('packages', 'Paket Yönetimi', 'Bayi paketlerini oluşturun, fiyatlarını güncelleyin ve satış durumlarını yönetin.'); ?>
-<main class="admin-main">
-  <div class="container">
+<?php admin_layout_start('packages', 'Paket Yönetimi', 'Bayi paketlerini oluşturun, fiyatlarını güncelleyin ve satış durumlarını yönetin.'); ?>
     <?php flash_box(); ?>
     <div class="row g-4">
       <div class="col-lg-5">
@@ -204,7 +202,6 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
         </div>
       </div>
     </div>
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 </body>
 </html>

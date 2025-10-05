@@ -225,14 +225,12 @@ function confirmSoftDelete(){
 </script>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('dashboard', 'Panel Genel Bakış', 'Salon: '.$VNAME.' • Etkinlik ve QR yönetimi'); ?>
+<?php admin_layout_start('dashboard', 'Panel Genel Bakış', 'Salon: '.$VNAME.' • Etkinlik ve QR yönetimi'); ?>
 
-<main class="admin-main">
-  <div class="container">
     <?php flash_box(); ?>
 
   <!-- Yeni Etkinlik -->
-  <div id="ev" class="card-lite p-3 mb-4">
+  <div id="ev" class="card-lite mb-4">
     <div class="section-heading">
       <h5>Yeni Etkinlik Oluştur</h5>
       <a class="btn btn-zs-outline" href="<?=h(BASE_URL)?>/admin/campaigns.php">Kampanyaları Yönet</a>
@@ -260,7 +258,7 @@ function confirmSoftDelete(){
   </div>
 
   <!-- Etkinlik Listesi -->
-  <div class="card-lite p-3 mb-4">
+  <div class="card-lite mb-4">
     <div class="section-heading">
       <h5>Etkinliklerim</h5>
       <form class="d-flex align-items-center gap-2" method="get">
@@ -325,7 +323,7 @@ function confirmSoftDelete(){
   </div>
 
   <!-- Kalıcı QR Yönetimi -->
-  <div id="qr" class="card-lite p-3 mb-4">
+  <div id="qr" class="card-lite mb-4">
     <h5 class="mb-3">Kalıcı QR Kodlar</h5>
     <form method="post" class="row g-2 align-items-end mb-3 grid-compact">
       <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
@@ -394,7 +392,6 @@ function confirmSoftDelete(){
     <?php endif; ?>
   </div>
 
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 </body>
 </html>

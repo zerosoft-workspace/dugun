@@ -214,10 +214,8 @@ if (isset($_GET['export']) && $_GET['export']==='pdf') {
 </style>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('venues', 'Salon Düğünleri', 'Salon: '.$VNAME.' için etkinlik listesi'); ?>
+<?php admin_layout_start('venues', 'Salon Etkinlikleri', 'Salon: '.$VNAME.' için etkinlik listesi'); ?>
 
-<main class="admin-main">
-  <div class="container">
   <?php flash_box(); ?>
 
   <!-- Filtre + PDF -->
@@ -305,7 +303,6 @@ if (isset($_GET['export']) && $_GET['export']==='pdf') {
       </div>
     <?php endforeach; ?>
   <?php endif; ?>
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 </body>
 </html>

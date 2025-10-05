@@ -108,9 +108,7 @@ while (count($navItems) < 5) {
   </style>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('site', 'Site İçerikleri', 'Landing sayfası metinlerini ve sıkça sorulan soruları yönetin.'); ?>
-<main class="admin-main">
-  <div class="container py-4">
+<?php admin_layout_start('site', 'Site İçerikleri', 'Landing sayfası metinlerini ve sıkça sorulan soruları yönetin.'); ?>
     <?php flash_box(); ?>
     <form method="post" class="card card-lite">
       <div class="card-section border-bottom">
@@ -254,8 +252,7 @@ while (count($navItems) < 5) {
         <button type="submit" class="btn btn-brand">Değişiklikleri Kaydet</button>
       </div>
     </form>
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){

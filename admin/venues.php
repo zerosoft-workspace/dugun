@@ -164,10 +164,8 @@ function askToggle(){
 </script>
 </head>
 <body class="admin-body">
-<?php render_admin_topnav('venues', 'Düğün Salonları', 'Salon portföyünüzü yönetin ve etkinliklerinizi organize edin.'); ?>
+<?php admin_layout_start('venues', 'Düğün Salonları', 'Salon portföyünüzü yönetin ve etkinliklerinizi organize edin.'); ?>
 
-<main class="admin-main">
-  <div class="container">
   <?php flash_box(); ?>
 
   <!-- Yeni Salon -->
@@ -315,7 +313,6 @@ function askToggle(){
       </div>
     <?php endif; ?>
   </div>
-  </div>
-</main>
+<?php admin_layout_end(); ?>
 </body>
 </html>
