@@ -102,160 +102,241 @@ while (count($navItems) < 5) {
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <?=admin_base_styles()?>
   <style>
+    .settings-shell{display:flex;flex-direction:column;gap:1.5rem;}
+    .pane-nav{background:#fff;border-radius:18px;padding:1.5rem;box-shadow:0 24px 60px -45px rgba(15,23,42,.55);}
+    .pane-nav h6{font-weight:700;font-size:1.05rem;margin-bottom:1rem;color:var(--admin-ink);}
+    .pane-button{width:100%;display:flex;align-items:center;gap:.85rem;border:none;background:rgba(14,165,181,.08);color:var(--admin-ink);padding:.8rem 1rem;border-radius:14px;font-weight:600;transition:all .2s ease;}
+    .pane-button i{font-size:1.05rem;color:var(--admin-brand);transition:inherit;}
+    .pane-button:not(:last-child){margin-bottom:.65rem;}
+    .pane-button:hover,.pane-button:focus{background:rgba(14,165,181,.16);color:var(--admin-brand);outline:none;}
+    .pane-button.active{background:var(--admin-brand);color:#fff;box-shadow:0 12px 30px -20px rgba(14,165,181,.9);}
+    .pane-button.active i{color:#fff;}
+    .content-pane{display:none;}
+    .content-pane.active{display:block;}
     .repeater-item{border:1px dashed rgba(14,165,181,.35);border-radius:16px;padding:1rem 1.25rem;background:#fff;}
     .repeater-item + .repeater-item{margin-top:1rem;}
     .btn-add-row{border-radius:12px;}
+    @media (max-width: 991px){
+      .settings-shell{gap:1rem;}
+    }
   </style>
 </head>
 <body class="admin-body">
-<?php admin_layout_start('site', 'Site İçerikleri', 'Landing sayfası metinlerini ve sıkça sorulan soruları yönetin.'); ?>
+<?php admin_layout_start('site', 'Site İçerikleri', 'Landing sayfanızdaki blokları düzenleyin ve hızlıca yayınlayın.'); ?>
     <?php flash_box(); ?>
-    <form method="post" class="card card-lite">
-      <div class="card-section border-bottom">
-        <h5 class="fw-bold mb-3">İletişim Alanı</h5>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Başlık</label>
-            <input type="text" name="contact_title" class="form-control" value="<?=h($content['contact_title'] ?? '')?>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Açıklama</label>
-            <input type="text" name="contact_text" class="form-control" value="<?=h($content['contact_text'] ?? '')?>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Telefon</label>
-            <input type="text" name="contact_phone" class="form-control" value="<?=h($content['contact_phone'] ?? '')?>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">E-posta</label>
-            <input type="email" name="contact_email" class="form-control" value="<?=h($content['contact_email'] ?? '')?>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">Adres</label>
-            <input type="text" name="contact_address" class="form-control" value="<?=h($content['contact_address'] ?? '')?>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Web Adresi</label>
-            <input type="text" name="contact_website" class="form-control" value="<?=h($content['contact_website'] ?? '')?>" placeholder="https://...">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Web Etiketi</label>
-            <input type="text" name="contact_website_label" class="form-control" value="<?=h($content['contact_website_label'] ?? '')?>" placeholder="zerosoft.com.tr">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Birincil Buton Metni</label>
-            <input type="text" name="contact_primary_label" class="form-control" value="<?=h($content['contact_primary_label'] ?? '')?>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Birincil Buton URL</label>
-            <input type="text" name="contact_primary_url" class="form-control" value="<?=h($content['contact_primary_url'] ?? '')?>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">İkincil Buton Metni</label>
-            <input type="text" name="contact_secondary_label" class="form-control" value="<?=h($content['contact_secondary_label'] ?? '')?>">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">İkincil Buton URL</label>
-            <input type="text" name="contact_secondary_url" class="form-control" value="<?=h($content['contact_secondary_url'] ?? '')?>">
+    <form method="post" class="settings-shell" novalidate>
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-4">
+          <div class="pane-nav">
+            <h6>İçerik Başlıkları</h6>
+            <button type="button" class="pane-button active" data-pane-target="contact"><i class="bi bi-person-rolodex"></i>İletişim Bilgileri</button>
+            <button type="button" class="pane-button" data-pane-target="cta"><i class="bi bi-bullseye"></i>Çağrı Alanı</button>
+            <button type="button" class="pane-button" data-pane-target="faq"><i class="bi bi-chat-dots"></i>Sıkça Sorulanlar</button>
+            <button type="button" class="pane-button" data-pane-target="footer"><i class="bi bi-columns-gap"></i>Footer İçeriği</button>
           </div>
         </div>
-        <hr class="my-4">
-        <div class="row g-3">
-          <div class="col-md-4">
-            <label class="form-label">CTA Rozeti</label>
-            <input type="text" name="contact_cta_badge" class="form-control" value="<?=h($content['contact_cta_badge'] ?? '')?>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">CTA Başlığı</label>
-            <input type="text" name="contact_cta_title" class="form-control" value="<?=h($content['contact_cta_title'] ?? '')?>">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label">CTA Buton Metni</label>
-            <input type="text" name="contact_cta_button_label" class="form-control" value="<?=h($content['contact_cta_button_label'] ?? '')?>">
-          </div>
-          <div class="col-12">
-            <label class="form-label">CTA Açıklaması</label>
-            <textarea name="contact_cta_text" class="form-control" rows="3"><?=h($content['contact_cta_text'] ?? '')?></textarea>
-          </div>
-          <div class="col-12">
-            <label class="form-label">CTA Buton URL</label>
-            <input type="text" name="contact_cta_button_url" class="form-control" value="<?=h($content['contact_cta_button_url'] ?? '')?>">
-          </div>
-        </div>
-      </div>
-
-      <div class="card-section border-bottom">
-        <h5 class="fw-bold mb-3">Sıkça Sorulan Sorular</h5>
-        <div id="faqRepeater">
-          <?php foreach ($faqItems as $index => $faq): ?>
-            <div class="repeater-item" data-index="<?=$index?>">
-              <div class="row g-3 align-items-start">
-                <div class="col-md-6">
-                  <label class="form-label">Soru</label>
-                  <input type="text" class="form-control" name="faq_question[]" value="<?=h($faq['question'])?>" placeholder="Soru metni">
+        <div class="col-lg-8">
+          <div class="card card-lite content-pane active" data-pane="contact">
+            <div class="card-section border-bottom">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">İletişim Bilgileri</h5>
+                  <p class="text-muted mb-0">Footer ve iletişim bloklarında yer alan temel bilgileri güncelleyin.</p>
                 </div>
-                <div class="col-md-6">
-                  <label class="form-label">Cevap</label>
-                  <textarea class="form-control" name="faq_answer[]" rows="2" placeholder="Cevap metni"><?=h($faq['answer'])?></textarea>
-                </div>
+                <span class="badge rounded-pill text-bg-light text-uppercase" style="letter-spacing:.05em;color:var(--admin-brand);background:rgba(14,165,181,.15);">#0ea5b5</span>
               </div>
-            </div>
-          <?php endforeach; ?>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary mt-3 btn-add-row" data-target="faq">+ Soru Ekle</button>
-      </div>
-
-      <div class="card-section border-bottom">
-        <h5 class="fw-bold mb-3">Footer İçeriği</h5>
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label">Hakkımızda Metni</label>
-            <textarea name="footer_about" class="form-control" rows="4"><?=h($content['footer_about'] ?? '')?></textarea>
-          </div>
-          <div class="col-md-6">
-            <label class="form-label">Firma Adı</label>
-            <input type="text" name="footer_company" class="form-control" value="<?=h($content['footer_company'] ?? '')?>">
-            <div class="mt-3">
-              <label class="form-label">Alt Satır (Sol)</label>
-              <input type="text" name="footer_disclaimer_left" class="form-control" value="<?=h($content['footer_disclaimer_left'] ?? '')?>">
-            </div>
-            <div class="mt-3">
-              <label class="form-label">Alt Satır (Sağ)</label>
-              <input type="text" name="footer_disclaimer_right" class="form-control" value="<?=h($content['footer_disclaimer_right'] ?? '')?>">
-            </div>
-          </div>
-        </div>
-        <hr class="my-4">
-        <h6 class="fw-semibold">Footer Navigasyonu</h6>
-        <div id="navRepeater">
-          <?php foreach ($navItems as $item): ?>
-            <div class="repeater-item">
               <div class="row g-3">
                 <div class="col-md-6">
-                  <label class="form-label">Etiket</label>
-                  <input type="text" class="form-control" name="nav_label[]" value="<?=h($item['label'])?>" placeholder="Örn. Paketler">
+                  <label class="form-label">Başlık</label>
+                  <input type="text" name="contact_title" class="form-control" value="<?=h($content['contact_title'] ?? '')?>">
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">Bağlantı</label>
-                  <input type="text" class="form-control" name="nav_url[]" value="<?=h($item['url'])?>" placeholder="#paketler">
+                  <label class="form-label">Açıklama</label>
+                  <input type="text" name="contact_text" class="form-control" value="<?=h($content['contact_text'] ?? '')?>">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Telefon</label>
+                  <input type="text" name="contact_phone" class="form-control" value="<?=h($content['contact_phone'] ?? '')?>">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">E-posta</label>
+                  <input type="email" name="contact_email" class="form-control" value="<?=h($content['contact_email'] ?? '')?>">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Adres</label>
+                  <input type="text" name="contact_address" class="form-control" value="<?=h($content['contact_address'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Web Adresi</label>
+                  <input type="text" name="contact_website" class="form-control" value="<?=h($content['contact_website'] ?? '')?>" placeholder="https://...">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Web Etiketi</label>
+                  <input type="text" name="contact_website_label" class="form-control" value="<?=h($content['contact_website_label'] ?? '')?>" placeholder="zerosoft.com.tr">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Birincil Buton Metni</label>
+                  <input type="text" name="contact_primary_label" class="form-control" value="<?=h($content['contact_primary_label'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Birincil Buton URL</label>
+                  <input type="text" name="contact_primary_url" class="form-control" value="<?=h($content['contact_primary_url'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">İkincil Buton Metni</label>
+                  <input type="text" name="contact_secondary_label" class="form-control" value="<?=h($content['contact_secondary_label'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">İkincil Buton URL</label>
+                  <input type="text" name="contact_secondary_url" class="form-control" value="<?=h($content['contact_secondary_url'] ?? '')?>">
                 </div>
               </div>
             </div>
-          <?php endforeach; ?>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="cta">
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Çağrı Alanı</h5>
+                  <p class="text-muted mb-0">Anasayfanın alt bölümünde yer alan harekete geçirici mesajı şekillendirin.</p>
+                </div>
+                <i class="bi bi-megaphone-fill" style="font-size:1.6rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">CTA Rozeti</label>
+                  <input type="text" name="contact_cta_badge" class="form-control" value="<?=h($content['contact_cta_badge'] ?? '')?>">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">CTA Başlığı</label>
+                  <input type="text" name="contact_cta_title" class="form-control" value="<?=h($content['contact_cta_title'] ?? '')?>">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">CTA Buton Metni</label>
+                  <input type="text" name="contact_cta_button_label" class="form-control" value="<?=h($content['contact_cta_button_label'] ?? '')?>">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">CTA Açıklaması</label>
+                  <textarea name="contact_cta_text" class="form-control" rows="3"><?=h($content['contact_cta_text'] ?? '')?></textarea>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">CTA Buton URL</label>
+                  <input type="text" name="contact_cta_button_url" class="form-control" value="<?=h($content['contact_cta_button_url'] ?? '')?>">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="faq">
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Sıkça Sorulan Sorular</h5>
+                  <p class="text-muted mb-0">Ziyaretçilerin en çok merak ettiği başlıkları hızlıca düzenleyin.</p>
+                </div>
+                <span class="badge text-bg-light" style="color:var(--admin-brand);background:rgba(14,165,181,.15);">En az 3 önerilir</span>
+              </div>
+              <div data-repeater="faq">
+                <?php foreach ($faqItems as $index => $faq): ?>
+                  <div class="repeater-item" data-index="<?=$index?>">
+                    <div class="row g-3 align-items-start">
+                      <div class="col-md-6">
+                        <label class="form-label">Soru</label>
+                        <input type="text" class="form-control" name="faq_question[]" value="<?=h($faq['question'])?>" placeholder="Soru metni">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">Cevap</label>
+                        <textarea class="form-control" name="faq_answer[]" rows="2" placeholder="Cevap metni"><?=h($faq['answer'])?></textarea>
+                      </div>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary mt-3 btn-add-row" data-target="faq">+ Soru Ekle</button>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="footer">
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Footer İçeriği</h5>
+                  <p class="text-muted mb-0">Hakkımızda alanı, alt satırlar ve hızlı bağlantıları buradan yönetin.</p>
+                </div>
+                <i class="bi bi-layout-text-window-reverse" style="font-size:1.6rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Hakkımızda Metni</label>
+                  <textarea name="footer_about" class="form-control" rows="4"><?=h($content['footer_about'] ?? '')?></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Firma Adı</label>
+                  <input type="text" name="footer_company" class="form-control" value="<?=h($content['footer_company'] ?? '')?>">
+                  <div class="mt-3">
+                    <label class="form-label">Alt Satır (Sol)</label>
+                    <input type="text" name="footer_disclaimer_left" class="form-control" value="<?=h($content['footer_disclaimer_left'] ?? '')?>">
+                  </div>
+                  <div class="mt-3">
+                    <label class="form-label">Alt Satır (Sağ)</label>
+                    <input type="text" name="footer_disclaimer_right" class="form-control" value="<?=h($content['footer_disclaimer_right'] ?? '')?>">
+                  </div>
+                </div>
+              </div>
+              <hr class="my-4">
+              <h6 class="fw-semibold">Footer Navigasyonu</h6>
+              <div data-repeater="nav">
+                <?php foreach ($navItems as $item): ?>
+                  <div class="repeater-item">
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label">Etiket</label>
+                        <input type="text" class="form-control" name="nav_label[]" value="<?=h($item['label'])?>" placeholder="Örn. Paketler">
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">Bağlantı</label>
+                        <input type="text" class="form-control" name="nav_url[]" value="<?=h($item['url'])?>" placeholder="#paketler">
+                      </div>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary mt-3 btn-add-row" data-target="nav">+ Navigasyon Öğesi Ekle</button>
+            </div>
+          </div>
         </div>
-        <button type="button" class="btn btn-sm btn-outline-secondary mt-3 btn-add-row" data-target="nav">+ Navigasyon Öğesi Ekle</button>
       </div>
 
-      <div class="card-section d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-        <span class="text-muted small">Girdiğiniz içerik anasayfada anında güncellenecektir.</span>
-        <button type="submit" class="btn btn-brand">Değişiklikleri Kaydet</button>
+      <div class="card card-lite">
+        <div class="card-section d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+          <div>
+            <h6 class="fw-semibold mb-1">Kaydet ve Yayına Al</h6>
+            <p class="text-muted small mb-0">Güncellemeleriniz kaydedildiğinde BİKARE anasayfasında hemen görüntülenir.</p>
+          </div>
+          <button type="submit" class="btn btn-brand px-4">Değişiklikleri Kaydet</button>
+        </div>
       </div>
     </form>
 <?php admin_layout_end(); ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
+  const panes = document.querySelectorAll('.content-pane');
+  const buttons = document.querySelectorAll('[data-pane-target]');
+  const activate = (id) => {
+    panes.forEach(pane => {
+      pane.classList.toggle('active', pane.dataset.pane === id);
+    });
+    buttons.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.paneTarget === id);
+    });
+  };
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => activate(btn.dataset.paneTarget));
+  });
+
   const templateFaq = () => {
     const wrapper = document.createElement('div');
     wrapper.className = 'repeater-item';
@@ -294,10 +375,10 @@ while (count($navItems) < 5) {
     btn.addEventListener('click', () => {
       const target = btn.dataset.target;
       if (target === 'faq') {
-        document.getElementById('faqRepeater').appendChild(templateFaq());
+        document.querySelector('[data-repeater="faq"]').appendChild(templateFaq());
       }
       if (target === 'nav') {
-        document.getElementById('navRepeater').appendChild(templateNav());
+        document.querySelector('[data-repeater="nav"]').appendChild(templateNav());
       }
     });
   });
