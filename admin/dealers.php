@@ -238,28 +238,82 @@ if (!in_array($statusFilter, $validStatusFilters, true)) {
   $statusFilter = 'all';
 }
 
+$searchTerm = trim($_GET['q'] ?? '');
+$page = max(1, (int)($_GET['page'] ?? 1));
+$perPage = 30;
+
 $statusCounts = dealer_status_counts();
 $activeCount = (int)($statusCounts['active'] ?? 0);
 $pendingCount = (int)($statusCounts['pending'] ?? 0);
 $inactiveCount = (int)($statusCounts['inactive'] ?? 0);
 $totalDealers = (int)($statusCounts['total'] ?? ($activeCount + $pendingCount + $inactiveCount));
-$dealerListSql = "SELECT * FROM dealers";
+
+$dealerListConditions = [];
 $dealerListParams = [];
 if ($statusFilter !== 'all') {
-  $dealerListSql .= " WHERE status=?";
+  $dealerListConditions[] = 'status=?';
   $dealerListParams[] = $statusFilter;
 }
-$dealerListSql .= " ORDER BY name";
+if ($searchTerm !== '') {
+  $dealerListConditions[] = '(name LIKE ? OR email LIKE ? OR phone LIKE ? OR company LIKE ? OR code LIKE ?)';
+  $like = '%'.$searchTerm.'%';
+  array_push($dealerListParams, $like, $like, $like, $like, $like);
+}
+
+$dealerBaseSql = 'FROM dealers';
+if ($dealerListConditions) {
+  $dealerBaseSql .= ' WHERE '.implode(' AND ', $dealerListConditions);
+}
+
+$countStmt = pdo()->prepare('SELECT COUNT(*) '.$dealerBaseSql);
+$countStmt->execute($dealerListParams);
+$totalMatches = (int)$countStmt->fetchColumn();
+$totalMatches = max(0, $totalMatches);
+$totalPages = max(1, (int)ceil($totalMatches / $perPage));
+if ($page > $totalPages) {
+  $page = $totalPages;
+}
+$offset = max(0, ($page - 1) * $perPage);
+
+$dealerListSql = 'SELECT * '.$dealerBaseSql.' ORDER BY name LIMIT ? OFFSET ?';
 $dealerListStmt = pdo()->prepare($dealerListSql);
-$dealerListStmt->execute($dealerListParams);
+$paramIndex = 1;
+foreach ($dealerListParams as $param) {
+  $dealerListStmt->bindValue($paramIndex++, $param);
+}
+$dealerListStmt->bindValue($paramIndex++, $perPage, PDO::PARAM_INT);
+$dealerListStmt->bindValue($paramIndex++, $offset, PDO::PARAM_INT);
+$dealerListStmt->execute();
 $dealersList = $dealerListStmt->fetchAll();
-$allDealers = pdo()->query("SELECT * FROM dealers ORDER BY name")->fetchAll();
+
+$listStart = $totalMatches ? ($offset + 1) : 0;
+$listEnd = $totalMatches ? min($offset + count($dealersList), $totalMatches) : 0;
+
+$allDealers = pdo()->query('SELECT id, code, name, email, status FROM dealers ORDER BY name')->fetchAll();
 $selectedId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $selectedDealer = $selectedId ? dealer_get($selectedId) : null;
 $assignedVenues = $selectedDealer ? dealer_fetch_venues($selectedId) : [];
 $assignedVenueIds = array_map(fn($v) => (int)$v['id'], $assignedVenues);
 $allVenues = pdo()->query("SELECT * FROM venues ORDER BY name")->fetchAll();
 $events = $selectedDealer ? dealer_allowed_events($selectedId) : [];
+$buildDealerUrl = function(array $overrides = []) use ($statusFilter, $searchTerm, $page, $selectedId) {
+  $query = [
+    'status' => $statusFilter !== 'all' ? $statusFilter : null,
+    'q' => $searchTerm !== '' ? $searchTerm : null,
+    'page' => $page > 1 ? $page : null,
+    'id' => $selectedId ?: null,
+  ];
+  foreach ($overrides as $key => $value) {
+    if ($value === null || $value === '') {
+      unset($query[$key]);
+    } else {
+      $query[$key] = $value;
+    }
+  }
+  $query = array_filter($query, fn($value) => $value !== null && $value !== '');
+  $queryString = http_build_query($query);
+  return $queryString ? ('?'.$queryString) : ($_SERVER['PHP_SELF'] ?? '#');
+};
 if ($selectedDealer) {
   dealer_refresh_purchase_states($selectedId);
   $walletBalance = dealer_get_balance($selectedId);
@@ -286,6 +340,38 @@ if ($selectedDealer) {
   $topupRequests = [];
 }
 $venueAssignments = dealer_fetch_venue_assignments();
+$unassignedVenueCount = 0;
+$totalVenueAssignments = 0;
+foreach ($venueAssignments as $group) {
+  $assignedCount = count($group['dealers']);
+  $totalVenueAssignments += $assignedCount;
+  if ($assignedCount === 0) {
+    $unassignedVenueCount++;
+  }
+}
+$assignedVenueCount = max(0, count($venueAssignments) - $unassignedVenueCount);
+
+$dealerOptionPayload = array_map(function($dealer) {
+  return [
+    'value' => (int)$dealer['id'],
+    'label' => $dealer['name'],
+    'code' => $dealer['code'] ?? '',
+    'email' => $dealer['email'] ?? '',
+    'status' => $dealer['status'] ?? '',
+  ];
+}, $allDealers);
+
+$venueOptionPayload = array_map(function($venue) {
+  return [
+    'value' => (int)$venue['id'],
+    'label' => $venue['name'],
+  ];
+}, $allVenues);
+
+if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] === (int)$selectedDealer['id'])) {
+  $selectedDealer['_virtual'] = true;
+  array_unshift($dealersList, $selectedDealer);
+}
 ?>
 <!doctype html>
 <html lang="tr">
@@ -307,7 +393,7 @@ $venueAssignments = dealer_fetch_venue_assignments();
   }
   .stats-row .stat-label{font-size:.78rem;color:var(--admin-muted);letter-spacing:.08em;text-transform:uppercase;}
   .stats-row .stat-value{font-size:1.9rem;font-weight:700;color:var(--admin-ink);}
-  .stats-row .stat-chip{display:inline-flex;align-items:center;gap:6px;padding:.28rem .85rem;border-radius:999px;background:rgba(14,165,181,.12);color:var(--admin-brand-dark);font-size:.75rem;font-weight:600;}
+  .stats-row .stat-chip{display:inline-flex;align-items:center;gap:6px;padding:.28rem .85rem;border-radius:999px;background:rgba(14,165,181,.12);color:#0ea5b5;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
   .badge-status{padding:.35rem .75rem;border-radius:999px;font-size:.75rem;font-weight:600;}
   .status-active{background:rgba(34,197,94,.15);color:#15803d;}
   .status-pending{background:rgba(250,204,21,.18);color:#854d0e;}
@@ -319,12 +405,6 @@ $venueAssignments = dealer_fetch_venue_assignments();
   .dealer-list .list-group-item{padding:1rem 1.25rem;border:none;border-bottom:1px solid rgba(148,163,184,.15);transition:all .2s ease;}
   .dealer-list .list-group-item:hover{background:rgba(14,165,181,.08);}
   .dealer-list .list-group-item.active{background:rgba(14,165,181,.12);border-color:rgba(14,165,181,.28);box-shadow:0 18px 30px -26px rgba(14,165,181,.6);}
-  .assigned-tags{display:flex;flex-wrap:wrap;gap:.4rem;}
-  .assigned-tags .dealer-chip{background:rgba(14,165,181,.12);color:#0f172a;border-radius:999px;padding:.25rem .75rem;font-size:.75rem;font-weight:500;}
-  .assigned-tags .dealer-chip span{font-weight:600;color:#0f172a;}
-  .venue-card{border:1px solid rgba(148,163,184,.25);border-radius:14px;padding:1.25rem;margin-bottom:1.25rem;background:#fff;box-shadow:0 10px 28px -20px rgba(15,23,42,.4);}
-  .venue-card:last-child{margin-bottom:0;}
-  .venue-card h6{margin-bottom:.35rem;}
   .combo-helper{font-size:.8rem;color:var(--muted);}
   .ts-wrapper.form-select .ts-control{padding:.35rem .5rem;}
   .ts-wrapper.multi .ts-control>div{background:rgba(14,165,181,.12);color:#0f172a;border-radius:999px;padding:.25rem .5rem;font-weight:500;}
@@ -333,6 +413,37 @@ $venueAssignments = dealer_fetch_venue_assignments();
   .venue-chip-empty{color:var(--muted);font-size:.85rem;}
   .section-subtitle{font-size:.85rem;color:var(--muted);}
   .tab-card{border-radius:18px; background:#fff; border:1px solid rgba(148,163,184,.16); box-shadow:0 22px 45px -28px rgba(15,23,42,.45);}
+  .dealer-search-form .btn{font-size:.8rem;padding-inline:1rem;}
+  .dealer-virtual-note{margin-top:.6rem;background:rgba(14,165,181,.08);border:1px solid rgba(14,165,181,.18);border-radius:12px;padding:.5rem .75rem;font-size:.78rem;color:#055160;}
+  .assignment-pill{display:inline-flex;align-items:center;gap:.45rem;padding:.4rem .85rem;border-radius:999px;background:rgba(14,165,181,.12);color:#0f172a;font-weight:600;font-size:.85rem;}
+  .assignment-pill span{text-transform:uppercase;font-size:.68rem;letter-spacing:.08em;color:#0ea5b5;}
+  .assignment-pill-group{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:flex-end;}
+  .assignment-summary{display:flex;flex-wrap:wrap;gap:.45rem;padding:.25rem 0;min-height:42px;}
+  .assignment-summary.is-empty::before{content:attr(data-empty-text);color:var(--muted);font-size:.85rem;}
+  .assignment-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .75rem;border-radius:14px;background:#fff;border:1px solid rgba(14,165,181,.28);box-shadow:0 18px 34px -28px rgba(14,165,181,.55);font-size:.85rem;color:#0f172a;}
+  .assignment-chip-code{font-family:"JetBrains Mono",monospace;font-size:.72rem;background:rgba(14,165,181,.16);color:#0ea5b5;padding:.1rem .45rem;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;}
+  .assignment-chip-email{font-size:.72rem;color:#64748b;}
+  .assignment-chip-status{font-size:.7rem;padding:.1rem .45rem;border-radius:999px;text-transform:uppercase;letter-spacing:.05em;}
+  .assignment-chip-status.status-active{background:rgba(34,197,94,.16);color:#166534;}
+  .assignment-chip-status.status-pending{background:rgba(250,204,21,.18);color:#854d0e;}
+  .assignment-chip-status.status-inactive{background:rgba(248,113,113,.16);color:#b91c1c;}
+  .assignment-chip-remove{border:none;background:none;color:#0ea5b5;font-weight:700;font-size:1.1rem;line-height:1;padding:0 .1rem;cursor:pointer;}
+  .assignment-chip-remove:hover{color:#0b8fa1;}
+  .assignment-filter{background:rgba(14,165,181,.08);border:1px solid rgba(14,165,181,.22);border-radius:18px;}
+  .assignment-filter .form-text{font-size:.8rem;color:var(--muted);}
+  .assignment-inline-stats{display:flex;flex-wrap:wrap;gap:1.1rem;font-size:.9rem;color:var(--muted);}
+  .assignment-inline-stats strong{color:#0f172a;}
+  .assignment-accordion .accordion-item{border:none;border-radius:18px;margin-bottom:1rem;box-shadow:0 24px 45px -36px rgba(15,23,42,.45);overflow:hidden;}
+  .assignment-accordion .accordion-item:last-child{margin-bottom:0;}
+  .assignment-accordion .accordion-button{background:#f8fafc;font-weight:600;color:#0f172a;}
+  .assignment-accordion .accordion-button:not(.collapsed){background:#e0f7fb;color:#055160;}
+  .assignment-accordion .accordion-button:focus{box-shadow:none;}
+  .assignment-accordion .accordion-body{background:#fff;border-top:1px solid rgba(14,165,181,.2);}
+  .assignment-count{background:rgba(14,165,181,.18);color:#0a7281;font-weight:600;}
+  .assignment-empty{border:1px dashed rgba(148,163,184,.35);border-radius:16px;background:#f8fafc;}
+  .ts-dropdown .ts-code{font-family:"JetBrains Mono",monospace;font-size:.7rem;margin-right:.4rem;color:#0ea5b5;}
+  .ts-dropdown .ts-option-line{display:flex;flex-direction:column;}
+  .ts-dropdown .ts-option-line .ts-email{font-size:.72rem;color:#64748b;}
   .filter-pills .nav-link{padding:.35rem .65rem;font-size:.75rem;border-radius:999px;color:var(--muted);background:rgba(148,163,184,.18);margin-left:.35rem;transition:all .2s ease;}
   .filter-pills .nav-link:first-child{margin-left:0;}
   .filter-pills .nav-link:hover{background:rgba(14,165,181,.18);color:var(--admin-brand-dark);}
@@ -358,21 +469,21 @@ $venueAssignments = dealer_fetch_venue_assignments();
       <div class="stat-card">
         <span class="stat-label">Toplam Bayi</span>
         <span class="stat-value"><?=$totalDealers?></span>
-        <span class="stat-chip"><i class="bi bi-people-fill me-1"></i>Portföy</span>
+        <span class="stat-chip">Portföy</span>
       </div>
     </div>
     <div class="col-md-4">
       <div class="stat-card">
         <span class="stat-label">Aktif</span>
         <span class="stat-value text-success"><?=$activeCount?></span>
-        <span class="stat-chip"><i class="bi bi-lightning-charge me-1"></i>Canlı</span>
+        <span class="stat-chip">Canlı</span>
       </div>
     </div>
     <div class="col-md-4">
       <div class="stat-card">
         <span class="stat-label">Onay Bekliyor</span>
         <span class="stat-value text-warning"><?=$pendingCount?></span>
-        <span class="stat-chip"><i class="bi bi-hourglass-split me-1"></i>Sırada</span>
+        <span class="stat-chip">Sırada</span>
       </div>
     </div>
   </div>
@@ -440,7 +551,8 @@ $venueAssignments = dealer_fetch_venue_assignments();
               ?>
               <?php foreach ($statusLabels as $key => $label): ?>
                 <?php $isActive = $statusFilter === $key; ?>
-                <a class="nav-link <?= $isActive ? 'active' : '' ?>" href="?status=<?=$key?>">
+                <?php $statusUrl = $buildDealerUrl(['status' => $key === 'all' ? null : $key, 'page' => null]); ?>
+                <a class="nav-link <?= $isActive ? 'active' : '' ?>" href="<?=h($statusUrl)?>">
                   <?=h($label)?>
                   <span class="fw-semibold ms-1">(<?= (int)($statusCounts[$key] ?? 0) ?>)</span>
                 </a>
@@ -448,35 +560,84 @@ $venueAssignments = dealer_fetch_venue_assignments();
             </div>
           </div>
         </div>
+        <form method="get" class="dealer-search-form p-3 border-bottom">
+          <input type="hidden" name="status" value="<?=h($statusFilter)?>">
+          <?php if ($selectedId && empty($selectedDealer['_virtual'] ?? false)): ?>
+            <input type="hidden" name="id" value="<?= (int)$selectedId ?>">
+          <?php endif; ?>
+          <div class="input-group input-group-sm">
+            <input type="text" class="form-control" name="q" value="<?=h($searchTerm)?>" placeholder="Ad, e-posta, kod veya telefon ile ara">
+            <?php if ($searchTerm !== ''): ?>
+              <?php $clearUrl = $buildDealerUrl(['q' => null, 'page' => null]); ?>
+              <a class="btn btn-outline-secondary" href="<?=h($clearUrl)?>">Temizle</a>
+            <?php endif; ?>
+            <button class="btn btn-brand" type="submit">Ara</button>
+          </div>
+          <div class="form-text mt-2">
+            <?php if ($totalMatches): ?>
+              <?=h($listStart)?>–<?=h($listEnd)?> / <?=h($totalMatches)?> sonuç gösteriliyor
+            <?php else: ?>
+              Aramanızla eşleşen bayi bulunamadı.
+            <?php endif; ?>
+          </div>
+        </form>
         <div class="list-group list-group-flush dealer-list" style="max-height:420px;overflow:auto;">
-          <?php foreach ($dealersList as $d): ?>
-            <?php
-              $badge = dealer_status_badge($d['status']);
-              $badgeClass = dealer_status_class($d['status']);
-              $activeClass = ($selectedId === (int)$d['id']) ? 'active' : '';
-              $license = $d['license_expires_at'] ? date('d.m.Y', strtotime($d['license_expires_at'])) : '—';
-            ?>
-            <?php
-              $linkQuery = http_build_query(array_filter([
-                'status' => $statusFilter !== 'all' ? $statusFilter : null,
-                'id' => (int)$d['id'],
-              ]));
-            ?>
-            <a href="?<?=$linkQuery?>" class="list-group-item list-group-item-action <?= $activeClass ?>">
-              <div class="d-flex justify-content-between align-items-center mb-1">
-                <div>
-                  <div class="fw-semibold me-2"><?=h($d['name'])?></div>
-                  <div class="dealer-meta"><?=h($d['email'])?></div>
+          <?php if (!$dealersList): ?>
+            <div class="p-4 text-center text-muted small">Liste boş.</div>
+          <?php else: ?>
+            <?php foreach ($dealersList as $d): ?>
+              <?php
+                $badge = dealer_status_badge($d['status']);
+                $badgeClass = dealer_status_class($d['status']);
+                $activeClass = ($selectedId === (int)$d['id']) ? 'active' : '';
+                $license = $d['license_expires_at'] ? date('d.m.Y', strtotime($d['license_expires_at'])) : '—';
+                $rowUrl = $buildDealerUrl(['id' => (int)$d['id']]);
+                $isVirtual = !empty($d['_virtual']);
+              ?>
+              <a href="<?=h($rowUrl)?>" class="list-group-item list-group-item-action <?= $activeClass ?>">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <div>
+                    <div class="fw-semibold me-2"><?=h($d['name'])?></div>
+                    <div class="dealer-meta"><?=h($d['email'])?></div>
+                  </div>
+                  <span class="badge-status <?=$badgeClass?>"><?=h($badge)?></span>
                 </div>
-                <span class="badge-status <?=$badgeClass?>"><?=h($badge)?></span>
-              </div>
-              <div class="d-flex justify-content-between align-items-center">
-                <span class="dealer-code"><?=h($d['code'] ?? '—')?></span>
-                <span class="dealer-meta">Lisans: <?=h($license)?></span>
-              </div>
-            </a>
-          <?php endforeach; ?>
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="dealer-code"><?=h($d['code'] ?? '—')?></span>
+                  <span class="dealer-meta">Lisans: <?=h($license)?></span>
+                </div>
+                <?php if ($isVirtual): ?>
+                  <div class="dealer-virtual-note">Bu bayi mevcut filtre sonuçlarında yer almıyor ancak detaylarını görüntüleyebilirsiniz.</div>
+                <?php endif; ?>
+              </a>
+            <?php endforeach; ?>
+          <?php endif; ?>
         </div>
+        <?php if ($totalPages > 1): ?>
+          <div class="px-3 py-2 border-top">
+            <nav>
+              <ul class="pagination pagination-sm mb-0">
+                <?php $prevUrl = $buildDealerUrl(['page' => $page > 1 ? $page - 1 : null]); ?>
+                <li class="page-item <?= $page <= 1 ? 'disabled' : '' ?>">
+                  <a class="page-link" href="<?=h($prevUrl)?>" tabindex="-1">Önceki</a>
+                </li>
+                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                  <?php
+                    $pageUrl = $buildDealerUrl(['page' => $i === 1 ? null : $i]);
+                    $isCurrent = $page === $i;
+                  ?>
+                  <li class="page-item <?= $isCurrent ? 'active' : '' ?>">
+                    <a class="page-link" href="<?=h($pageUrl)?>"><?= $i ?></a>
+                  </li>
+                <?php endfor; ?>
+                <?php $nextUrl = $buildDealerUrl(['page' => $page < $totalPages ? $page + 1 : $totalPages]); ?>
+                <li class="page-item <?= $page >= $totalPages ? 'disabled' : '' ?>">
+                  <a class="page-link" href="<?=h($nextUrl)?>">Sonraki</a>
+                </li>
+              </ul>
+            </nav>
+          </div>
+        <?php endif; ?>
       </div>
     </div>
     <div class="col-lg-7">
@@ -764,29 +925,23 @@ $venueAssignments = dealer_fetch_venue_assignments();
         </div>
 
         <div class="card-lite p-4 mb-4">
-          <h5 class="mb-1">Salon Atamaları</h5>
-          <p class="combo-helper mb-3">Birden fazla salonu seçebilir, arama yaparak kolayca filtreleyebilirsiniz.</p>
-          <?php if ($assignedVenues): ?>
-            <div class="assigned-tags mb-3">
-              <?php foreach ($assignedVenues as $v): ?>
-                <span class="dealer-chip"><span><?=h($v['name'])?></span></span>
-              <?php endforeach; ?>
+          <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-3">
+            <div>
+              <h5 class="mb-1">Salon Atamaları</h5>
+              <p class="combo-helper mb-0">Bayinin erişebileceği salonları arama destekli kombinasyonla yönetin.</p>
             </div>
-          <?php else: ?>
-            <div class="venue-chip-empty mb-3">Bu bayiye henüz salon atanmadı.</div>
-          <?php endif; ?>
-          <form method="post" class="row g-3">
+            <span class="assignment-pill"><span>Atanmış salon</span><strong><?=h(count($assignedVenues))?></strong></span>
+          </div>
+          <div id="dealer-venue-summary" class="assignment-summary" data-empty-text="Bu bayiye henüz salon atanmadı."></div>
+          <form method="post" class="row g-3 assignment-form mt-1">
             <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
             <input type="hidden" name="do" value="assign_venues">
             <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
             <div class="col-12">
-              <select class="form-select js-combobox" name="venue_ids[]" multiple data-placeholder="Salon seçin">
-                <?php foreach ($allVenues as $v): ?>
-                  <option value="<?= (int)$v['id'] ?>" <?= in_array((int)$v['id'], $assignedVenueIds, true) ? 'selected' : '' ?>><?=h($v['name'])?></option>
-                <?php endforeach; ?>
-              </select>
+              <select class="form-select js-assignment-select" id="dealer-venues-select" name="venue_ids[]" multiple data-selected="<?=h(implode(',', $assignedVenueIds))?>" data-options-key="venues" data-summary="#dealer-venue-summary" data-empty-text="Bu bayiye henüz salon atanmadı." data-placeholder="Salon arayın"></select>
             </div>
-            <div class="col-12 d-grid">
+            <div class="col-12 d-flex flex-wrap gap-2 justify-content-end">
+              <button class="btn btn-outline-secondary" type="button" data-ts-clear="dealer-venues-select">Temizle</button>
               <button class="btn btn-outline-primary" type="submit">Atamaları Kaydet</button>
             </div>
           </form>
@@ -799,74 +954,239 @@ $venueAssignments = dealer_fetch_venue_assignments();
   <div class="row mt-4">
     <div class="col-12">
       <div class="card-lite p-4">
-        <div class="d-flex justify-content-between align-items-start mb-3">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
           <div>
-            <h5 class="mb-1">Salon Bazlı Bayi Ataması</h5>
-            <p class="section-subtitle mb-0">Salonlara atanmış bayileri görüntüleyin ve çoklu seçimle hızla güncelleyin.</p>
+            <h5 class="mb-1">Salon Bazlı Bayi Atama Merkezi</h5>
+            <p class="section-subtitle mb-0">Yüzlerce bayiyle çalışırken bile salon eşleştirmelerini filtreleyin, düzenleyin ve tek tıkla kaydedin.</p>
+          </div>
+          <div class="assignment-pill-group">
+            <span class="assignment-pill"><span>Salon</span><strong><?=h(count($venueAssignments))?></strong></span>
+            <span class="assignment-pill"><span>Ataması yapılmış</span><strong><?=h($assignedVenueCount)?></strong></span>
+            <span class="assignment-pill"><span>Boşta</span><strong><?=h($unassignedVenueCount)?></strong></span>
           </div>
         </div>
         <?php if (!$allVenues): ?>
           <p class="text-muted mb-0">Henüz tanımlanmış salon bulunmuyor.</p>
         <?php else: ?>
-        <div class="row g-3">
-          <?php foreach ($venueAssignments as $group): ?>
-            <?php
-              $venue = $group['venue'];
-              $assigned = $group['dealers'];
-              $assignedIds = array_map(fn($d) => (int)$d['id'], $assigned);
-            ?>
-            <div class="col-xl-6">
-              <div class="venue-card" id="venue-<?= (int)$venue['id'] ?>">
-                <h6 class="fw-semibold mb-1"><?=h($venue['name'])?></h6>
-                <?php if ($assigned): ?>
-                  <div class="assigned-tags mb-2">
-                    <?php foreach ($assigned as $dealer): ?>
-                      <span class="dealer-chip"><span><?=h($dealer['code'] ?? '—')?></span> • <?=h($dealer['name'])?></span>
-                    <?php endforeach; ?>
-                  </div>
-                <?php else: ?>
-                  <div class="venue-chip-empty mb-2">Bu salona henüz bayi atanmadı.</div>
-                <?php endif; ?>
-                <?php if ($allDealers): ?>
-                  <form method="post" class="vstack gap-2">
-                    <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                    <input type="hidden" name="do" value="assign_venue_dealers">
-                    <input type="hidden" name="venue_id" value="<?= (int)$venue['id'] ?>">
-                    <select class="form-select js-combobox" name="dealer_ids[]" multiple data-placeholder="Bayi seçin">
-                      <?php foreach ($allDealers as $dealerOption): ?>
-                        <option value="<?= (int)$dealerOption['id'] ?>" <?= in_array((int)$dealerOption['id'], $assignedIds, true) ? 'selected' : '' ?>><?=h(($dealerOption['code'] ?? '—').' • '.$dealerOption['name'])?></option>
-                      <?php endforeach; ?>
-                    </select>
-                    <button class="btn btn-sm btn-brand align-self-start" type="submit">Kaydet</button>
-                  </form>
-                <?php else: ?>
-                  <p class="venue-chip-empty mb-0">Bayi tanımlanmadan atama yapılamaz.</p>
-                <?php endif; ?>
+          <div class="row g-3 align-items-stretch mb-3">
+            <div class="col-lg-4">
+              <div class="assignment-filter p-3 h-100">
+                <label for="venueFilterInput" class="form-label">Salon veya bayi ara</label>
+                <input type="text" id="venueFilterInput" class="form-control" placeholder="Salon adı, bayi kodu ya da e-posta">
+                <div class="form-text">Yazdıkça sonuçlar filtrelenir.</div>
               </div>
             </div>
-          <?php endforeach; ?>
-        </div>
+            <div class="col-lg-8 d-flex flex-column justify-content-center">
+              <div class="assignment-inline-stats">
+                <span>Toplam atama: <strong><?=h($totalVenueAssignments)?></strong></span>
+                <span>Ortalama bayi/salon: <strong><?= $assignedVenueCount ? number_format($totalVenueAssignments / max(1, $assignedVenueCount), 1) : '0.0' ?></strong></span>
+              </div>
+            </div>
+          </div>
+          <div class="accordion assignment-accordion" id="venueAssignAccordion">
+            <?php foreach ($venueAssignments as $group): ?>
+              <?php
+                $venue = $group['venue'];
+                $assigned = $group['dealers'];
+                $assignedIds = array_map(fn($d) => (int)$d['id'], $assigned);
+                $searchTokens = [$venue['name'] ?? '', $venue['city'] ?? '', $venue['district'] ?? ''];
+                foreach ($assigned as $dealer) {
+                  $searchTokens[] = $dealer['name'] ?? '';
+                  $searchTokens[] = $dealer['code'] ?? '';
+                  $searchTokens[] = $dealer['email'] ?? '';
+                }
+                $searchText = trim(implode(' ', $searchTokens));
+                $searchValue = $searchText !== '' ? mb_strtolower($searchText, 'UTF-8') : '';
+              ?>
+              <div class="accordion-item assignment-item" data-search="<?=h($searchValue)?>">
+                <h2 class="accordion-header" id="heading-<?= (int)$venue['id'] ?>">
+                  <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-<?= (int)$venue['id'] ?>" aria-expanded="false" aria-controls="collapse-<?= (int)$venue['id'] ?>">
+                    <div class="d-flex justify-content-between align-items-center w-100 gap-3">
+                      <div>
+                        <span class="fw-semibold"><?=h($venue['name'])?></span>
+                        <?php if (!empty($venue['city'])): ?>
+                          <span class="text-muted ms-2"><?=h($venue['city'])?><?= !empty($venue['district']) ? ' • '.h($venue['district']) : '' ?></span>
+                        <?php endif; ?>
+                      </div>
+                      <span class="assignment-count badge rounded-pill"><?=count($assigned)?> bayi</span>
+                    </div>
+                  </button>
+                </h2>
+                <div id="collapse-<?= (int)$venue['id'] ?>" class="accordion-collapse collapse" data-bs-parent="#venueAssignAccordion">
+                  <div class="accordion-body">
+                    <div id="venue-summary-<?= (int)$venue['id'] ?>" class="assignment-summary mb-3" data-empty-text="Bu salona henüz bayi atanmadı."></div>
+                    <?php if ($allDealers): ?>
+                      <form method="post" class="assignment-form">
+                        <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                        <input type="hidden" name="do" value="assign_venue_dealers">
+                        <input type="hidden" name="venue_id" value="<?= (int)$venue['id'] ?>">
+                        <select class="form-select js-assignment-select" id="venue-select-<?= (int)$venue['id'] ?>" name="dealer_ids[]" multiple data-selected="<?=h(implode(',', $assignedIds))?>" data-options-key="dealers" data-summary="#venue-summary-<?= (int)$venue['id'] ?>" data-empty-text="Bu salona henüz bayi atanmadı." data-placeholder="Bayi arayın"></select>
+                        <div class="d-flex flex-wrap gap-2 justify-content-end mt-3">
+                          <button class="btn btn-outline-secondary btn-sm" type="button" data-ts-clear="venue-select-<?= (int)$venue['id'] ?>">Temizle</button>
+                          <button class="btn btn-brand btn-sm" type="submit">Kaydet</button>
+                        </div>
+                      </form>
+                    <?php else: ?>
+                      <p class="venue-chip-empty mb-0">Bayi tanımlanmadan atama yapılamaz.</p>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <div class="assignment-empty d-none" id="assignmentEmpty">
+            <div class="text-center text-muted py-4">Aramanızla eşleşen salon bulunamadı.</div>
+          </div>
         <?php endif; ?>
       </div>
     </div>
   </div>
 <?php admin_layout_end(); ?>
+<script type="application/json" id="dealer-options-data"><?=json_encode($dealerOptionPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)?></script>
+<script type="application/json" id="venue-options-data"><?=json_encode($venueOptionPayload, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP)?></script>
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
-  document.querySelectorAll('.js-combobox').forEach(function(el){
-    new TomSelect(el, {
-      plugins: {
-        remove_button: { title: 'Seçimi kaldır' }
-      },
+  const statusLabels = { active: 'Aktif', pending: 'Onay Bekliyor', inactive: 'Pasif' };
+  const optionData = {
+    dealers: [],
+    venues: []
+  };
+  const dealerOptionsEl = document.getElementById('dealer-options-data');
+  const venueOptionsEl = document.getElementById('venue-options-data');
+  try {
+    optionData.dealers = dealerOptionsEl ? JSON.parse(dealerOptionsEl.textContent || '[]') : [];
+  } catch (err) {
+    optionData.dealers = [];
+  }
+  try {
+    optionData.venues = venueOptionsEl ? JSON.parse(venueOptionsEl.textContent || '[]') : [];
+  } catch (err) {
+    optionData.venues = [];
+  }
+
+  const escapeMap = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'};
+  const escapeHtml = function(value) {
+    return String(value ?? '').replace(/[&<>"']/g, function(ch) {
+      return escapeMap[ch] || ch;
+    });
+  };
+
+  const refreshSummary = function(ts, summaryEl) {
+    if (!summaryEl) return;
+    const values = ts.getValue();
+    summaryEl.innerHTML = '';
+    if (!values.length) {
+      summaryEl.classList.add('is-empty');
+      return;
+    }
+    summaryEl.classList.remove('is-empty');
+    values.forEach(function(val){
+      const option = ts.options[val];
+      if (!option) return;
+      const chip = document.createElement('div');
+      chip.className = 'assignment-chip';
+      const parts = [];
+      if (option.code) {
+        parts.push('<span class="assignment-chip-code">'+escapeHtml(option.code)+'</span>');
+      }
+      parts.push('<span>'+escapeHtml(option.label)+'</span>');
+      if (option.email) {
+        parts.push('<span class="assignment-chip-email">'+escapeHtml(option.email)+'</span>');
+      }
+      if (option.status) {
+        const statusLabel = statusLabels[option.status] || option.status;
+        parts.push('<span class="assignment-chip-status status-'+escapeHtml(option.status)+'">'+escapeHtml(statusLabel)+'</span>');
+      }
+      const optionValue = option.value !== undefined ? option.value : val;
+      parts.push('<button type="button" class="assignment-chip-remove" data-remove-item="'+escapeHtml(optionValue)+'">&times;</button>');
+      chip.innerHTML = parts.join('');
+      summaryEl.appendChild(chip);
+    });
+  };
+
+  document.querySelectorAll('.js-assignment-select').forEach(function(selectEl){
+    const key = selectEl.dataset.optionsKey || '';
+    const options = optionData[key] || [];
+    const selected = (selectEl.dataset.selected || '').split(',').map(function(v){ return v.trim(); }).filter(Boolean);
+    const placeholder = selectEl.dataset.placeholder || '';
+    const ts = new TomSelect(selectEl, {
+      valueField: 'value',
+      labelField: 'label',
+      searchField: ['label','code','email'],
+      options: options,
+      items: selected,
       persist: false,
       create: false,
       hideSelected: true,
       closeAfterSelect: false,
-      placeholder: el.dataset.placeholder || '',
-      sortField: { field: 'text', direction: 'asc' }
+      maxOptions: 1000,
+      placeholder: placeholder,
+      plugins: {
+        remove_button: { title: 'Kaldır' }
+      },
+      render: {
+        option: function(data, escape) {
+          const code = data.code ? '<span class="ts-code">'+escape(data.code)+'</span>' : '';
+          const email = data.email ? '<span class="ts-email">'+escape(data.email)+'</span>' : '';
+          return '<div class="ts-option-line">'+code+'<span class="ts-label">'+escape(data.label)+'</span>'+email+'</div>';
+        },
+        item: function(data, escape) {
+          const code = data.code ? '<span class="ts-code">'+escape(data.code)+'</span>' : '';
+          return '<div>'+code+'<span>'+escape(data.label)+'</span></div>';
+        }
+      }
+    });
+    const summaryEl = selectEl.dataset.summary ? document.querySelector(selectEl.dataset.summary) : null;
+    if (summaryEl) {
+      summaryEl.classList.add('is-empty');
+      summaryEl.addEventListener('click', function(ev){
+        const btn = ev.target.closest('[data-remove-item]');
+        if (btn) {
+          ev.preventDefault();
+          const value = btn.getAttribute('data-remove-item');
+          if (value !== null) {
+            ts.removeItem(value);
+          }
+        }
+      });
+      ts.on('change', function(){ refreshSummary(ts, summaryEl); });
+      refreshSummary(ts, summaryEl);
+    }
+    selectEl.tomselect = ts;
+  });
+
+  document.querySelectorAll('[data-ts-clear]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      const targetId = btn.getAttribute('data-ts-clear');
+      if (!targetId) return;
+      const selectEl = document.getElementById(targetId);
+      if (selectEl && selectEl.tomselect) {
+        selectEl.tomselect.clear();
+      }
     });
   });
+
+  const filterInput = document.getElementById('venueFilterInput');
+  if (filterInput) {
+    const items = Array.from(document.querySelectorAll('.assignment-item'));
+    const emptyState = document.getElementById('assignmentEmpty');
+    const applyFilter = function(){
+      const query = filterInput.value.trim().toLowerCase();
+      let visible = 0;
+      items.forEach(function(item){
+        const haystack = (item.dataset.search || '').toLowerCase();
+        const matches = !query || haystack.includes(query);
+        item.classList.toggle('d-none', !matches);
+        if (matches) visible++;
+      });
+      if (emptyState) {
+        emptyState.classList.toggle('d-none', visible !== 0);
+      }
+    };
+    filterInput.addEventListener('input', applyFilter);
+    applyFilter();
+  }
 });
 </script>
 </body>
