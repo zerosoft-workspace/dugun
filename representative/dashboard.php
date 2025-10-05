@@ -6,6 +6,7 @@ require_once __DIR__.'/../includes/dealers.php';
 require_once __DIR__.'/../includes/representatives.php';
 require_once __DIR__.'/../includes/dealer_crm.php';
 require_once __DIR__.'/../includes/representative_auth.php';
+require_once __DIR__.'/partials/ui.php';
 
 install_schema();
 
@@ -126,23 +127,18 @@ foreach ($leads as $lead) {
 
 $pageStyles = <<<'CSS'
 <style>
-  body{background:#f4f6fb;font-family:'Inter','Segoe UI',system-ui,sans-serif;color:#0f172a;margin:0;}
-  .rep-shell{max-width:1240px;margin:0 auto;padding:2.5rem 1.5rem;}
-  .card-lite{border-radius:22px;background:#fff;border:1px solid rgba(148,163,184,.18);box-shadow:0 24px 50px -36px rgba(15,23,42,.35);padding:1.8rem;}
+  .card-lite{border-radius:22px;background:#fff;border:1px solid rgba(148,163,184,.16);box-shadow:0 28px 60px -42px rgba(15,23,42,.45);padding:2rem;}
   .card-lite + .card-lite{margin-top:1.6rem;}
-  .header{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;}
-  .header h1{font-size:1.6rem;font-weight:700;margin:0;}
-  .header p{margin:0;color:#64748b;}
-  .dealer-tag{display:inline-flex;align-items:center;gap:.5rem;padding:.45rem .9rem;border-radius:999px;background:rgba(14,165,181,.12);color:#0b8b98;font-weight:600;}
-  .dealer-tag i{color:#0b8b98;}
-  .dealer-tag--pending{background:rgba(148,163,184,.2);color:#475569;}
-  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1rem;}
-  .summary-item{border-radius:18px;padding:1rem 1.1rem;background:linear-gradient(150deg,#fff,rgba(14,165,181,.08));border:1px solid rgba(148,163,184,.22);box-shadow:0 20px 44px -34px rgba(15,23,42,.35);}
+  .section-heading{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;}
+  .section-heading h5{font-weight:700;margin:0;}
+  .section-heading small{color:#64748b;}
+  .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.1rem;}
+  .summary-item{border-radius:20px;padding:1.15rem 1.25rem;background:linear-gradient(150deg,#fff,rgba(14,165,181,.08));border:1px solid rgba(148,163,184,.22);box-shadow:0 24px 54px -40px rgba(15,23,42,.45);}
   .summary-item span{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.35rem;font-weight:600;}
-  .summary-item strong{font-size:1.4rem;color:#0f172a;display:block;}
+  .summary-item strong{font-size:1.45rem;color:#0f172a;display:block;}
   .summary-item small{display:block;font-size:.78rem;color:#475569;margin-top:.25rem;}
   .crm-status-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.5rem;}
-  .status-chip{display:flex;align-items:center;gap:.45rem;padding:.35rem .8rem;border-radius:999px;font-size:.78rem;font-weight:600;background:rgba(148,163,184,.16);color:#475569;}
+  .status-chip{display:flex;align-items:center;gap:.45rem;padding:.35rem .85rem;border-radius:999px;font-size:.78rem;font-weight:600;background:rgba(148,163,184,.16);color:#475569;}
   .status-chip .count{font-size:.9rem;color:#0f172a;}
   .status-chip--new{background:rgba(14,165,181,.18);color:#0b8b98;}
   .status-chip--contacted{background:rgba(59,130,246,.16);color:#1d4ed8;}
@@ -153,8 +149,8 @@ $pageStyles = <<<'CSS'
   .status-chip--on-hold{background:rgba(148,163,184,.25);color:#475569;}
   .status-chip--won{background:rgba(34,197,94,.18);color:#166534;}
   .status-chip--lost{background:rgba(248,113,113,.18);color:#b91c1c;}
-  .crm-panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1rem;margin-top:1.2rem;}
-  .crm-panel{border:1px solid rgba(148,163,184,.2);border-radius:16px;padding:1rem;background:#f9fbfd;}
+  .crm-panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.05rem;margin-top:1.2rem;}
+  .crm-panel{border:1px solid rgba(148,163,184,.2);border-radius:18px;padding:1.2rem;background:#f9fbfd;box-shadow:0 20px 48px -40px rgba(15,23,42,.3);}
   .crm-panel h6{font-size:.9rem;margin:0 0 .9rem;font-weight:600;color:#0f172a;text-transform:uppercase;letter-spacing:.08em;}
   .crm-panel ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.9rem;}
   .crm-panel li{display:flex;gap:.75rem;align-items:flex-start;}
@@ -204,359 +200,341 @@ $pageStyles = <<<'CSS'
   .badge-status{display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .7rem;border-radius:999px;font-size:.75rem;font-weight:600;}
   .status-paid{background:rgba(34,197,94,.2);color:#166534;}
   .status-pending{background:rgba(250,204,21,.2);color:#854d0e;}
-  .logout-btn{display:inline-flex;align-items:center;gap:.4rem;}
   @media (max-width: 767px){
     .crm-board{grid-auto-columns:90%;}
-    .header{flex-direction:column;align-items:flex-start;}
     .summary-grid{grid-template-columns:1fr;}
   }
 </style>
 CSS;
-?>
-<!doctype html>
-<html lang="tr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><?=h(APP_NAME)?> — Temsilci Paneli</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css">
-  <?=$pageStyles?>
-</head>
-<body>
-  <div class="rep-shell">
-    <div class="header">
-      <div>
-        <h1>Merhaba <?=h($representative['name'])?> 👋</h1>
-        <?php if ($dealer): ?>
-          <p class="mb-0">Atandığınız bayi: <span class="fw-semibold text-primary"><?=h($dealer['name'])?></span></p>
-        <?php else: ?>
-          <p class="mb-0 text-muted">Henüz bir bayi ataması yapılmadı.</p>
-        <?php endif; ?>
+
+$headerSubtitle = $dealer
+  ? 'Bayinizin yüklemelerini takip edin, CRM akışını güncelleyin ve komisyon durumunu inceleyin.'
+  : 'Henüz bir bayi ataması yapılmadı. Yönetici ekibinizden atama talep edebilirsiniz.';
+
+representative_layout_start([
+  'page_title' => APP_NAME.' — Temsilci Paneli',
+  'header_title' => 'Merhaba '.$representative['name'].' 👋',
+  'header_subtitle' => $headerSubtitle,
+  'representative' => $representative,
+  'dealer' => $dealer,
+  'extra_head' => $pageStyles,
+  'logout_url' => 'login.php?logout=1',
+]);
+
+flash_box();
+
+if (!$dealer): ?>
+  <div class="card-lite mb-4">
+    <h5 class="fw-semibold mb-2">Bayi ataması bekleniyor</h5>
+    <p class="mb-0 text-muted">CRM ekranlarını ve komisyon özetlerini görüntüleyebilmek için sistem yöneticinizden bir bayi ataması yapılmasını isteyin.</p>
+  </div>
+<?php else: ?>
+  <div class="card-lite mb-4">
+    <div class="section-heading">
+      <h5 class="mb-0">Komisyon özeti</h5>
+      <small>Bayinizin gerçekleştirdiği yüklemeler üzerinden kazanımlarınızı takip edin.</small>
+    </div>
+    <div class="summary-grid">
+      <div class="summary-item">
+        <span>Toplam Komisyon</span>
+        <strong><?=h(format_currency($commissionTotals['total_amount']))?></strong>
+        <small>Bayinizin gerçekleştirdiği yüklemeler</small>
       </div>
-      <div class="text-end">
-        <?php if ($dealer): ?>
-          <span class="dealer-tag"><i class="bi bi-building"></i><?=h($dealer['company'] ?: $dealer['name'])?></span>
-        <?php else: ?>
-          <span class="dealer-tag dealer-tag--pending"><i class="bi bi-hourglass-split"></i>Atama Bekleniyor</span>
-        <?php endif; ?>
-        <div class="mt-3">
-          <a class="btn btn-sm btn-outline-danger logout-btn" href="login.php?logout=1"><i class="bi bi-box-arrow-right"></i>Çıkış Yap</a>
-        </div>
+      <div class="summary-item">
+        <span>Bekleyen</span>
+        <strong><?=h(format_currency($commissionTotals['pending_amount']))?></strong>
+        <small><?=h((int)$commissionTotals['pending_count'])?> bekleyen işlem</small>
+      </div>
+      <div class="summary-item">
+        <span>Ödenen</span>
+        <strong><?=h(format_currency($commissionTotals['paid_amount']))?></strong>
+        <small><?=h((int)$commissionTotals['paid_count'])?> tamamlanan ödeme</small>
+      </div>
+      <div class="summary-item">
+        <span>Komisyon Oranı</span>
+        <strong>%<?=h(number_format($representative['commission_rate'], 1))?></strong>
+        <small>Temsilci oranınız</small>
       </div>
     </div>
+  </div>
 
-    <?php flash_box(); ?>
-
-    <?php if (!$dealer): ?>
-      <div class="card-lite">
-        <h5 class="fw-semibold mb-2">Bayi Ataması Bekleniyor</h5>
-        <p class="mb-0 text-muted">CRM ekranlarını kullanabilmek için lütfen sistem yöneticinizden bir bayi ataması yapılmasını isteyin.</p>
-      </div>
-    <?php else: ?>
-      <div class="card-lite mb-4">
-        <h5 class="fw-semibold mb-3">Komisyon Özeti</h5>
-        <div class="summary-grid">
-          <div class="summary-item">
-            <span>Toplam Komisyon</span>
-            <strong><?=h(format_currency($commissionTotals['total_amount']))?></strong>
-            <small>Bayinizin gerçekleştirdiği yüklemeler</small>
-          </div>
-          <div class="summary-item">
-            <span>Bekleyen</span>
-            <strong><?=h(format_currency($commissionTotals['pending_amount']))?></strong>
-            <small><?=h((int)$commissionTotals['pending_count'])?> bekleyen işlem</small>
-          </div>
-          <div class="summary-item">
-            <span>Ödenen</span>
-            <strong><?=h(format_currency($commissionTotals['paid_amount']))?></strong>
-            <small><?=h((int)$commissionTotals['paid_count'])?> tamamlanan ödeme</small>
-          </div>
-          <div class="summary-item">
-            <span>Komisyon Oranı</span>
-            <strong>%<?=h(number_format($representative['commission_rate'], 1))?></strong>
-            <small>Temsilci oranınız</small>
-          </div>
+  <div class="card-lite mb-4">
+    <div class="section-heading">
+      <h5 class="mb-0">CRM özeti</h5>
+      <span class="badge bg-light text-dark px-3 py-2 rounded-pill">Toplam Potansiyel: <?=$leadTotal?></span>
+    </div>
+    <div class="crm-status-row">
+      <?php foreach ($leadStats as $statusKey => $count): ?>
+        <?php $statusLabel = $leadStatusLabels[$statusKey] ?? ucfirst($statusKey); $chipClass = 'status-chip--'.preg_replace('/[^a-z0-9]+/', '-', $statusKey); ?>
+        <div class="status-chip <?=$chipClass?>">
+          <span><?=h($statusLabel)?></span>
+          <span class="count"><?= (int)$count ?></span>
         </div>
-      </div>
-
-      <div class="card-lite mb-4">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-          <h5 class="fw-semibold mb-0">CRM Özeti</h5>
-          <span class="badge bg-light text-dark px-3 py-2 rounded-pill">Toplam Potansiyel: <?=$leadTotal?></span>
-        </div>
-        <div class="crm-status-row">
-          <?php foreach ($leadStats as $statusKey => $count): ?>
-            <?php $statusLabel = $leadStatusLabels[$statusKey] ?? ucfirst($statusKey); $chipClass = 'status-chip--'.preg_replace('/[^a-z0-9]+/', '-', $statusKey); ?>
-            <div class="status-chip <?=$chipClass?>">
-              <span><?=h($statusLabel)?></span>
-              <span class="count"><?= (int)$count ?></span>
-            </div>
-          <?php endforeach; ?>
-        </div>
-        <div class="crm-panels">
-          <div class="crm-panel">
-            <h6>Yaklaşan Aksiyonlar</h6>
-            <?php if (!$upcomingActions): ?>
-              <p class="empty mb-0">Planlanmış aksiyon bulunmuyor.</p>
-            <?php else: ?>
-              <ul>
-                <?php foreach ($upcomingActions as $item): ?>
-                  <li>
-                    <div class="icon"><i class="bi bi-calendar-event"></i></div>
-                    <div class="content">
-                      <strong><?=h($item['name'])?></strong>
-                      <span><?=h(date('d.m.Y H:i', strtotime($item['next_action_at'])))?></span>
-                      <small><?=h($leadStatusLabels[$item['status']] ?? ucfirst($item['status']))?></small>
-                    </div>
-                  </li>
-                <?php endforeach; ?>
-              </ul>
-            <?php endif; ?>
-          </div>
-          <div class="crm-panel">
-            <h6>Son Görüşme Notları</h6>
-            <?php if (!$recentNotes): ?>
-              <p class="empty mb-0">Henüz not eklenmedi.</p>
-            <?php else: ?>
-              <ul>
-                <?php foreach ($recentNotes as $note): ?>
-                  <li>
-                    <div class="icon"><i class="bi bi-chat-dots"></i></div>
-                    <div class="content">
-                      <strong><?=h($note['lead_name'])?></strong>
-                      <span><?=nl2br(h($note['note']))?></span>
-                      <small><?=h(date('d.m.Y H:i', strtotime($note['created_at'])))?></small>
-                    </div>
-                  </li>
-                <?php endforeach; ?>
-              </ul>
-            <?php endif; ?>
-          </div>
-        </div>
-      </div>
-
-      <div class="card-lite mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-semibold mb-0">Yeni Potansiyel Kaydı</h5>
-          <small class="text-muted">Yeni temasları hızlıca CRM'e ekleyin.</small>
-        </div>
-        <form method="post" class="create-lead-form">
-          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-          <input type="hidden" name="do" value="create_lead">
-          <div>
-            <label class="form-label">Ad Soyad</label>
-            <input type="text" name="lead_name" class="form-control" required>
-          </div>
-          <div>
-            <label class="form-label">E-posta</label>
-            <input type="email" name="lead_email" class="form-control">
-          </div>
-          <div>
-            <label class="form-label">Telefon</label>
-            <input type="text" name="lead_phone" class="form-control">
-          </div>
-          <div>
-            <label class="form-label">Firma / Kurum</label>
-            <input type="text" name="lead_company" class="form-control">
-          </div>
-          <div>
-            <label class="form-label">Durum</label>
-            <select name="lead_status" class="form-select">
-              <?php foreach ($leadStatusLabels as $key => $label): ?>
-                <option value="<?=h($key)?>"><?=h($label)?></option>
-              <?php endforeach; ?>
-            </select>
-          </div>
-          <div>
-            <label class="form-label">Kaynak</label>
-            <input type="text" name="lead_source" class="form-control" placeholder="Örn. Instagram, Telefon">
-          </div>
-          <div>
-            <label class="form-label">Sonraki Aksiyon</label>
-            <input type="datetime-local" name="lead_next_action" class="form-control">
-          </div>
-          <div class="full-span">
-            <label class="form-label">Notlar</label>
-            <textarea name="lead_notes" class="form-control" placeholder="Görüşmenin özetini yazın."></textarea>
-          </div>
-          <div class="full-span d-grid">
-            <button type="submit" class="btn btn-primary">Potansiyeli Oluştur</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card-lite mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-semibold mb-0">Potansiyel CRM Panosu</h5>
-          <small class="text-muted">Durumlara göre gruplanmış potansiyeller</small>
-        </div>
-        <?php if (!$leads): ?>
-          <div class="empty-state">Bu bayi için henüz kayıtlı potansiyel müşteri bulunmuyor.</div>
+      <?php endforeach; ?>
+    </div>
+    <div class="crm-panels">
+      <div class="crm-panel">
+        <h6>Yaklaşan Aksiyonlar</h6>
+        <?php if (!$upcomingActions): ?>
+          <p class="empty mb-0">Planlanmış aksiyon bulunmuyor.</p>
         <?php else: ?>
-          <div class="crm-board">
-            <?php foreach ($leadColumns as $statusKey => $column): ?>
-              <?php $columnClass = 'status-'.preg_replace('/[^a-z0-9]+/', '-', $statusKey); $statusLabel = $column['label']; $columnCount = count($column['leads']); ?>
-              <div class="crm-column <?=$columnClass?>">
-                <div class="crm-column-header">
-                  <h6><?=h($statusLabel)?></h6>
-                  <span class="count-badge"><?=$columnCount?></span>
+          <ul>
+            <?php foreach ($upcomingActions as $item): ?>
+              <li>
+                <div class="icon"><i class="bi bi-calendar-event"></i></div>
+                <div class="content">
+                  <strong><?=h($item['name'])?></strong>
+                  <span><?=h(date('d.m.Y H:i', strtotime($item['next_action_at'])))?></span>
+                  <small><?=h($leadStatusLabels[$item['status']] ?? ucfirst($item['status']))?></small>
                 </div>
-                <?php if (!$column['leads']): ?>
-                  <p class="text-muted small mb-0">Bu aşamada potansiyel yok.</p>
-                <?php else: ?>
-                  <?php foreach ($column['leads'] as $lead): ?>
-                    <?php
-                      $leadId = (int)$lead['id'];
-                      $leadStatusKey = $lead['status'] ?? DEALER_LEAD_STATUS_NEW;
-                      $leadStatusLabel = $leadStatusLabels[$leadStatusKey] ?? ucfirst($leadStatusKey);
-                      $chipClass = 'status-chip--'.preg_replace('/[^a-z0-9]+/', '-', $leadStatusKey);
-                      $nextActionValue = !empty($lead['next_action_at']) ? date('Y-m-d\\TH:i', strtotime($lead['next_action_at'])) : '';
-                      $noteSlice = $leadNotesMap[$leadId] ?? [];
-                    ?>
-                    <div class="lead-card" id="lead-<?=$leadId?>">
-                      <div>
-                        <h6><?=h($lead['name'])?></h6>
-                        <span class="status-chip <?=$chipClass?>"><?=h($leadStatusLabel)?></span>
-                      </div>
-                      <ul class="lead-meta">
-                        <?php if (!empty($lead['email'])): ?><li><i class="bi bi-envelope"></i><span><?=h($lead['email'])?></span></li><?php endif; ?>
-                        <?php if (!empty($lead['phone'])): ?><li><i class="bi bi-telephone"></i><span><?=h($lead['phone'])?></span></li><?php endif; ?>
-                        <?php if (!empty($lead['company'])): ?><li><i class="bi bi-building"></i><span><?=h($lead['company'])?></span></li><?php endif; ?>
-                        <?php if (!empty($lead['source'])): ?><li><i class="bi bi-bullseye"></i><span><?=h($lead['source'])?></span></li><?php endif; ?>
-                      </ul>
-                      <div class="lead-timestamps">
-                        <?php if (!empty($lead['created_at'])): ?><span>Kaydedildi: <?=h(date('d.m.Y H:i', strtotime($lead['created_at'])))?></span><?php endif; ?>
-                        <?php if (!empty($lead['last_contact_at'])): ?><span>Son görüşme: <?=h(date('d.m.Y H:i', strtotime($lead['last_contact_at'])))?></span><?php endif; ?>
-                        <?php if (!empty($lead['next_action_at'])): ?><span>Sonraki aksiyon: <?=h(date('d.m.Y H:i', strtotime($lead['next_action_at'])))?></span><?php endif; ?>
-                      </div>
-                      <form method="post" class="lead-update-form">
-                        <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                        <input type="hidden" name="do" value="update_lead">
-                        <input type="hidden" name="lead_id" value="<?=$leadId?>">
-                        <div>
-                          <label class="form-label">Durum</label>
-                          <select class="form-select" name="status">
-                            <?php foreach ($leadStatusLabels as $key => $label): ?>
-                              <option value="<?=h($key)?>" <?=$leadStatusKey === $key ? 'selected' : ''?>><?=h($label)?></option>
-                            <?php endforeach; ?>
-                          </select>
-                        </div>
-                        <div>
-                          <label class="form-label">Sonraki Aksiyon</label>
-                          <input type="datetime-local" class="form-control" name="next_action_at" value="<?=h($nextActionValue)?>">
-                        </div>
-                        <div class="full-span">
-                          <label class="form-label">Genel Not</label>
-                          <textarea class="form-control" name="notes" rows="2" placeholder="Potansiyel notunu güncelleyin."><?=h($lead['notes'] ?? '')?></textarea>
-                        </div>
-                        <div class="full-span d-grid">
-                          <button class="btn btn-sm btn-outline-primary" type="submit">Kaydet</button>
-                        </div>
-                      </form>
-                      <div>
-                        <h6 class="fw-semibold fs-6 mb-2">Son Notlar</h6>
-                        <?php if (!$noteSlice): ?>
-                          <p class="text-muted small mb-2">Bu potansiyel için henüz not eklenmedi.</p>
-                        <?php else: ?>
-                          <ul class="note-timeline">
-                            <?php foreach ($noteSlice as $note): ?>
-                              <li>
-                                <div class="fw-semibold mb-1"><?=h(date('d.m.Y H:i', strtotime($note['created_at'])))?></div>
-                                <div><?=nl2br(h($note['note']))?></div>
-                                <div class="meta">
-                                  <?php if (!empty($note['representative_name'])): ?><span><?=h($note['representative_name'])?></span><?php endif; ?>
-                                  <?php if (!empty($note['contact_type'])): ?><span><?=h($note['contact_type'])?></span><?php endif; ?>
-                                  <?php if (!empty($note['next_action_at'])): ?><span>Sonraki: <?=h(date('d.m.Y H:i', strtotime($note['next_action_at'])))?></span><?php endif; ?>
-                                </div>
-                              </li>
-                            <?php endforeach; ?>
-                          </ul>
-                        <?php endif; ?>
-                      </div>
-                      <form method="post" class="note-form">
-                        <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                        <input type="hidden" name="do" value="add_note">
-                        <input type="hidden" name="lead_id" value="<?=$leadId?>">
-                        <div class="mb-2">
-                          <label class="form-label">Yeni Görüşme Notu</label>
-                          <textarea class="form-control" name="note" required placeholder="Görüşmenin detaylarını yazın."></textarea>
-                        </div>
-                        <div class="row g-2">
-                          <div class="col-sm-6">
-                            <label class="form-label">Görüşme Tipi</label>
-                            <input type="text" class="form-control" name="contact_type" placeholder="Örn. Telefon, Yüz yüze">
-                          </div>
-                          <div class="col-sm-6">
-                            <label class="form-label">Sonraki Aksiyon</label>
-                            <input type="datetime-local" class="form-control" name="next_action_at">
-                          </div>
-                        </div>
-                        <div class="d-grid mt-3">
-                          <button class="btn btn-sm btn-primary" type="submit">Not Ekle</button>
-                        </div>
-                      </form>
-                    </div>
-                  <?php endforeach; ?>
-                <?php endif; ?>
-              </div>
+              </li>
             <?php endforeach; ?>
-          </div>
+          </ul>
         <?php endif; ?>
       </div>
-
-      <div class="card-lite mb-4">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h5 class="fw-semibold mb-0">Tamamlanan Yüklemeler</h5>
-          <small class="text-muted">Komisyon durumlarınızı takip edin.</small>
-        </div>
-        <div class="table-responsive">
-          <table class="table align-middle">
-            <thead><tr><th>Tarih</th><th>Tutar</th><th>Komisyon</th><th>Durum</th></tr></thead>
-            <tbody>
-              <?php if (!$topups): ?>
-                <tr><td colspan="4" class="text-center text-muted">Henüz tamamlanan yükleme bulunmuyor.</td></tr>
-              <?php else: ?>
-                <?php foreach ($topups as $topup): ?>
-                  <?php $isPaid = ($topup['commission_status'] ?? 'pending') === 'paid'; ?>
-                  <tr>
-                    <td><?=h($topup['completed_at'] ? date('d.m.Y H:i', strtotime($topup['completed_at'])) : date('d.m.Y H:i', strtotime($topup['created_at'])))?></td>
-                    <td><?=h(format_currency($topup['amount_cents']))?></td>
-                    <td><?=h(format_currency($topup['commission_cents']))?></td>
-                    <td><span class="badge-status <?=$isPaid ? 'status-paid' : 'status-pending'?>"><?=$isPaid ? 'Ödendi' : 'Bekliyor'?></span></td>
-                  </tr>
-                <?php endforeach; ?>
-              <?php endif; ?>
-            </tbody>
-          </table>
-        </div>
+      <div class="crm-panel">
+        <h6>Son Görüşme Notları</h6>
+        <?php if (!$recentNotes): ?>
+          <p class="empty mb-0">Henüz not eklenmedi.</p>
+        <?php else: ?>
+          <ul>
+            <?php foreach ($recentNotes as $note): ?>
+              <li>
+                <div class="icon"><i class="bi bi-chat-dots"></i></div>
+                <div class="content">
+                  <strong><?=h($note['lead_name'])?></strong>
+                  <span><?=nl2br(h($note['note']))?></span>
+                  <small><?=h(date('d.m.Y H:i', strtotime($note['created_at'])))?></small>
+                </div>
+              </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
       </div>
+    </div>
+  </div>
 
-      <div class="card-lite">
-        <h5 class="fw-semibold mb-3">Komisyon Hareketleri</h5>
-        <div class="table-responsive">
-          <table class="table align-middle">
-            <thead><tr><th>Tarih</th><th>Yükleme Tutarı</th><th>Komisyon</th><th>Durum</th></tr></thead>
-            <tbody>
-              <?php if (!$commissionHistory): ?>
-                <tr><td colspan="4" class="text-center text-muted">Henüz komisyon kaydı bulunmuyor.</td></tr>
-              <?php else: ?>
-                <?php foreach ($commissionHistory as $row): ?>
-                  <?php $isPaid = ($row['status'] ?? 'pending') === 'paid'; ?>
-                  <tr>
-                    <td><?=h(date('d.m.Y H:i', strtotime($row['created_at'])))?></td>
-                    <td><?=h(format_currency($row['topup_amount_cents']))?></td>
-                    <td><?=h(format_currency($row['commission_cents']))?></td>
-                    <td><span class="badge-status <?=$isPaid ? 'status-paid' : 'status-pending'?>"><?=$isPaid ? 'Ödendi' : 'Bekliyor'?></span></td>
-                  </tr>
-                <?php endforeach; ?>
-              <?php endif; ?>
-            </tbody>
-          </table>
-        </div>
+  <div class="card-lite mb-4">
+    <div class="section-heading">
+      <h5 class="mb-0">Yeni potansiyel kaydı</h5>
+      <small class="text-muted">Yeni temasları hızlıca CRM'e ekleyin.</small>
+    </div>
+    <form method="post" class="create-lead-form">
+      <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+      <input type="hidden" name="do" value="create_lead">
+      <div>
+        <label class="form-label">Ad Soyad</label>
+        <input type="text" name="lead_name" class="form-control" required>
+      </div>
+      <div>
+        <label class="form-label">E-posta</label>
+        <input type="email" name="lead_email" class="form-control">
+      </div>
+      <div>
+        <label class="form-label">Telefon</label>
+        <input type="text" name="lead_phone" class="form-control">
+      </div>
+      <div>
+        <label class="form-label">Firma / Kurum</label>
+        <input type="text" name="lead_company" class="form-control">
+      </div>
+      <div>
+        <label class="form-label">Durum</label>
+        <select name="lead_status" class="form-select">
+          <?php foreach ($leadStatusLabels as $key => $label): ?>
+            <option value="<?=h($key)?>"><?=h($label)?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div>
+        <label class="form-label">Kaynak</label>
+        <input type="text" name="lead_source" class="form-control" placeholder="Örn. Instagram, Telefon">
+      </div>
+      <div>
+        <label class="form-label">Sonraki Aksiyon</label>
+        <input type="datetime-local" name="lead_next_action" class="form-control">
+      </div>
+      <div class="full-span">
+        <label class="form-label">Notlar</label>
+        <textarea name="lead_notes" class="form-control" placeholder="Görüşmenin özetini yazın."></textarea>
+      </div>
+      <div class="full-span d-grid">
+        <button type="submit" class="btn btn-primary">Potansiyeli Oluştur</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="card-lite mb-4">
+    <div class="section-heading">
+      <h5 class="mb-0">Potansiyel CRM panosu</h5>
+      <small class="text-muted">Durumlara göre gruplanmış potansiyeller</small>
+    </div>
+    <?php if (!$leads): ?>
+      <div class="empty-state">Bu bayi için henüz kayıtlı potansiyel müşteri bulunmuyor.</div>
+    <?php else: ?>
+      <div class="crm-board">
+        <?php foreach ($leadColumns as $statusKey => $column): ?>
+          <?php $columnClass = 'status-'.preg_replace('/[^a-z0-9]+/', '-', $statusKey); $statusLabel = $column['label']; $columnCount = count($column['leads']); ?>
+          <div class="crm-column <?=$columnClass?>">
+            <div class="crm-column-header">
+              <h6><?=h($statusLabel)?></h6>
+              <span class="count-badge"><?=$columnCount?></span>
+            </div>
+            <?php if (!$column['leads']): ?>
+              <p class="text-muted small mb-0">Bu aşamada potansiyel yok.</p>
+            <?php else: ?>
+              <?php foreach ($column['leads'] as $lead): ?>
+                <?php
+                  $leadId = (int)$lead['id'];
+                  $leadStatusKey = $lead['status'] ?? DEALER_LEAD_STATUS_NEW;
+                  $leadStatusLabel = $leadStatusLabels[$leadStatusKey] ?? ucfirst($leadStatusKey);
+                  $chipClass = 'status-chip--'.preg_replace('/[^a-z0-9]+/', '-', $leadStatusKey);
+                  $nextActionValue = !empty($lead['next_action_at']) ? date('Y-m-d\\TH:i', strtotime($lead['next_action_at'])) : '';
+                  $noteSlice = $leadNotesMap[$leadId] ?? [];
+                ?>
+                <div class="lead-card" id="lead-<?=$leadId?>">
+                  <div>
+                    <h6><?=h($lead['name'])?></h6>
+                    <span class="status-chip <?=$chipClass?>"><?=h($leadStatusLabel)?></span>
+                  </div>
+                  <ul class="lead-meta">
+                    <?php if (!empty($lead['email'])): ?><li><i class="bi bi-envelope"></i><span><?=h($lead['email'])?></span></li><?php endif; ?>
+                    <?php if (!empty($lead['phone'])): ?><li><i class="bi bi-telephone"></i><span><?=h($lead['phone'])?></span></li><?php endif; ?>
+                    <?php if (!empty($lead['company'])): ?><li><i class="bi bi-building"></i><span><?=h($lead['company'])?></span></li><?php endif; ?>
+                    <?php if (!empty($lead['source'])): ?><li><i class="bi bi-bullseye"></i><span><?=h($lead['source'])?></span></li><?php endif; ?>
+                  </ul>
+                  <div class="lead-timestamps">
+                    <?php if (!empty($lead['created_at'])): ?><span>Kaydedildi: <?=h(date('d.m.Y H:i', strtotime($lead['created_at'])))?></span><?php endif; ?>
+                    <?php if (!empty($lead['last_contact_at'])): ?><span>Son görüşme: <?=h(date('d.m.Y H:i', strtotime($lead['last_contact_at'])))?></span><?php endif; ?>
+                    <?php if (!empty($lead['next_action_at'])): ?><span>Sonraki aksiyon: <?=h(date('d.m.Y H:i', strtotime($lead['next_action_at'])))?></span><?php endif; ?>
+                  </div>
+                  <form method="post" class="lead-update-form">
+                    <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                    <input type="hidden" name="do" value="update_lead">
+                    <input type="hidden" name="lead_id" value="<?=$leadId?>">
+                    <div>
+                      <label class="form-label">Durum</label>
+                      <select class="form-select" name="status">
+                        <?php foreach ($leadStatusLabels as $key => $label): ?>
+                          <option value="<?=h($key)?>" <?=$leadStatusKey === $key ? 'selected' : ''?>><?=h($label)?></option>
+                        <?php endforeach; ?>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="form-label">Sonraki Aksiyon</label>
+                      <input type="datetime-local" class="form-control" name="next_action_at" value="<?=h($nextActionValue)?>">
+                    </div>
+                    <div class="full-span">
+                      <label class="form-label">Genel Not</label>
+                      <textarea class="form-control" name="notes" rows="2" placeholder="Potansiyel notunu güncelleyin."><?=h($lead['notes'] ?? '')?></textarea>
+                    </div>
+                    <div class="full-span d-grid">
+                      <button class="btn btn-sm btn-outline-primary" type="submit">Kaydet</button>
+                    </div>
+                  </form>
+                  <div>
+                    <h6 class="fw-semibold fs-6 mb-2">Son Notlar</h6>
+                    <?php if (!$noteSlice): ?>
+                      <p class="text-muted small mb-2">Bu potansiyel için henüz not eklenmedi.</p>
+                    <?php else: ?>
+                      <ul class="note-timeline">
+                        <?php foreach ($noteSlice as $note): ?>
+                          <li>
+                            <div class="fw-semibold mb-1"><?=h(date('d.m.Y H:i', strtotime($note['created_at'])))?></div>
+                            <div><?=nl2br(h($note['note']))?></div>
+                            <div class="meta">
+                              <?php if (!empty($note['representative_name'])): ?><span><?=h($note['representative_name'])?></span><?php endif; ?>
+                              <?php if (!empty($note['contact_type'])): ?><span><?=h($note['contact_type'])?></span><?php endif; ?>
+                              <?php if (!empty($note['next_action_at'])): ?><span>Sonraki: <?=h(date('d.m.Y H:i', strtotime($note['next_action_at'])))?></span><?php endif; ?>
+                            </div>
+                          </li>
+                        <?php endforeach; ?>
+                      </ul>
+                    <?php endif; ?>
+                  </div>
+                  <form method="post" class="note-form">
+                    <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                    <input type="hidden" name="do" value="add_note">
+                    <input type="hidden" name="lead_id" value="<?=$leadId?>">
+                    <div class="mb-2">
+                      <label class="form-label">Yeni Görüşme Notu</label>
+                      <textarea class="form-control" name="note" required placeholder="Görüşmenin detaylarını yazın."></textarea>
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-sm-6">
+                        <label class="form-label">Görüşme Tipi</label>
+                        <input type="text" class="form-control" name="contact_type" placeholder="Örn. Telefon, Yüz yüze">
+                      </div>
+                      <div class="col-sm-6">
+                        <label class="form-label">Sonraki Aksiyon</label>
+                        <input type="datetime-local" class="form-control" name="next_action_at">
+                      </div>
+                    </div>
+                    <div class="d-grid mt-3">
+                      <button class="btn btn-sm btn-primary" type="submit">Not Ekle</button>
+                    </div>
+                  </form>
+                </div>
+              <?php endforeach; ?>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
       </div>
     <?php endif; ?>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+
+  <div class="card-lite mb-4">
+    <div class="section-heading">
+      <h5 class="mb-0">Tamamlanan yüklemeler</h5>
+      <small class="text-muted">Komisyon durumlarınızı takip edin.</small>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Tarih</th><th>Tutar</th><th>Komisyon</th><th>Durum</th></tr></thead>
+        <tbody>
+          <?php if (!$topups): ?>
+            <tr><td colspan="4" class="text-center text-muted">Henüz tamamlanan yükleme bulunmuyor.</td></tr>
+          <?php else: ?>
+            <?php foreach ($topups as $topup): ?>
+              <?php $isPaid = ($topup['commission_status'] ?? 'pending') === 'paid'; ?>
+              <tr>
+                <td><?=h($topup['completed_at'] ? date('d.m.Y H:i', strtotime($topup['completed_at'])) : date('d.m.Y H:i', strtotime($topup['created_at'])))?></td>
+                <td><?=h(format_currency($topup['amount_cents']))?></td>
+                <td><?=h(format_currency($topup['commission_cents']))?></td>
+                <td><span class="badge-status <?=$isPaid ? 'status-paid' : 'status-pending'?>"><?=$isPaid ? 'Ödendi' : 'Bekliyor'?></span></td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card-lite">
+    <div class="section-heading">
+      <h5 class="mb-0">Komisyon hareketleri</h5>
+    </div>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Tarih</th><th>Yükleme Tutarı</th><th>Komisyon</th><th>Durum</th></tr></thead>
+        <tbody>
+          <?php if (!$commissionHistory): ?>
+            <tr><td colspan="4" class="text-center text-muted">Henüz komisyon kaydı bulunmuyor.</td></tr>
+          <?php else: ?>
+            <?php foreach ($commissionHistory as $row): ?>
+              <?php $isPaid = ($row['status'] ?? 'pending') === 'paid'; ?>
+              <tr>
+                <td><?=h(date('d.m.Y H:i', strtotime($row['created_at'])))?></td>
+                <td><?=h(format_currency($row['topup_amount_cents']))?></td>
+                <td><?=h(format_currency($row['commission_cents']))?></td>
+                <td><span class="badge-status <?=$isPaid ? 'status-paid' : 'status-pending'?>"><?=$isPaid ? 'Ödendi' : 'Bekliyor'?></span></td>
+              </tr>
+            <?php endforeach; ?>
+          <?php endif; ?>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<?php endif; ?>
+
+<?php representative_layout_end();
