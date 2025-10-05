@@ -706,3 +706,79 @@ function representative_has_commission(int $representative_id, int $topup_id): b
   $st->execute([$representative_id, $topup_id]);
   return (bool)$st->fetchColumn();
 }
+
+function representative_admin_commission_overview(): array {
+  $summary = [
+    'pending_amount' => 0,
+    'paid_amount' => 0,
+    'pending_count' => 0,
+    'paid_count' => 0,
+    'total_amount' => 0,
+    'total_count' => 0,
+  ];
+  try {
+    $sql = 'SELECT status, COUNT(*) AS c, COALESCE(SUM(commission_cents),0) AS total
+            FROM dealer_representative_commissions
+            GROUP BY status';
+    foreach (pdo()->query($sql) as $row) {
+      $status = $row['status'] ?? '';
+      $count = (int)($row['c'] ?? 0);
+      $total = (int)($row['total'] ?? 0);
+      if ($status === 'paid') {
+        $summary['paid_amount'] += $total;
+        $summary['paid_count'] += $count;
+      } else {
+        $summary['pending_amount'] += $total;
+        $summary['pending_count'] += $count;
+      }
+      $summary['total_amount'] += $total;
+      $summary['total_count'] += $count;
+    }
+  } catch (Throwable $e) {
+    // sessizce yok say
+  }
+  return $summary;
+}
+
+function representative_commission_leaderboard(int $limit = 5): array {
+  $limit = max(1, min($limit, 50));
+  try {
+    $sql = 'SELECT r.id, r.name, r.email, r.phone, r.status,
+                   COUNT(*) AS total_commission_count,
+                   SUM(CASE WHEN c.status = "paid" THEN 1 ELSE 0 END) AS paid_commission_count,
+                   COALESCE(SUM(c.commission_cents),0) AS total_commission_cents,
+                   COALESCE(SUM(CASE WHEN c.status = "paid" THEN c.commission_cents ELSE 0 END),0) AS paid_commission_cents,
+                   COALESCE(SUM(CASE WHEN c.status <> "paid" THEN c.commission_cents ELSE 0 END),0) AS pending_commission_cents,
+                   COUNT(DISTINCT a.dealer_id) AS dealer_count,
+                   MAX(c.created_at) AS latest_activity_at
+            FROM dealer_representative_commissions c
+            INNER JOIN dealer_representatives r ON r.id = c.representative_id
+            LEFT JOIN dealer_representative_assignments a ON a.representative_id = r.id
+            GROUP BY r.id, r.name, r.email, r.phone, r.status
+            ORDER BY total_commission_cents DESC
+            LIMIT ?';
+    $st = pdo()->prepare($sql);
+    $st->bindValue(1, $limit, PDO::PARAM_INT);
+    $st->execute();
+    $rows = [];
+    foreach ($st as $row) {
+      $rows[] = [
+        'id' => (int)$row['id'],
+        'name' => $row['name'] ?? '',
+        'email' => $row['email'] ?? null,
+        'phone' => $row['phone'] ?? null,
+        'status' => $row['status'] ?? REPRESENTATIVE_STATUS_ACTIVE,
+        'dealer_count' => (int)($row['dealer_count'] ?? 0),
+        'total_commission_cents' => (int)($row['total_commission_cents'] ?? 0),
+        'paid_commission_cents' => (int)($row['paid_commission_cents'] ?? 0),
+        'pending_commission_cents' => (int)($row['pending_commission_cents'] ?? 0),
+        'total_commission_count' => (int)($row['total_commission_count'] ?? 0),
+        'paid_commission_count' => (int)($row['paid_commission_count'] ?? 0),
+        'latest_activity_at' => $row['latest_activity_at'] ?? null,
+      ];
+    }
+    return $rows;
+  } catch (Throwable $e) {
+    return [];
+  }
+}

@@ -367,3 +367,264 @@ function representative_crm_recent_notes(int $representative_id, int $limit = 5)
   }
   return $rows;
 }
+
+function representative_crm_global_status_counts(): array {
+  $summary = array_fill_keys(array_keys(representative_crm_status_options()), 0);
+  $summary['total'] = 0;
+  if (!representative_crm_tables_ready()) {
+    return $summary;
+  }
+  $sql = 'SELECT status, COUNT(*) AS c FROM representative_leads GROUP BY status';
+  foreach (pdo()->query($sql) as $row) {
+    $status = $row['status'] ?? REP_LEAD_STATUS_NEW;
+    $count = (int)($row['c'] ?? 0);
+    if (!array_key_exists($status, $summary)) {
+      $summary[$status] = 0;
+    }
+    $summary[$status] += $count;
+    $summary['total'] += $count;
+  }
+  return $summary;
+}
+
+function representative_crm_pipeline_amounts(): array {
+  $summary = [
+    'total_value_cents' => 0,
+    'active_value_cents' => 0,
+    'won_value_cents' => 0,
+    'lost_value_cents' => 0,
+    'with_value_count' => 0,
+  ];
+  if (!representative_crm_tables_ready()) {
+    return $summary;
+  }
+  $sql = 'SELECT status, COALESCE(SUM(potential_value_cents),0) AS total,
+                 SUM(CASE WHEN potential_value_cents IS NOT NULL AND potential_value_cents > 0 THEN 1 ELSE 0 END) AS with_value
+          FROM representative_leads
+          WHERE potential_value_cents IS NOT NULL';
+  $totals = [
+    'total' => 0,
+    'with_value' => 0,
+    'won' => 0,
+    'lost' => 0,
+    'active' => 0,
+  ];
+  foreach (pdo()->query($sql.' GROUP BY status') as $row) {
+    $status = $row['status'] ?? REP_LEAD_STATUS_NEW;
+    $value = (int)($row['total'] ?? 0);
+    $withValue = (int)($row['with_value'] ?? 0);
+    $totals['total'] += $value;
+    $totals['with_value'] += $withValue;
+    if ($status === REP_LEAD_STATUS_WON) {
+      $totals['won'] += $value;
+    } elseif ($status === REP_LEAD_STATUS_LOST) {
+      $totals['lost'] += $value;
+    } else {
+      $totals['active'] += $value;
+    }
+  }
+  $summary['total_value_cents'] = $totals['total'];
+  $summary['won_value_cents'] = $totals['won'];
+  $summary['lost_value_cents'] = $totals['lost'];
+  $summary['active_value_cents'] = $totals['active'];
+  $summary['with_value_count'] = $totals['with_value'];
+  return $summary;
+}
+
+function representative_crm_all_leads(array $filters = []): array {
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
+  $limit = isset($filters['limit']) ? (int)$filters['limit'] : 50;
+  $limit = max(1, min($limit, 200));
+  $conditions = [];
+  $params = [];
+  $status = $filters['status'] ?? 'all';
+  if ($status !== 'all' && $status !== '') {
+    $conditions[] = 'l.status=?';
+    $params[] = $status;
+  }
+  $representativeId = isset($filters['representative_id']) ? (int)$filters['representative_id'] : 0;
+  if ($representativeId > 0) {
+    $conditions[] = 'l.representative_id=?';
+    $params[] = $representativeId;
+  }
+  $search = trim($filters['q'] ?? '');
+  if ($search !== '') {
+    $conditions[] = '(l.name LIKE ? OR l.company LIKE ? OR l.email LIKE ? OR l.phone LIKE ?)';
+    $like = '%'.$search.'%';
+    array_push($params, $like, $like, $like, $like);
+  }
+  $sql = 'SELECT l.*, r.name AS rep_name, r.email AS rep_email, r.phone AS rep_phone
+          FROM representative_leads l
+          LEFT JOIN dealer_representatives r ON r.id = l.representative_id';
+  if ($conditions) {
+    $sql .= ' WHERE '.implode(' AND ', $conditions);
+  }
+  $sql .= ' ORDER BY l.created_at DESC LIMIT ?';
+  $params[] = $limit;
+  $st = pdo()->prepare($sql);
+  $position = 1;
+  foreach ($params as $param) {
+    $type = is_int($param) ? PDO::PARAM_INT : PDO::PARAM_STR;
+    $st->bindValue($position, $param, $type);
+    $position++;
+  }
+  $st->execute();
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'id' => (int)$row['id'],
+      'representative_id' => isset($row['representative_id']) ? (int)$row['representative_id'] : null,
+      'representative_name' => $row['rep_name'] ?? null,
+      'representative_email' => $row['rep_email'] ?? null,
+      'representative_phone' => $row['rep_phone'] ?? null,
+      'name' => $row['name'] ?? '',
+      'email' => $row['email'] ?? null,
+      'phone' => $row['phone'] ?? null,
+      'company' => $row['company'] ?? null,
+      'status' => $row['status'] ?? REP_LEAD_STATUS_NEW,
+      'source' => $row['source'] ?? null,
+      'notes' => $row['notes'] ?? null,
+      'potential_value_cents' => isset($row['potential_value_cents']) ? (int)$row['potential_value_cents'] : null,
+      'last_contact_at' => $row['last_contact_at'] ?? null,
+      'next_action_at' => $row['next_action_at'] ?? null,
+      'created_at' => $row['created_at'] ?? null,
+      'updated_at' => $row['updated_at'] ?? null,
+    ];
+  }
+  return $rows;
+}
+
+function representative_crm_admin_recent_notes(int $limit = 6): array {
+  $limit = max(1, $limit);
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
+  $sql = 'SELECT n.*, l.name AS lead_name, l.company AS lead_company, l.status AS lead_status,
+                 r.name AS rep_name, r.email AS rep_email
+          FROM representative_lead_notes n
+          INNER JOIN representative_leads l ON l.id = n.lead_id
+          LEFT JOIN dealer_representatives r ON r.id = n.representative_id
+          ORDER BY n.created_at DESC
+          LIMIT ?';
+  $st = pdo()->prepare($sql);
+  $st->bindValue(1, $limit, PDO::PARAM_INT);
+  $st->execute();
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'id' => (int)$row['id'],
+      'lead_id' => (int)$row['lead_id'],
+      'representative_id' => isset($row['representative_id']) ? (int)$row['representative_id'] : null,
+      'representative_name' => $row['rep_name'] ?? null,
+      'representative_email' => $row['rep_email'] ?? null,
+      'lead_name' => $row['lead_name'] ?? '',
+      'lead_company' => $row['lead_company'] ?? null,
+      'lead_status' => $row['lead_status'] ?? REP_LEAD_STATUS_NEW,
+      'note' => $row['note'] ?? '',
+      'contact_type' => $row['contact_type'] ?? null,
+      'next_action_at' => $row['next_action_at'] ?? null,
+      'created_at' => $row['created_at'] ?? null,
+    ];
+  }
+  return $rows;
+}
+
+function representative_crm_admin_upcoming_actions(int $limit = 6): array {
+  $limit = max(1, $limit);
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
+  $sql = 'SELECT l.id, l.name, l.company, l.status, l.next_action_at, l.representative_id,
+                 r.name AS rep_name, r.email AS rep_email
+          FROM representative_leads l
+          LEFT JOIN dealer_representatives r ON r.id = l.representative_id
+          WHERE l.next_action_at IS NOT NULL
+          ORDER BY l.next_action_at ASC
+          LIMIT ?';
+  $st = pdo()->prepare($sql);
+  $st->bindValue(1, $limit, PDO::PARAM_INT);
+  $st->execute();
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'id' => (int)$row['id'],
+      'name' => $row['name'] ?? '',
+      'company' => $row['company'] ?? null,
+      'status' => $row['status'] ?? REP_LEAD_STATUS_NEW,
+      'next_action_at' => $row['next_action_at'] ?? null,
+      'representative_id' => isset($row['representative_id']) ? (int)$row['representative_id'] : null,
+      'representative_name' => $row['rep_name'] ?? null,
+      'representative_email' => $row['rep_email'] ?? null,
+    ];
+  }
+  return $rows;
+}
+
+function representative_crm_leads_by_month(int $months = 6): array {
+  $months = max(1, min($months, 24));
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
+  $start = new DateTime('first day of this month');
+  $start->modify('-'.($months - 1).' months');
+  $startDate = $start->format('Y-m-01');
+  $sql = 'SELECT DATE_FORMAT(created_at, "%Y-%m") AS ym,
+                 COUNT(*) AS total,
+                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS won_count,
+                 SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS lost_count
+          FROM representative_leads
+          WHERE created_at >= ?
+          GROUP BY ym
+          ORDER BY ym ASC';
+  $st = pdo()->prepare($sql);
+  $st->execute([REP_LEAD_STATUS_WON, REP_LEAD_STATUS_LOST, $startDate]);
+  $raw = [];
+  foreach ($st as $row) {
+    $raw[$row['ym']] = [
+      'total' => (int)($row['total'] ?? 0),
+      'won' => (int)($row['won_count'] ?? 0),
+      'lost' => (int)($row['lost_count'] ?? 0),
+    ];
+  }
+  $timeline = [];
+  $cursor = clone $start;
+  for ($i = 0; $i < $months; $i++) {
+    $key = $cursor->format('Y-m');
+    $data = $raw[$key] ?? ['total' => 0, 'won' => 0, 'lost' => 0];
+    $timeline[] = [
+      'month' => $key,
+      'label' => $cursor->format('m.Y'),
+      'total' => $data['total'],
+      'won' => $data['won'],
+      'lost' => $data['lost'],
+    ];
+    $cursor->modify('+1 month');
+  }
+  return $timeline;
+}
+
+function representative_crm_source_breakdown(int $limit = 8): array {
+  $limit = max(1, $limit);
+  if (!representative_crm_tables_ready()) {
+    return [];
+  }
+  $sql = 'SELECT CASE WHEN source IS NULL OR source = "" THEN "Diğer" ELSE source END AS label,
+                 COUNT(*) AS total
+          FROM representative_leads
+          GROUP BY label
+          ORDER BY total DESC
+          LIMIT ?';
+  $st = pdo()->prepare($sql);
+  $st->bindValue(1, $limit, PDO::PARAM_INT);
+  $st->execute();
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'label' => $row['label'] ?? 'Diğer',
+      'total' => (int)($row['total'] ?? 0),
+    ];
+  }
+  return $rows;
+}
