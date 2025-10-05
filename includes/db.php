@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240609_01');
+  define('APP_SCHEMA_VERSION', '20240609_02');
 }
 
 function pdo(): PDO {
@@ -405,25 +405,147 @@ function install_schema(){
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representative_commissions(
     id INT AUTO_INCREMENT PRIMARY KEY,
     representative_id INT NOT NULL,
-    dealer_topup_id INT NOT NULL,
+    dealer_id INT NOT NULL,
+    dealer_topup_id INT NULL,
+    package_purchase_id INT NULL,
+    site_order_id INT NULL,
+    source_type VARCHAR(32) NOT NULL DEFAULT 'package',
+    source_label VARCHAR(190) NULL,
+    commission_rate DECIMAL(7,4) NULL,
     amount_cents INT NOT NULL,
     commission_cents INT NOT NULL,
     status VARCHAR(16) NOT NULL DEFAULT 'pending',
     notes VARCHAR(255) NULL,
     created_at DATETIME NOT NULL,
-    paid_at DATETIME NULL,
+    available_at DATETIME NULL,
     approved_at DATETIME NULL,
+    paid_at DATETIME NULL,
     UNIQUE KEY uniq_commission_topup (dealer_topup_id),
+    UNIQUE KEY uniq_commission_package (package_purchase_id),
+    UNIQUE KEY uniq_commission_site_order (site_order_id),
     INDEX idx_commission_rep_status (representative_id, status),
+    INDEX idx_commission_rep_available (representative_id, available_at),
+    INDEX idx_commission_dealer (dealer_id),
     FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
-    FOREIGN KEY (dealer_topup_id) REFERENCES dealer_topups(id) ON DELETE CASCADE
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (dealer_topup_id) REFERENCES dealer_topups(id) ON DELETE CASCADE,
+    FOREIGN KEY (package_purchase_id) REFERENCES dealer_package_purchases(id) ON DELETE CASCADE,
+    FOREIGN KEY (site_order_id) REFERENCES site_orders(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  try {
+    pdo()->exec("ALTER TABLE dealer_representative_commissions MODIFY dealer_topup_id INT NULL");
+  } catch (Throwable $e) {}
+
+  if (!column_exists('dealer_representative_commissions', 'dealer_id')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD dealer_id INT NULL AFTER representative_id");
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD INDEX idx_commission_dealer (dealer_id)");
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD CONSTRAINT fk_commission_dealer FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE");
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('dealer_representative_commissions', 'package_purchase_id')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD package_purchase_id INT NULL AFTER dealer_topup_id");
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD CONSTRAINT fk_commission_package FOREIGN KEY (package_purchase_id) REFERENCES dealer_package_purchases(id) ON DELETE CASCADE");
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('dealer_representative_commissions', 'site_order_id')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD site_order_id INT NULL AFTER package_purchase_id");
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD CONSTRAINT fk_commission_order FOREIGN KEY (site_order_id) REFERENCES site_orders(id) ON DELETE CASCADE");
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('dealer_representative_commissions', 'source_type')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD source_type VARCHAR(32) NOT NULL DEFAULT 'package' AFTER site_order_id");
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('dealer_representative_commissions', 'source_label')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD source_label VARCHAR(190) NULL AFTER source_type");
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('dealer_representative_commissions', 'commission_rate')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD commission_rate DECIMAL(7,4) NULL AFTER source_label");
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('dealer_representative_commissions', 'available_at')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD available_at DATETIME NULL AFTER created_at");
+    } catch (Throwable $e) {}
+  }
 
   if (!column_exists('dealer_representative_commissions', 'approved_at')) {
     try {
-      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD approved_at DATETIME NULL AFTER paid_at");
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD approved_at DATETIME NULL AFTER available_at");
     } catch (Throwable $e) {}
   }
+
+  if (column_exists('dealer_representative_commissions', 'available_at')) {
+    try {
+      pdo()->exec("UPDATE dealer_representative_commissions SET available_at = DATE_ADD(created_at, INTERVAL 30 DAY) WHERE available_at IS NULL");
+    } catch (Throwable $e) {}
+  }
+
+  try {
+    pdo()->exec("UPDATE dealer_representative_commissions c INNER JOIN dealer_package_purchases pp ON pp.id = c.package_purchase_id SET c.dealer_id = pp.dealer_id WHERE c.dealer_id IS NULL AND c.package_purchase_id IS NOT NULL");
+  } catch (Throwable $e) {}
+  try {
+    pdo()->exec("UPDATE dealer_representative_commissions c INNER JOIN dealer_topups dt ON dt.id = c.dealer_topup_id SET c.dealer_id = dt.dealer_id WHERE c.dealer_id IS NULL AND c.dealer_topup_id IS NOT NULL");
+  } catch (Throwable $e) {}
+  try {
+    pdo()->exec("UPDATE dealer_representative_commissions c INNER JOIN site_orders so ON so.id = c.site_order_id SET c.dealer_id = so.dealer_id WHERE c.dealer_id IS NULL AND c.site_order_id IS NOT NULL AND so.dealer_id IS NOT NULL");
+  } catch (Throwable $e) {}
+
+  if (!column_exists('dealer_representative_commissions', 'paid_at')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD paid_at DATETIME NULL AFTER approved_at");
+    } catch (Throwable $e) {}
+  }
+
+  try {
+    pdo()->exec("ALTER TABLE dealer_representative_commissions ADD UNIQUE KEY uniq_commission_package (package_purchase_id)");
+  } catch (Throwable $e) {}
+
+  try {
+    pdo()->exec("ALTER TABLE dealer_representative_commissions ADD UNIQUE KEY uniq_commission_site_order (site_order_id)");
+  } catch (Throwable $e) {}
+
+  try {
+    pdo()->exec("ALTER TABLE dealer_representative_commissions ADD INDEX idx_commission_rep_available (representative_id, available_at)");
+  } catch (Throwable $e) {}
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_payout_requests(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    representative_id INT NOT NULL,
+    amount_cents INT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    invoice_path VARCHAR(255) NULL,
+    note VARCHAR(255) NULL,
+    requested_at DATETIME NOT NULL,
+    reviewed_at DATETIME NULL,
+    reviewed_by INT NULL,
+    response_note VARCHAR(255) NULL,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
+    INDEX idx_rep_payout_status (status),
+    INDEX idx_rep_payout_rep (representative_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_payout_request_commissions(
+    request_id INT NOT NULL,
+    commission_id INT NOT NULL,
+    PRIMARY KEY (request_id, commission_id),
+    FOREIGN KEY (request_id) REFERENCES representative_payout_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (commission_id) REFERENCES dealer_representative_commissions(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_leads(
     id INT AUTO_INCREMENT PRIMARY KEY,

@@ -1003,6 +1003,9 @@ function dealer_purchase_package(int $dealer_id, int $package_id): array {
       $pdo->commit();
     }
     $purchase = dealer_purchase_get($purchaseId);
+    if ($purchase) {
+      representative_create_commission_for_package_purchase((int)$purchase['id']);
+    }
     return $purchase ?? [];
   } catch (Throwable $e) {
     if ($ownTxn && $pdo->inTransaction()) {
@@ -1430,7 +1433,6 @@ function dealer_mark_topup_completed(int $topup_id, ?string $reference = null, a
           now(),
           $topup_id,
         ]);
-    representative_create_commission_for_topup($topup_id, (int)$row['dealer_id'], $amount);
     if ($ownTxn) {
       $pdo->commit();
     }

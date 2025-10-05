@@ -23,8 +23,12 @@ $assignedDealers = $representative['dealers'] ?? [];
 $dealerCount = count($assignedDealers);
 
 $commissionTotals = representative_commission_totals($representativeId);
-$recentTopups = representative_completed_topups($representativeId, 5);
+$recentSales = representative_recent_sales($representativeId, 5);
 $recentCommissions = representative_recent_commissions($representativeId, 5);
+
+$availableAmount = (int)($commissionTotals['available_amount'] ?? 0);
+$availableCount = (int)($commissionTotals['available_count'] ?? 0);
+$nextReleaseAt = $commissionTotals['next_release_at'] ?? null;
 
 $statusOptions = representative_crm_status_options();
 $statusCounts = representative_crm_status_counts($representativeId);
@@ -106,9 +110,14 @@ representative_layout_start([
     <small><?= $activePipeline ? 'Takipte olan potansiyel müşteriler.' : 'Tüm potansiyel müşteriler kapatıldı veya henüz eklenmedi.' ?></small>
   </div>
   <div class="summary-card">
+    <span>Çekilebilir Komisyon</span>
+    <strong><?=h(format_currency($availableAmount))?></strong>
+    <small><?=h($availableCount)?> komisyon talep için hazır<?= $nextReleaseAt ? '. Sonraki tarih: '.h(date('d.m.Y', strtotime($nextReleaseAt))) : '' ?>.</small>
+  </div>
+  <div class="summary-card">
     <span>Bekleyen Komisyon</span>
     <strong><?=h(format_currency($commissionTotals['pending_amount']))?></strong>
-    <small><?=h((int)$commissionTotals['pending_count'])?> işlem ödeme bekliyor.</small>
+    <small><?=h((int)$commissionTotals['pending_count'])?> komisyon onay sürecinde.</small>
   </div>
   <div class="summary-card">
     <span>Onaylanan Komisyon</span>
@@ -189,21 +198,21 @@ representative_layout_start([
 <section class="card-lite mb-4">
   <div class="section-heading">
     <h5>Komisyon Özeti</h5>
-    <small><?=h((int)($commissionTotals['paid_count'] ?? 0))?> ödenen · <?=h((int)($commissionTotals['approved_count'] ?? 0))?> onaylı · <?=h((int)($commissionTotals['pending_count'] ?? 0))?> bekleyen</small>
+    <small><?=h($availableCount)?> çekilebilir · <?=h((int)($commissionTotals['approved_count'] ?? 0))?> onaylı · <?=h((int)($commissionTotals['pending_count'] ?? 0))?> bekleyen · <?=h((int)($commissionTotals['paid_count'] ?? 0))?> ödenen</small>
   </div>
   <div class="two-column">
     <div>
-      <h6 class="fw-semibold text-muted mb-3">Son Yüklemeler</h6>
+      <h6 class="fw-semibold text-muted mb-3">Son Satışlar</h6>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>İşlem</th><th>Tutar</th><th>Komisyon</th><th>Durum</th></tr></thead>
+          <thead><tr><th>Satış</th><th>Tutar</th><th>Komisyon</th><th>Durum</th></tr></thead>
           <tbody>
-            <?php if (!$recentTopups): ?>
-              <tr><td colspan="4" class="text-muted text-center">Temsilciye ait tamamlanan yükleme bulunmuyor.</td></tr>
+            <?php if (!$recentSales): ?>
+              <tr><td colspan="4" class="text-muted text-center">Listelenecek satış bulunmuyor.</td></tr>
             <?php else: ?>
-              <?php foreach ($recentTopups as $topup): ?>
+              <?php foreach ($recentSales as $sale): ?>
                 <?php
-                  $status = $topup['commission_status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
+                  $status = $sale['commission_status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
                   $label = representative_commission_status_label($status);
                   $pillClass = 'status-pill default';
                   if ($status === REPRESENTATIVE_COMMISSION_STATUS_PENDING) {
@@ -215,11 +224,13 @@ representative_layout_start([
                   } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED) {
                     $pillClass = 'status-pill negative';
                   }
+                  $reference = $sale['site_order_id'] ? 'Sipariş #'.$sale['site_order_id'] : ($sale['package_purchase_id'] ? 'Paket #'.$sale['package_purchase_id'] : '#'.$sale['commission_id']);
+                  $title = $sale['package_name'] ?? ($sale['source_label'] ?? $reference);
                 ?>
                 <tr>
-                  <td>#<?=h($topup['id'])?></td>
-                  <td><?=h(format_currency($topup['amount_cents']))?></td>
-                  <td><?= $topup['commission_cents'] !== null ? h(format_currency($topup['commission_cents'])) : '—' ?></td>
+                  <td><div class="fw-semibold"><?=h($title)?></div><div class="small text-muted"><?=h($reference)?></div></td>
+                  <td><?=h(format_currency($sale['amount_cents'] ?? 0))?></td>
+                  <td><?=h(format_currency($sale['commission_cents'] ?? 0))?></td>
                   <td><span class="<?=$pillClass?>"><?=h($label)?></span></td>
                 </tr>
               <?php endforeach; ?>
@@ -232,7 +243,7 @@ representative_layout_start([
       <h6 class="fw-semibold text-muted mb-3">Son Komisyon Kayıtları</h6>
       <div class="table-responsive">
         <table class="table table-sm align-middle mb-0">
-          <thead><tr><th>Kayıt</th><th>Komisyon</th><th>Durum</th><th>Tarih</th></tr></thead>
+          <thead><tr><th>Satış</th><th>Komisyon</th><th>Durum</th><th>Tarih</th></tr></thead>
           <tbody>
             <?php if (!$recentCommissions): ?>
               <tr><td colspan="4" class="text-muted text-center">Komisyon kaydı bulunmuyor.</td></tr>
@@ -251,9 +262,11 @@ representative_layout_start([
                   } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED) {
                     $pillClass = 'status-pill negative';
                   }
+                  $reference = $row['site_order_id'] ? 'Sipariş #'.$row['site_order_id'] : ($row['package_purchase_id'] ? 'Paket #'.$row['package_purchase_id'] : '#'.$row['id']);
+                  $title = $row['package_name'] ?? ($row['source_label'] ?? $reference);
                 ?>
                 <tr>
-                  <td>#<?=h($row['dealer_topup_id'])?></td>
+                  <td><div class="fw-semibold"><?=h($title)?></div><div class="small text-muted"><?=h($reference)?></div></td>
                   <td><?=h(format_currency($row['commission_cents']))?></td>
                   <td><span class="<?=$pillClass?>"><?=h($label)?></span></td>
                   <td><?= $row['created_at'] ? h(date('d.m.Y H:i', strtotime($row['created_at']))) : '—' ?></td>

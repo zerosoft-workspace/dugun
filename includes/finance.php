@@ -112,7 +112,17 @@ function finance_overview(): array {
     'last_30_paid_amount' => 0,
     'last_30_paid_count' => 0,
     'average_paid_amount' => 0,
+    'available_amount' => 0,
+    'available_count' => 0,
+    'next_release_at' => null,
   ];
+
+  $availableSummary = representative_commission_global_available_summary();
+  $commissions['available_amount'] = $availableSummary['amount'] ?? 0;
+  $commissions['available_count'] = $availableSummary['count'] ?? 0;
+  $commissions['next_release_at'] = $availableSummary['next_release_at'] ?? null;
+
+  $payoutSummary = representative_payout_pending_summary();
 
   try {
     $st = $pdo->prepare('SELECT COUNT(*) AS c, COALESCE(SUM(commission_cents),0) AS total, COALESCE(AVG(commission_cents),0) AS avg
@@ -192,6 +202,7 @@ function finance_overview(): array {
     'orders' => $orders,
     'commissions' => $commissions,
     'cashbacks' => $cashbacks,
+    'payout_requests' => $payoutSummary,
     'totals' => $totals,
   ];
 }
@@ -458,4 +469,13 @@ function turkish_month_label(DateTimeInterface $dt): string {
   $year = $dt->format('Y');
   $name = $names[$month] ?? $dt->format('M');
   return $name.' '.$year;
+}
+
+function finance_recent_payout_requests(int $limit = 10, ?string $status = null): array {
+  $limit = max(1, min($limit, 100));
+  $filters = ['limit' => $limit];
+  if ($status !== null && $status !== '') {
+    $filters['status'] = $status;
+  }
+  return representative_payout_request_admin_list($filters);
 }

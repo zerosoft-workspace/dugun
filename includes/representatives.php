@@ -14,6 +14,11 @@ const REPRESENTATIVE_COMMISSION_STATUS_APPROVED  = 'approved';
 const REPRESENTATIVE_COMMISSION_STATUS_PAID      = 'paid';
 const REPRESENTATIVE_COMMISSION_STATUS_REJECTED  = 'rejected';
 
+const REPRESENTATIVE_PAYOUT_STATUS_PENDING  = 'pending';
+const REPRESENTATIVE_PAYOUT_STATUS_APPROVED = 'approved';
+const REPRESENTATIVE_PAYOUT_STATUS_PAID     = 'paid';
+const REPRESENTATIVE_PAYOUT_STATUS_REJECTED = 'rejected';
+
 function representative_commission_status_label(string $status): string {
   return match ($status) {
     REPRESENTATIVE_COMMISSION_STATUS_PENDING  => 'Onay Bekliyor',
@@ -22,6 +27,67 @@ function representative_commission_status_label(string $status): string {
     REPRESENTATIVE_COMMISSION_STATUS_REJECTED => 'Reddedildi',
     default                                   => ucfirst($status),
   };
+}
+
+function representative_payout_status_label(string $status): string {
+  return match ($status) {
+    REPRESENTATIVE_PAYOUT_STATUS_PENDING  => 'Bekliyor',
+    REPRESENTATIVE_PAYOUT_STATUS_APPROVED => 'Onaylandı',
+    REPRESENTATIVE_PAYOUT_STATUS_PAID     => 'Ödendi',
+    REPRESENTATIVE_PAYOUT_STATUS_REJECTED => 'Reddedildi',
+    default                               => ucfirst($status),
+  };
+}
+
+function representative_invoice_storage_dir(): string {
+  $dir = __DIR__.'/../uploads/representatives/invoices';
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
+  }
+  return $dir;
+}
+
+function representative_process_invoice_upload(?array $file, bool $required = true): ?string {
+  $error = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+  if ($error === UPLOAD_ERR_NO_FILE) {
+    if ($required) {
+      throw new InvalidArgumentException('Ödeme talebi için fatura yüklemeniz gerekir.');
+    }
+    return null;
+  }
+  if ($error !== UPLOAD_ERR_OK) {
+    throw new RuntimeException('Fatura yüklenirken bir hata oluştu.');
+  }
+  if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+    throw new RuntimeException('Geçersiz fatura yüklemesi.');
+  }
+  $finfo = new finfo(FILEINFO_MIME_TYPE);
+  $mime = $finfo ? $finfo->file($file['tmp_name']) : null;
+  $allowed = [
+    'application/pdf' => 'pdf',
+    'image/jpeg'      => 'jpg',
+    'image/png'       => 'png',
+  ];
+  if (!isset($allowed[$mime])) {
+    throw new InvalidArgumentException('Fatura yalnızca PDF, JPG veya PNG formatında yüklenebilir.');
+  }
+  $dir = representative_invoice_storage_dir();
+  $name = 'rep_invoice_'.date('Ymd_His').'_' . bin2hex(random_bytes(4)).'.'.$allowed[$mime];
+  $path = $dir.'/'.$name;
+  if (!@move_uploaded_file($file['tmp_name'], $path)) {
+    throw new RuntimeException('Fatura kaydedilemedi.');
+  }
+  return 'representatives/invoices/'.$name;
+}
+
+function representative_payout_invoice_url(?string $path): ?string {
+  if (!$path) {
+    return null;
+  }
+  if (preg_match('~^https?://~i', $path)) {
+    return $path;
+  }
+  return rtrim(BASE_URL, '/').'/uploads/'.ltrim($path, '/');
 }
 
 function representative_assignments_support_commission_rate(): bool {
@@ -566,61 +632,154 @@ function representative_record_login(int $representative_id): void {
 }
 
 function representative_create_commission_for_topup(int $topup_id, int $dealer_id, int $amount_cents): void {
-  $topup_id = max(0, $topup_id);
-  $dealer_id = max(0, $dealer_id);
-  $amount_cents = max(0, $amount_cents);
-  if ($topup_id <= 0 || $dealer_id <= 0 || $amount_cents <= 0) {
+  // Top-up işlemleri temsilci komisyonu oluşturmaz.
+  return;
+}
+
+function representative_fetch_package_purchase(int $purchase_id): ?array {
+  $purchase_id = (int)$purchase_id;
+  if ($purchase_id <= 0) {
+    return null;
+  }
+  $sql = "SELECT pp.*, pkg.name AS package_name, pkg.price_cents AS package_price"
+       . " FROM dealer_package_purchases pp"
+       . " INNER JOIN dealer_packages pkg ON pkg.id = pp.package_id"
+       . " WHERE pp.id=? LIMIT 1";
+  $st = pdo()->prepare($sql);
+  $st->execute([$purchase_id]);
+  $row = $st->fetch();
+  if (!$row) {
+    return null;
+  }
+  $row['id'] = (int)$row['id'];
+  $row['dealer_id'] = (int)$row['dealer_id'];
+  $row['package_id'] = (int)$row['package_id'];
+  $row['price_cents'] = (int)$row['price_cents'];
+  $row['package_price'] = (int)$row['package_price'];
+  $row['created_at'] = $row['created_at'] ?? now();
+  $row['source'] = $row['source'] ?? 'dealer';
+  $row['lead_event_id'] = $row['lead_event_id'] !== null ? (int)$row['lead_event_id'] : null;
+  return $row;
+}
+
+function representative_package_purchase_site_order_id(array $purchase): ?int {
+  if (empty($purchase['lead_event_id'])) {
+    return null;
+  }
+  try {
+    $st = pdo()->prepare('SELECT id FROM site_orders WHERE event_id=? ORDER BY id DESC LIMIT 1');
+    $st->execute([(int)$purchase['lead_event_id']]);
+    $orderId = $st->fetchColumn();
+    return $orderId ? (int)$orderId : null;
+  } catch (Throwable $e) {
+    return null;
+  }
+}
+
+function representative_create_commission_for_package_purchase(int $purchase_id): void {
+  $purchase = representative_fetch_package_purchase($purchase_id);
+  if (!$purchase) {
     return;
   }
-  $rep = representative_for_dealer($dealer_id);
+  $dealerId = (int)$purchase['dealer_id'];
+  if ($dealerId <= 0) {
+    return;
+  }
+  $rep = representative_for_dealer($dealerId);
   if (!$rep || ($rep['status'] ?? REPRESENTATIVE_STATUS_ACTIVE) !== REPRESENTATIVE_STATUS_ACTIVE) {
     return;
   }
   $pdo = pdo();
-  $check = $pdo->prepare('SELECT id FROM dealer_representative_commissions WHERE dealer_topup_id=? LIMIT 1');
-  $check->execute([$topup_id]);
+  $check = $pdo->prepare('SELECT id FROM dealer_representative_commissions WHERE package_purchase_id=? LIMIT 1');
+  $check->execute([$purchase['id']]);
   if ($check->fetch()) {
     return;
   }
-  $commission = (int)round($amount_cents * (($rep['commission_rate'] ?? 10.0) / 100));
+
+  $rate = $rep['dealer_commission_rate'] ?? ($rep['commission_rate'] ?? 0);
+  $rate = representative_sanitize_commission_rate($rate, 0.0);
+  if ($rate <= 0) {
+    return;
+  }
+
+  $amount = (int)$purchase['price_cents'];
+  if ($amount <= 0) {
+    $amount = (int)$purchase['package_price'];
+  }
+  if ($amount <= 0) {
+    return;
+  }
+
+  $commission = (int)round($amount * ($rate / 100));
   if ($commission <= 0) {
     return;
   }
-  $pdo->prepare('INSERT INTO dealer_representative_commissions (representative_id, dealer_topup_id, amount_cents, commission_cents, status, created_at) VALUES (?,?,?,?,?,?)')
+
+  $createdAt = $purchase['created_at'] ?? now();
+  try {
+    $availableAt = (new DateTime($createdAt))->modify('+30 days')->format('Y-m-d H:i:s');
+  } catch (Throwable $e) {
+    $availableAt = (new DateTime())->modify('+30 days')->format('Y-m-d H:i:s');
+  }
+
+  $source = strtolower((string)$purchase['source']);
+  $sourceType = 'package';
+  if ($source === (defined('DEALER_PURCHASE_SOURCE_LEAD') ? DEALER_PURCHASE_SOURCE_LEAD : 'lead')) {
+    $sourceType = 'site_order';
+  }
+  $sourceLabel = $sourceType === 'site_order'
+    ? 'Web Satışı'
+    : 'Paket Satışı';
+  if (!empty($purchase['package_name'])) {
+    $sourceLabel .= ': '.$purchase['package_name'];
+  }
+
+  $siteOrderId = representative_package_purchase_site_order_id($purchase);
+
+  $pdo->prepare('INSERT INTO dealer_representative_commissions (representative_id, dealer_id, package_purchase_id, site_order_id, source_type, source_label, commission_rate, amount_cents, commission_cents, status, created_at, available_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
       ->execute([
         (int)$rep['id'],
-        $topup_id,
-        $amount_cents,
+        $dealerId,
+        $purchase['id'],
+        $siteOrderId,
+        $sourceType,
+        $sourceLabel,
+        number_format($rate, 4, '.', ''),
+        $amount,
         $commission,
         REPRESENTATIVE_COMMISSION_STATUS_PENDING,
-        now(),
+        $createdAt,
+        $availableAt,
       ]);
 }
 
 function representative_commission_totals(int $representative_id, ?int $dealer_id = null): array {
   $summary = [
-    'pending_amount'  => 0,
-    'pending_count'   => 0,
-    'approved_amount' => 0,
-    'approved_count'  => 0,
-    'paid_amount'     => 0,
-    'paid_count'      => 0,
-    'rejected_amount' => 0,
-    'rejected_count'  => 0,
-    'total_amount'    => 0,
-    'total_count'     => 0,
+    'pending_amount'    => 0,
+    'pending_count'     => 0,
+    'approved_amount'   => 0,
+    'approved_count'    => 0,
+    'paid_amount'       => 0,
+    'paid_count'        => 0,
+    'rejected_amount'   => 0,
+    'rejected_count'    => 0,
+    'total_amount'      => 0,
+    'total_count'       => 0,
+    'available_amount'  => 0,
+    'available_count'   => 0,
+    'next_release_at'   => null,
   ];
-  $sql = 'SELECT c.status, COUNT(*) AS c, COALESCE(SUM(c.commission_cents),0) AS total FROM dealer_representative_commissions c';
+
+  $sql = 'SELECT status, COUNT(*) AS c, COALESCE(SUM(commission_cents),0) AS total'
+       . ' FROM dealer_representative_commissions'
+       . ' WHERE representative_id=?';
   $params = [$representative_id];
   if ($dealer_id) {
-    $sql .= ' INNER JOIN dealer_topups t ON t.id = c.dealer_topup_id';
-  }
-  $sql .= ' WHERE c.representative_id=?';
-  if ($dealer_id) {
-    $sql .= ' AND t.dealer_id=?';
+    $sql .= ' AND dealer_id=?';
     $params[] = $dealer_id;
   }
-  $sql .= ' GROUP BY c.status';
+  $sql .= ' GROUP BY status';
+
   $st = pdo()->prepare($sql);
   $st->execute($params);
   foreach ($st as $row) {
@@ -648,44 +807,72 @@ function representative_commission_totals(int $representative_id, ?int $dealer_i
     $summary['total_amount'] += $total;
     $summary['total_count']  += $count;
   }
+
+  $available = representative_commission_available_summary($representative_id, $dealer_id);
+  $summary['available_amount'] = $available['amount'] ?? 0;
+  $summary['available_count'] = $available['count'] ?? 0;
+  $summary['next_release_at'] = $available['next_release_at'] ?? null;
+
   return $summary;
 }
 
 function representative_recent_commissions(int $representative_id, int $limit = 20, ?int $dealer_id = null): array {
   $limit = max(1, $limit);
-  $sql = "SELECT c.*, t.amount_cents AS topup_amount, t.status AS topup_status, t.completed_at, t.dealer_id
-    FROM dealer_representative_commissions c
-    INNER JOIN dealer_topups t ON t.id = c.dealer_topup_id
-    WHERE c.representative_id=?";
-  $st = null;
+  $sql = "SELECT c.*, pp.created_at AS purchase_created_at, pp.id AS purchase_id, pp.price_cents AS purchase_price_cents,"
+       . " pkg.name AS package_name, d.name AS dealer_name,"
+       . " so.id AS site_order_id, so.price_cents AS order_price_cents, so.paid_at AS order_paid_at, so.customer_name, so.customer_email,"
+       . " COALESCE(pp.created_at, so.paid_at, so.created_at, c.created_at) AS activity_at"
+       . " FROM dealer_representative_commissions c"
+       . " LEFT JOIN dealer_package_purchases pp ON pp.id = c.package_purchase_id"
+       . " LEFT JOIN site_orders so ON so.id = c.site_order_id"
+       . " LEFT JOIN dealer_packages pkg ON pkg.id = COALESCE(pp.package_id, so.package_id)"
+       . " LEFT JOIN dealers d ON d.id = c.dealer_id"
+       . " WHERE c.representative_id=?";
+  $params = [$representative_id];
   if ($dealer_id) {
-    $sql .= ' AND t.dealer_id=?';
+    $sql .= ' AND c.dealer_id=?';
+    $params[] = $dealer_id;
   }
-  $sql .= ' ORDER BY c.created_at DESC LIMIT ?';
+  $sql .= ' ORDER BY COALESCE(pp.created_at, so.paid_at, so.created_at, c.created_at) DESC, c.id DESC LIMIT ?';
+  $params[] = $limit;
+
   $st = pdo()->prepare($sql);
-  $st->bindValue(1, $representative_id, PDO::PARAM_INT);
-  $position = 2;
-  if ($dealer_id) {
-    $st->bindValue($position, $dealer_id, PDO::PARAM_INT);
-    $position++;
+  foreach ($params as $idx => $value) {
+    $st->bindValue($idx + 1, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
   }
-  $st->bindValue($position, $limit, PDO::PARAM_INT);
   $st->execute();
   $rows = [];
   foreach ($st as $row) {
+    $saleAmount = isset($row['purchase_price_cents']) ? (int)$row['purchase_price_cents'] : null;
+    if ($saleAmount === null || $saleAmount <= 0) {
+      $saleAmount = isset($row['order_price_cents']) ? (int)$row['order_price_cents'] : null;
+    }
+    if ($saleAmount === null || $saleAmount <= 0) {
+      $saleAmount = isset($row['amount_cents']) ? (int)$row['amount_cents'] : 0;
+    }
     $rows[] = [
       'id' => (int)$row['id'],
-      'dealer_topup_id' => (int)$row['dealer_topup_id'],
+      'package_purchase_id' => isset($row['package_purchase_id']) ? (int)$row['package_purchase_id'] : null,
+      'site_order_id' => isset($row['site_order_id']) ? (int)$row['site_order_id'] : null,
       'commission_cents' => (int)$row['commission_cents'],
-      'amount_cents' => (int)$row['amount_cents'],
-      'topup_amount_cents' => (int)$row['topup_amount'],
+      'amount_cents' => $saleAmount,
       'status' => $row['status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING,
       'notes' => $row['notes'] ?? null,
       'created_at' => $row['created_at'] ?? null,
+      'available_at' => $row['available_at'] ?? null,
       'paid_at' => $row['paid_at'] ?? null,
-      'topup_status' => $row['topup_status'] ?? null,
-      'topup_completed_at' => $row['completed_at'] ?? null,
+      'approved_at' => $row['approved_at'] ?? null,
       'dealer_id' => isset($row['dealer_id']) ? (int)$row['dealer_id'] : null,
+      'dealer_name' => $row['dealer_name'] ?? null,
+      'source_type' => $row['source_type'] ?? 'package',
+      'source_label' => $row['source_label'] ?? null,
+      'commission_rate' => isset($row['commission_rate']) ? (float)$row['commission_rate'] : null,
+      'purchase_created_at' => $row['purchase_created_at'] ?? null,
+      'package_name' => $row['package_name'] ?? null,
+      'order_paid_at' => $row['order_paid_at'] ?? null,
+      'customer_name' => $row['customer_name'] ?? null,
+      'customer_email' => $row['customer_email'] ?? null,
+      'activity_at' => $row['activity_at'] ?? null,
     ];
   }
   return $rows;
@@ -796,17 +983,22 @@ function representative_commission_admin_list(array $filters = []): array {
   }
 
   if ($dealerId > 0) {
-    $conditions[] = 't.dealer_id=?';
+    $conditions[] = 'c.dealer_id=?';
     $params[] = $dealerId;
   }
 
-  $sql = "SELECT c.*, r.name AS representative_name, r.email AS representative_email, r.phone AS representative_phone,
-                 d.id AS dealer_id, d.name AS dealer_name, d.code AS dealer_code,
-                 t.amount_cents AS topup_amount_cents, t.status AS topup_status, t.created_at AS topup_created_at, t.completed_at AS topup_completed_at
-          FROM dealer_representative_commissions c
-          INNER JOIN dealer_representatives r ON r.id = c.representative_id
-          LEFT JOIN dealer_topups t ON t.id = c.dealer_topup_id
-          LEFT JOIN dealers d ON d.id = t.dealer_id";
+  $sql = "SELECT c.*, r.name AS representative_name, r.email AS representative_email, r.phone AS representative_phone,"
+       . " d.id AS dealer_id, d.name AS dealer_name, d.code AS dealer_code,"
+       . " pp.price_cents AS purchase_price_cents, pp.status AS purchase_status, pp.created_at AS purchase_created_at,"
+       . " pkg.name AS package_name,"
+       . " so.id AS site_order_id, so.price_cents AS order_price_cents, so.paid_at AS order_paid_at,"
+       . " so.customer_name, so.customer_email"
+       . " FROM dealer_representative_commissions c"
+       . " INNER JOIN dealer_representatives r ON r.id = c.representative_id"
+       . " LEFT JOIN dealers d ON d.id = c.dealer_id"
+       . " LEFT JOIN dealer_package_purchases pp ON pp.id = c.package_purchase_id"
+       . " LEFT JOIN site_orders so ON so.id = c.site_order_id"
+       . " LEFT JOIN dealer_packages pkg ON pkg.id = COALESCE(pp.package_id, so.package_id)";
   if ($conditions) {
     $sql .= ' WHERE '.implode(' AND ', $conditions);
   }
@@ -831,68 +1023,103 @@ function representative_commission_admin_list(array $filters = []): array {
       'dealer_id' => isset($row['dealer_id']) ? (int)$row['dealer_id'] : null,
       'dealer_name' => $row['dealer_name'] ?? null,
       'dealer_code' => $row['dealer_code'] ?? null,
-      'dealer_topup_id' => isset($row['dealer_topup_id']) ? (int)$row['dealer_topup_id'] : null,
+      'package_purchase_id' => isset($row['package_purchase_id']) ? (int)$row['package_purchase_id'] : null,
+      'site_order_id' => isset($row['site_order_id']) ? (int)$row['site_order_id'] : null,
       'amount_cents' => isset($row['amount_cents']) ? (int)$row['amount_cents'] : 0,
       'commission_cents' => isset($row['commission_cents']) ? (int)$row['commission_cents'] : 0,
+      'amount_cents' => $saleAmount,
       'status' => $row['status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING,
       'notes' => $row['notes'] ?? null,
       'created_at' => $row['created_at'] ?? null,
+      'available_at' => $row['available_at'] ?? null,
       'approved_at' => $row['approved_at'] ?? null,
       'paid_at' => $row['paid_at'] ?? null,
-      'topup_amount_cents' => isset($row['topup_amount_cents']) ? (int)$row['topup_amount_cents'] : null,
-      'topup_status' => $row['topup_status'] ?? null,
-      'topup_created_at' => $row['topup_created_at'] ?? null,
-      'topup_completed_at' => $row['topup_completed_at'] ?? null,
+      'source_type' => $row['source_type'] ?? 'package',
+      'source_label' => $row['source_label'] ?? null,
+      'commission_rate' => isset($row['commission_rate']) ? (float)$row['commission_rate'] : null,
+      'purchase_price_cents' => isset($row['purchase_price_cents']) ? (int)$row['purchase_price_cents'] : null,
+      'purchase_status' => $row['purchase_status'] ?? null,
+      'purchase_created_at' => $row['purchase_created_at'] ?? null,
+      'package_name' => $row['package_name'] ?? null,
+      'order_price_cents' => isset($row['order_price_cents']) ? (int)$row['order_price_cents'] : null,
+      'order_paid_at' => $row['order_paid_at'] ?? null,
+      'customer_name' => $row['customer_name'] ?? null,
+      'customer_email' => $row['customer_email'] ?? null,
+    ];
+  }
+  return $rows;
+}
+function representative_recent_sales(int $representative_id, int $limit = 20, ?int $dealer_id = null): array {
+  $limit = max(1, $limit);
+  $sql = "SELECT c.id AS commission_id, c.status AS commission_status, c.commission_cents, c.available_at, c.approved_at, c.paid_at,"
+       . " c.created_at AS commission_created_at, c.source_type, c.source_label, c.notes, c.dealer_id,"
+       . " pp.id AS package_purchase_id, pp.price_cents AS package_price_cents, pp.created_at AS package_created_at,"
+       . " pp.status AS package_status, pp.source AS package_source,"
+       . " so.id AS site_order_id, so.price_cents AS order_price_cents, so.paid_at AS order_paid_at, so.customer_name, so.customer_email,"
+       . " pkg.name AS package_name, c.amount_cents AS commission_amount_cents,"
+       . " COALESCE(pp.created_at, so.paid_at, so.created_at, c.created_at) AS activity_at"
+       . " FROM dealer_representative_commissions c"
+       . " LEFT JOIN dealer_package_purchases pp ON pp.id = c.package_purchase_id"
+       . " LEFT JOIN site_orders so ON so.id = c.site_order_id"
+       . " LEFT JOIN dealer_packages pkg ON pkg.id = COALESCE(pp.package_id, so.package_id)"
+       . " WHERE c.representative_id=?";
+  $params = [$representative_id];
+  if ($dealer_id) {
+    $sql .= ' AND c.dealer_id=?';
+    $params[] = $dealer_id;
+  }
+  $sql .= ' ORDER BY COALESCE(pp.created_at, so.paid_at, so.created_at, c.created_at) DESC, c.id DESC LIMIT ?';
+  $params[] = $limit;
+
+  $st = pdo()->prepare($sql);
+  foreach ($params as $idx => $value) {
+    $st->bindValue($idx + 1, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+  }
+  $st->bindValue(count($params), $limit, PDO::PARAM_INT);
+  $st->execute();
+
+  $rows = [];
+  foreach ($st as $row) {
+    $saleAmount = isset($row['package_price_cents']) ? (int)$row['package_price_cents'] : null;
+    if ($saleAmount === null || $saleAmount <= 0) {
+      $saleAmount = isset($row['order_price_cents']) ? (int)$row['order_price_cents'] : null;
+    }
+    if ($saleAmount === null || $saleAmount <= 0) {
+      $saleAmount = isset($row['commission_amount_cents']) ? (int)$row['commission_amount_cents'] : 0;
+    }
+    $rows[] = [
+      'commission_id' => isset($row['commission_id']) ? (int)$row['commission_id'] : 0,
+      'commission_status' => $row['commission_status'] ?? null,
+      'commission_cents' => isset($row['commission_cents']) ? (int)$row['commission_cents'] : 0,
+      'available_at' => $row['available_at'] ?? null,
+      'approved_at' => $row['approved_at'] ?? null,
+      'paid_at' => $row['paid_at'] ?? null,
+      'created_at' => $row['commission_created_at'] ?? null,
+      'package_purchase_id' => isset($row['package_purchase_id']) ? (int)$row['package_purchase_id'] : null,
+      'package_status' => $row['package_status'] ?? null,
+      'package_name' => $row['package_name'] ?? null,
+      'package_source' => $row['package_source'] ?? null,
+      'site_order_id' => isset($row['site_order_id']) ? (int)$row['site_order_id'] : null,
+      'order_paid_at' => $row['order_paid_at'] ?? null,
+      'customer_name' => $row['customer_name'] ?? null,
+      'customer_email' => $row['customer_email'] ?? null,
+      'dealer_id' => isset($row['dealer_id']) ? (int)$row['dealer_id'] : null,
+      'source_type' => $row['source_type'] ?? 'package',
+      'source_label' => $row['source_label'] ?? null,
+      'notes' => $row['notes'] ?? null,
+      'sale_amount_cents' => $saleAmount,
+      'sale_at' => $row['activity_at'] ?? ($row['commission_created_at'] ?? null),
     ];
   }
   return $rows;
 }
 
 function representative_completed_topups(int $representative_id, int $limit = 20, ?int $dealer_id = null): array {
-  $limit = max(1, $limit);
-  $commissionSelect = representative_assignments_support_commission_rate()
-    ? 'a.commission_rate'
-    : 'NULL AS commission_rate';
-  $sql = "SELECT t.id, t.amount_cents, t.status, t.completed_at, t.created_at, t.dealer_id, {$commissionSelect},
-                 c.commission_cents, c.status AS commission_status
-          FROM dealer_representative_assignments a
-          INNER JOIN dealer_topups t ON t.dealer_id = a.dealer_id
-          LEFT JOIN dealer_representative_commissions c ON c.dealer_topup_id = t.id AND c.representative_id = a.representative_id
-          WHERE a.representative_id=? AND t.status=?";
-  if ($dealer_id) {
-    $sql .= ' AND t.dealer_id=?';
-  }
-  $sql .= ' ORDER BY COALESCE(t.completed_at, t.created_at) DESC LIMIT ?';
-  $st = pdo()->prepare($sql);
-  $st->bindValue(1, $representative_id, PDO::PARAM_INT);
-  $st->bindValue(2, 'completed', PDO::PARAM_STR);
-  $position = 3;
-  if ($dealer_id) {
-    $st->bindValue($position, $dealer_id, PDO::PARAM_INT);
-    $position++;
-  }
-  $st->bindValue($position, $limit, PDO::PARAM_INT);
-  $st->execute();
-  $rows = [];
-  foreach ($st as $row) {
-    $rows[] = [
-      'id' => (int)$row['id'],
-      'amount_cents' => (int)$row['amount_cents'],
-      'status' => $row['status'] ?? 'completed',
-      'completed_at' => $row['completed_at'] ?? null,
-      'created_at' => $row['created_at'] ?? null,
-      'commission_cents' => isset($row['commission_cents']) ? (int)$row['commission_cents'] : null,
-      'commission_status' => $row['commission_status'] ?? null,
-      'dealer_id' => isset($row['dealer_id']) ? (int)$row['dealer_id'] : null,
-      'assignment_commission_rate' => isset($row['commission_rate']) ? (float)$row['commission_rate'] : null,
-    ];
-  }
-  return $rows;
+  return representative_recent_sales($representative_id, $limit, $dealer_id);
 }
-
-function representative_has_commission(int $representative_id, int $topup_id): bool {
-  $st = pdo()->prepare('SELECT 1 FROM dealer_representative_commissions WHERE representative_id=? AND dealer_topup_id=? LIMIT 1');
-  $st->execute([$representative_id, $topup_id]);
+function representative_has_commission(int $representative_id, int $package_purchase_id): bool {
+  $st = pdo()->prepare('SELECT 1 FROM dealer_representative_commissions WHERE representative_id=? AND package_purchase_id=? LIMIT 1');
+  $st->execute([$representative_id, $package_purchase_id]);
   return (bool)$st->fetchColumn();
 }
 
@@ -994,5 +1221,320 @@ function representative_commission_leaderboard(int $limit = 5): array {
     return $rows;
   } catch (Throwable $e) {
     return [];
+  }
+}
+
+
+function representative_commission_available_commissions(int $representative_id, ?int $dealer_id = null): array {
+  $representative_id = max(0, $representative_id);
+  if ($representative_id <= 0) {
+    return [];
+  }
+  $now = now();
+  $sql = "SELECT c.id, c.commission_cents, c.available_at, c.package_purchase_id"
+       . " FROM dealer_representative_commissions c"
+       . " LEFT JOIN representative_payout_request_commissions rpc ON rpc.commission_id = c.id"
+       . " LEFT JOIN representative_payout_requests pr ON pr.id = rpc.request_id AND pr.status IN ('pending','approved')"
+       . " WHERE c.representative_id=? AND c.status=? AND c.available_at IS NOT NULL AND c.available_at <= ? AND pr.id IS NULL";
+  $params = [$representative_id, REPRESENTATIVE_COMMISSION_STATUS_PENDING, $now];
+  if ($dealer_id) {
+    $sql .= ' AND c.dealer_id=?';
+    $params[] = $dealer_id;
+  }
+  $sql .= ' ORDER BY c.available_at ASC, c.id ASC';
+  $st = pdo()->prepare($sql);
+  foreach ($params as $idx => $value) {
+    $st->bindValue($idx + 1, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+  }
+  $st->execute();
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'id' => (int)$row['id'],
+      'commission_cents' => (int)($row['commission_cents'] ?? 0),
+      'available_at' => $row['available_at'] ?? null,
+      'package_purchase_id' => isset($row['package_purchase_id']) ? (int)$row['package_purchase_id'] : null,
+    ];
+  }
+  return $rows;
+}
+
+function representative_commission_available_summary(int $representative_id, ?int $dealer_id = null): array {
+  $eligible = representative_commission_available_commissions($representative_id, $dealer_id);
+  $total = 0;
+  foreach ($eligible as $row) {
+    $total += (int)($row['commission_cents'] ?? 0);
+  }
+  $count = count($eligible);
+  $nextRelease = null;
+  $now = now();
+  try {
+    $sql = "SELECT MIN(c.available_at) AS next_release"
+         . " FROM dealer_representative_commissions c"
+         . " LEFT JOIN representative_payout_request_commissions rpc ON rpc.commission_id = c.id"
+         . " LEFT JOIN representative_payout_requests pr ON pr.id = rpc.request_id AND pr.status IN ('pending','approved')"
+         . " WHERE c.representative_id=? AND c.status=? AND c.available_at IS NOT NULL AND c.available_at > ? AND pr.id IS NULL";
+    $params = [$representative_id, REPRESENTATIVE_COMMISSION_STATUS_PENDING, $now];
+    if ($dealer_id) {
+      $sql .= ' AND c.dealer_id=?';
+      $params[] = $dealer_id;
+    }
+    $st = pdo()->prepare($sql);
+    foreach ($params as $idx => $value) {
+      $st->bindValue($idx + 1, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+    }
+    $st->execute();
+    $nextRelease = $st->fetchColumn() ?: null;
+  } catch (Throwable $e) {
+    $nextRelease = null;
+  }
+  return [
+    'amount' => $total,
+    'count' => $count,
+    'next_release_at' => $nextRelease,
+  ];
+}
+
+function representative_commission_global_available_summary(): array {
+  $summary = [
+    'amount' => 0,
+    'count' => 0,
+    'next_release_at' => null,
+  ];
+  $now = now();
+  try {
+    $sql = "SELECT COUNT(*) AS c, COALESCE(SUM(c.commission_cents),0) AS total"
+         . " FROM dealer_representative_commissions c"
+         . " LEFT JOIN representative_payout_request_commissions rpc ON rpc.commission_id = c.id"
+         . " LEFT JOIN representative_payout_requests pr ON pr.id = rpc.request_id AND pr.status IN ('pending','approved')"
+         . " WHERE c.status=? AND c.available_at IS NOT NULL AND c.available_at <= ? AND pr.id IS NULL";
+    $st = pdo()->prepare($sql);
+    $st->execute([REPRESENTATIVE_COMMISSION_STATUS_PENDING, $now]);
+    if ($row = $st->fetch()) {
+      $summary['amount'] = (int)($row['total'] ?? 0);
+      $summary['count'] = (int)($row['c'] ?? 0);
+    }
+  } catch (Throwable $e) {
+    // ignore
+  }
+
+  try {
+    $sql = "SELECT MIN(c.available_at) AS next_release"
+         . " FROM dealer_representative_commissions c"
+         . " LEFT JOIN representative_payout_request_commissions rpc ON rpc.commission_id = c.id"
+         . " LEFT JOIN representative_payout_requests pr ON pr.id = rpc.request_id AND pr.status IN ('pending','approved')"
+         . " WHERE c.status=? AND c.available_at IS NOT NULL AND c.available_at > ? AND pr.id IS NULL";
+    $st = pdo()->prepare($sql);
+    $st->execute([REPRESENTATIVE_COMMISSION_STATUS_PENDING, $now]);
+    $summary['next_release_at'] = $st->fetchColumn() ?: null;
+  } catch (Throwable $e) {
+    // ignore
+  }
+
+  return $summary;
+}
+
+function representative_payout_requests(int $representative_id, ?int $limit = null): array {
+  $representative_id = max(0, $representative_id);
+  if ($representative_id <= 0) {
+    return [];
+  }
+  $sql = "SELECT r.*,
+                 COALESCE(SUM(c.commission_cents),0) AS commission_total,
+                 COUNT(c.id) AS commission_count"
+       . " FROM representative_payout_requests r"
+       . " LEFT JOIN representative_payout_request_commissions rpc ON rpc.request_id = r.id"
+       . " LEFT JOIN dealer_representative_commissions c ON c.id = rpc.commission_id"
+       . " WHERE r.representative_id=?"
+       . " GROUP BY r.id"
+       . " ORDER BY r.requested_at DESC";
+  if ($limit !== null) {
+    $limit = max(1, (int)$limit);
+    $sql .= ' LIMIT '.(int)$limit;
+  }
+  $st = pdo()->prepare($sql);
+  $st->bindValue(1, $representative_id, PDO::PARAM_INT);
+  $st->execute();
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'id' => (int)$row['id'],
+      'amount_cents' => (int)$row['amount_cents'],
+      'status' => $row['status'] ?? REPRESENTATIVE_PAYOUT_STATUS_PENDING,
+      'invoice_path' => $row['invoice_path'] ?? null,
+      'invoice_url' => representative_payout_invoice_url($row['invoice_path'] ?? null),
+      'note' => $row['note'] ?? null,
+      'requested_at' => $row['requested_at'] ?? null,
+      'reviewed_at' => $row['reviewed_at'] ?? null,
+      'reviewed_by' => isset($row['reviewed_by']) ? (int)$row['reviewed_by'] : null,
+      'response_note' => $row['response_note'] ?? null,
+      'commission_total_cents' => (int)($row['commission_total'] ?? 0),
+      'commission_count' => (int)($row['commission_count'] ?? 0),
+    ];
+  }
+  return $rows;
+}
+
+function representative_payout_request_commission_ids(int $request_id): array {
+  $st = pdo()->prepare('SELECT commission_id FROM representative_payout_request_commissions WHERE request_id=?');
+  $st->execute([(int)$request_id]);
+  return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+}
+
+function representative_payout_request_create(int $representative_id, string $invoice_path, ?string $note = null): array {
+  if (trim($invoice_path) === '') {
+    throw new InvalidArgumentException('Ödeme talebi için fatura yüklemeniz gerekir.');
+  }
+  $eligible = representative_commission_available_commissions($representative_id);
+  if (!$eligible) {
+    throw new RuntimeException('Çekilebilir komisyon bulunmuyor.');
+  }
+  $total = 0;
+  $ids = [];
+  foreach ($eligible as $item) {
+    $total += (int)($item['commission_cents'] ?? 0);
+    $ids[] = (int)$item['id'];
+  }
+  if ($total <= 0) {
+    throw new RuntimeException('Çekilebilir tutar bulunamadı.');
+  }
+  $pdo = pdo();
+  $pdo->beginTransaction();
+  try {
+    $stmt = $pdo->prepare('INSERT INTO representative_payout_requests (representative_id, amount_cents, status, invoice_path, note, requested_at) VALUES (?,?,?,?,?,?)');
+    $stmt->execute([$representative_id, $total, REPRESENTATIVE_PAYOUT_STATUS_PENDING, $invoice_path !== '' ? $invoice_path : null, $note !== '' ? $note : null, now()]);
+    $requestId = (int)$pdo->lastInsertId();
+    $link = $pdo->prepare('INSERT INTO representative_payout_request_commissions (request_id, commission_id) VALUES (?,?)');
+    foreach ($ids as $cid) {
+      $link->execute([$requestId, $cid]);
+    }
+    $pdo->commit();
+    return [
+      'id' => $requestId,
+      'amount_cents' => $total,
+      'status' => REPRESENTATIVE_PAYOUT_STATUS_PENDING,
+    ];
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    throw $e;
+  }
+}
+
+function representative_payout_request_admin_list(array $filters = []): array {
+  $statusFilter = $filters['status'] ?? null;
+  $limit = isset($filters['limit']) ? (int)$filters['limit'] : 50;
+  $limit = max(1, min($limit, 200));
+  $sql = "SELECT r.*, rep.name AS representative_name, rep.email AS representative_email, rep.phone AS representative_phone,
+                 COALESCE(SUM(c.commission_cents),0) AS commission_total,
+                 COUNT(c.id) AS commission_count"
+       . " FROM representative_payout_requests r"
+       . " INNER JOIN dealer_representatives rep ON rep.id = r.representative_id"
+       . " LEFT JOIN representative_payout_request_commissions rpc ON rpc.request_id = r.id"
+       . " LEFT JOIN dealer_representative_commissions c ON c.id = rpc.commission_id";
+  $params = [];
+  if ($statusFilter) {
+    $sql .= ' WHERE r.status=?';
+    $params[] = $statusFilter;
+  }
+  $sql .= ' GROUP BY r.id ORDER BY r.requested_at DESC LIMIT ?';
+  $params[] = $limit;
+  $st = pdo()->prepare($sql);
+  foreach ($params as $idx => $value) {
+    $st->bindValue($idx + 1, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+  }
+  $st->execute();
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'id' => (int)$row['id'],
+      'representative_id' => (int)$row['representative_id'],
+      'representative_name' => $row['representative_name'] ?? null,
+      'representative_email' => $row['representative_email'] ?? null,
+      'representative_phone' => $row['representative_phone'] ?? null,
+      'amount_cents' => (int)$row['amount_cents'],
+      'status' => $row['status'] ?? REPRESENTATIVE_PAYOUT_STATUS_PENDING,
+      'invoice_path' => $row['invoice_path'] ?? null,
+      'invoice_url' => representative_payout_invoice_url($row['invoice_path'] ?? null),
+      'note' => $row['note'] ?? null,
+      'requested_at' => $row['requested_at'] ?? null,
+      'reviewed_at' => $row['reviewed_at'] ?? null,
+      'reviewed_by' => isset($row['reviewed_by']) ? (int)$row['reviewed_by'] : null,
+      'response_note' => $row['response_note'] ?? null,
+      'commission_total_cents' => (int)($row['commission_total'] ?? 0),
+      'commission_count' => (int)($row['commission_count'] ?? 0),
+    ];
+  }
+  return $rows;
+}
+
+function representative_payout_pending_summary(): array {
+  $summary = ['count' => 0, 'amount_cents' => 0];
+  try {
+    $st = pdo()->prepare('SELECT COUNT(*) AS c, COALESCE(SUM(amount_cents),0) AS total FROM representative_payout_requests WHERE status IN (?, ?)');
+    $st->execute([REPRESENTATIVE_PAYOUT_STATUS_PENDING, REPRESENTATIVE_PAYOUT_STATUS_APPROVED]);
+    if ($row = $st->fetch()) {
+      $summary['count'] = (int)($row['c'] ?? 0);
+      $summary['amount_cents'] = (int)($row['total'] ?? 0);
+    }
+  } catch (Throwable $e) {
+    // ignore
+  }
+  return $summary;
+}
+
+function representative_payout_request_update(int $request_id, string $status, array $options = []): void {
+  $request_id = (int)$request_id;
+  if ($request_id <= 0) {
+    throw new InvalidArgumentException('Ödeme talebi bulunamadı.');
+  }
+  $status = strtolower(trim($status));
+  $allowed = [REPRESENTATIVE_PAYOUT_STATUS_PENDING, REPRESENTATIVE_PAYOUT_STATUS_APPROVED, REPRESENTATIVE_PAYOUT_STATUS_PAID, REPRESENTATIVE_PAYOUT_STATUS_REJECTED];
+  if (!in_array($status, $allowed, true)) {
+    throw new InvalidArgumentException('Geçersiz ödeme talebi durumu.');
+  }
+  $pdo = pdo();
+  $pdo->beginTransaction();
+  try {
+    $st = $pdo->prepare('SELECT * FROM representative_payout_requests WHERE id=? FOR UPDATE');
+    $st->execute([$request_id]);
+    $request = $st->fetch();
+    if (!$request) {
+      throw new RuntimeException('Ödeme talebi bulunamadı.');
+    }
+    $currentStatus = $request['status'] ?? REPRESENTATIVE_PAYOUT_STATUS_PENDING;
+    $reviewerId = isset($options['reviewed_by']) ? (int)$options['reviewed_by'] : null;
+    $responseNote = array_key_exists('response_note', $options) ? trim((string)$options['response_note']) : ($request['response_note'] ?? null);
+    $now = now();
+    if ($status === REPRESENTATIVE_PAYOUT_STATUS_PENDING) {
+      $reviewedAt = null;
+      $reviewedBy = null;
+    } else {
+      $reviewedAt = $now;
+      $reviewedBy = $reviewerId;
+    }
+    $pdo->prepare('UPDATE representative_payout_requests SET status=?, reviewed_at=?, reviewed_by=?, response_note=? WHERE id=?')
+        ->execute([$status, $reviewedAt, $reviewedBy, $responseNote !== '' ? $responseNote : null, $request_id]);
+
+    $commissionIds = representative_payout_request_commission_ids($request_id);
+    foreach ($commissionIds as $cid) {
+      if ($status === REPRESENTATIVE_PAYOUT_STATUS_APPROVED) {
+        representative_commission_update_status($cid, REPRESENTATIVE_COMMISSION_STATUS_APPROVED);
+      } elseif ($status === REPRESENTATIVE_PAYOUT_STATUS_PAID) {
+        representative_commission_update_status($cid, REPRESENTATIVE_COMMISSION_STATUS_PAID);
+      } elseif ($status === REPRESENTATIVE_PAYOUT_STATUS_REJECTED || $status === REPRESENTATIVE_PAYOUT_STATUS_PENDING) {
+        representative_commission_update_status($cid, REPRESENTATIVE_COMMISSION_STATUS_PENDING);
+      }
+    }
+    if ($status === REPRESENTATIVE_PAYOUT_STATUS_REJECTED) {
+      $pdo->prepare('DELETE FROM representative_payout_request_commissions WHERE request_id=?')->execute([$request_id]);
+    }
+    $pdo->commit();
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    throw $e;
   }
 }

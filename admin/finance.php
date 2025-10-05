@@ -70,6 +70,31 @@ if ($action === 'commission_update') {
   redirect($_SERVER['PHP_SELF'].'#approvals');
 }
 
+if ($action === 'payout_update') {
+  $requestId = (int)($_POST['request_id'] ?? 0);
+  $status = $_POST['status'] ?? REPRESENTATIVE_PAYOUT_STATUS_PENDING;
+  $noteProvided = array_key_exists('response_note', $_POST);
+  $note = $noteProvided ? trim($_POST['response_note']) : null;
+  if ($requestId <= 0) {
+    flash('err', 'Ödeme talebi bulunamadı.');
+    redirect($_SERVER['PHP_SELF'].'#payouts');
+  }
+  try {
+    $options = [];
+    if ($noteProvided) {
+      $options['response_note'] = $note;
+    }
+    if ($admin && isset($admin['id'])) {
+      $options['reviewed_by'] = (int)$admin['id'];
+    }
+    representative_payout_request_update($requestId, $status, $options);
+    flash('ok', 'Ödeme talebi güncellendi.');
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+  }
+  redirect($_SERVER['PHP_SELF'].'#payouts');
+}
+
 if ($action === 'cashback_pay') {
   $purchaseId = (int)($_POST['purchase_id'] ?? 0);
   $note = trim($_POST['note'] ?? '');
@@ -86,15 +111,19 @@ if ($action === 'cashback_pay') {
   redirect($_SERVER['PHP_SELF'].'#cashbacks');
 }
 
+$admin = admin_user();
+
 $overview = finance_overview();
 $totals = $overview['totals'] ?? ['revenue_total' => 0, 'revenue_last_30' => 0, 'payout_total' => 0, 'payout_last_30' => 0, 'net_last_30' => 0];
 $topups = $overview['topups'] ?? [];
 $orders = $overview['orders'] ?? [];
 $commissions = $overview['commissions'] ?? [];
 $cashbacks = $overview['cashbacks'] ?? [];
+$payoutSummary = $overview['payout_requests'] ?? ['count' => 0, 'amount_cents' => 0];
 
 $pendingTopups = finance_recent_topups(10, [DEALER_TOPUP_STATUS_PENDING, DEALER_TOPUP_STATUS_AWAITING_REVIEW]);
 $pendingCommissions = finance_recent_commissions(10, [REPRESENTATIVE_COMMISSION_STATUS_PENDING, REPRESENTATIVE_COMMISSION_STATUS_APPROVED]);
+$pendingPayoutRequests = finance_recent_payout_requests(8, REPRESENTATIVE_PAYOUT_STATUS_PENDING);
 $pendingCashbacks = finance_pending_cashbacks(8);
 $recentOrders = finance_recent_orders(8);
 $monthlySummary = finance_monthly_summary(6);
@@ -105,14 +134,17 @@ $avgTopup = (int)round($topups['average_amount'] ?? 0);
 $avgOrder = (int)round($orders['average_amount'] ?? 0);
 $avgCommission = (int)round($commissions['average_paid_amount'] ?? 0);
 $avgCashback = (int)round($cashbacks['average_paid_amount'] ?? 0);
+$availableCommissionAmount = (int)($commissions['available_amount'] ?? 0);
+$availableCommissionCount = (int)($commissions['available_count'] ?? 0);
+$nextReleaseAt = $commissions['next_release_at'] ?? null;
+$payoutRequestAmount = (int)($payoutSummary['amount_cents'] ?? 0);
+$payoutRequestCount = (int)($payoutSummary['count'] ?? 0);
 
 $projectsTotal = $orders['total_count'] ?? 0;
 $projectsLast30 = $orders['last_30_count'] ?? 0;
 
 $queueCommissionAmount = (int)($commissions['pending_amount'] ?? 0) + (int)($commissions['approved_amount'] ?? 0);
 $queueCommissionCount = (int)($commissions['pending_count'] ?? 0) + (int)($commissions['approved_count'] ?? 0);
-$pendingPayoutAmount = $pendingTopupAmount + $queueCommissionAmount;
-$pendingPayoutCount = $pendingTopupCount + $queueCommissionCount;
 
 $title = 'Finans Merkezi';
 $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yönetin.';
@@ -223,25 +255,25 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
     <div class="col-sm-6 col-xl-3">
       <div class="card h-100">
         <div class="card-body">
-          <div class="card-title mb-1">Bekleyen Ödemeler</div>
-          <div class="value mb-1"><?=format_currency($pendingPayoutAmount)?></div>
-          <div class="meta"><?=$pendingPayoutCount?> kayıt inceleme veya ödeme bekliyor.</div>
+          <div class="card-title mb-1">Çekilebilir Komisyon</div>
+          <div class="value mb-1"><?=format_currency($availableCommissionAmount)?></div>
+          <div class="meta"><?=$availableCommissionCount?> komisyon 30 günlük bekleme süresini tamamladı<?= $nextReleaseAt ? '. Sonraki tarih: '.h(date('d.m.Y', strtotime($nextReleaseAt))) : '' ?>.</div>
         </div>
       </div>
     </div>
     <div class="col-sm-6 col-xl-3">
       <div class="card h-100">
         <div class="card-body">
-          <div class="card-title mb-1">Son 30 Gün Net</div>
-          <div class="value mb-1 <?= ($totals['net_last_30'] ?? 0) >= 0 ? 'text-success' : 'text-danger' ?>"><?=format_currency($totals['net_last_30'] ?? 0)?></div>
-          <div class="meta">Gelirlerden ödemeler düşüldükten sonraki net kazanç.</div>
+          <div class="card-title mb-1">Bekleyen Ödeme Talepleri</div>
+          <div class="value mb-1"><?=format_currency($payoutRequestAmount)?></div>
+          <div class="meta"><?=$payoutRequestCount?> temsilci talebi onay bekliyor.</div>
         </div>
       </div>
     </div>
   </div>
 
   <div class="row g-4 mt-1">
-    <div class="col-lg-6">
+    <div class="col-xl-6 col-lg-6">
       <div id="approvals" class="card finance-card h-100">
         <div class="card-header d-flex justify-content-between align-items-start">
           <div>
@@ -303,7 +335,107 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
         </div>
       </div>
     </div>
-    <div class="col-lg-6">
+    <div class="col-xl-6 col-lg-6">
+      <div id="payouts" class="card finance-card h-100">
+        <div class="card-header d-flex justify-content-between align-items-start">
+          <div>
+            <h5 class="mb-0">Temsilci Ödeme Talepleri</h5>
+            <small class="text-muted"><?=$payoutRequestCount?> talep onay bekliyor.</small>
+          </div>
+          <span class="badge bg-light text-muted"><?=format_currency($payoutRequestAmount)?></span>
+        </div>
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table align-middle mb-0">
+              <thead class="table-light">
+                <tr><th scope="col">Temsilci</th><th scope="col">Tutar</th><th scope="col">Talep</th><th scope="col">Durum</th><th scope="col" class="text-end">İşlem</th></tr>
+              </thead>
+              <tbody>
+                <?php if (!$pendingPayoutRequests): ?>
+                  <tr><td colspan="5" class="text-center text-muted py-4">Onay bekleyen ödeme talebi bulunmuyor.</td></tr>
+                <?php else: ?>
+                  <?php foreach ($pendingPayoutRequests as $row): ?>
+                    <?php
+                      $status = $row['status'] ?? REPRESENTATIVE_PAYOUT_STATUS_PENDING;
+                      $badgeClass = 'status-badge pending';
+                      if ($status === REPRESENTATIVE_PAYOUT_STATUS_APPROVED) {
+                        $badgeClass = 'status-badge approved';
+                      } elseif ($status === REPRESENTATIVE_PAYOUT_STATUS_PAID) {
+                        $badgeClass = 'status-badge paid';
+                      } elseif ($status === REPRESENTATIVE_PAYOUT_STATUS_REJECTED) {
+                        $badgeClass = 'status-badge rejected';
+                      }
+                      $isPending = $status === REPRESENTATIVE_PAYOUT_STATUS_PENDING;
+                      $isApproved = $status === REPRESENTATIVE_PAYOUT_STATUS_APPROVED;
+                      $isPaid = $status === REPRESENTATIVE_PAYOUT_STATUS_PAID;
+                      $isRejected = $status === REPRESENTATIVE_PAYOUT_STATUS_REJECTED;
+                    ?>
+                    <tr>
+                      <td>
+                        <div class="fw-semibold mb-1"><?=h($row['representative_name'] ?? '—')?></div>
+                        <?php if (!empty($row['representative_email'])): ?><div class="small text-muted"><?=h($row['representative_email'])?></div><?php endif; ?>
+                      </td>
+                      <td>
+                        <div class="fw-semibold text-success mb-1"><?=format_currency($row['amount_cents'] ?? 0)?></div>
+                        <div class="small text-muted"><?= (int)($row['commission_count'] ?? 0) ?> komisyon</div>
+                      </td>
+                      <td>
+                        <div><?= $row['requested_at'] ? h(date('d.m.Y H:i', strtotime($row['requested_at']))) : '—' ?></div>
+                        <?php if (!empty($row['invoice_url'])): ?><div class="small"><a class="text-decoration-none" target="_blank" href="<?=h($row['invoice_url'])?>">Faturayı görüntüle</a></div><?php elseif (!empty($row['invoice_path'])): ?><div class="small"><a class="text-decoration-none" target="_blank" href="<?=h(representative_payout_invoice_url($row['invoice_path']))?>">Faturayı görüntüle</a></div><?php endif; ?>
+                        <?php if (!empty($row['note'])): ?><div class="small text-muted"><?=h($row['note'])?></div><?php endif; ?>
+                      </td>
+                      <td>
+                        <span class="<?=$badgeClass?>"><?=h(representative_payout_status_label($status))?></span>
+                        <?php if (!empty($row['response_note'])): ?><div class="small text-muted mt-1">Not: <?=h($row['response_note'])?></div><?php endif; ?>
+                      </td>
+                      <td class="text-end">
+                        <div class="action-stack">
+                          <form method="post" class="action-form">
+                            <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                            <input type="hidden" name="do" value="payout_update">
+                            <input type="hidden" name="request_id" value="<?= (int)$row['id'] ?>">
+                            <div class="btn-group btn-group-sm" role="group">
+                              <?php if ($isPending): ?>
+                                <button class="btn btn-outline-success" name="status" value="<?=REPRESENTATIVE_PAYOUT_STATUS_APPROVED?>" type="submit">Onayla</button>
+                                <button class="btn btn-outline-danger" name="status" value="<?=REPRESENTATIVE_PAYOUT_STATUS_REJECTED?>" type="submit">Reddet</button>
+                              <?php elseif ($isApproved): ?>
+                                <button class="btn btn-outline-primary" name="status" value="<?=REPRESENTATIVE_PAYOUT_STATUS_PAID?>" type="submit">Ödendi</button>
+                                <button class="btn btn-outline-secondary" name="status" value="<?=REPRESENTATIVE_PAYOUT_STATUS_PENDING?>" type="submit">Beklet</button>
+                              <?php elseif ($isPaid): ?>
+                                <button class="btn btn-outline-primary" name="status" value="<?=REPRESENTATIVE_PAYOUT_STATUS_APPROVED?>" type="submit">Onaya Al</button>
+                              <?php elseif ($isRejected): ?>
+                                <button class="btn btn-outline-secondary" name="status" value="<?=REPRESENTATIVE_PAYOUT_STATUS_PENDING?>" type="submit">Yeniden Aç</button>
+                              <?php endif; ?>
+                            </div>
+                          </form>
+                          <form method="post" class="action-form">
+                            <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                            <input type="hidden" name="do" value="payout_update">
+                            <input type="hidden" name="request_id" value="<?= (int)$row['id'] ?>">
+                            <select name="status" class="form-select form-select-sm">
+                              <option value="<?=REPRESENTATIVE_PAYOUT_STATUS_PENDING?>" <?= $isPending ? 'selected' : '' ?>>Beklemede</option>
+                              <option value="<?=REPRESENTATIVE_PAYOUT_STATUS_APPROVED?>" <?= $isApproved ? 'selected' : '' ?>>Ödeme Onayı</option>
+                              <option value="<?=REPRESENTATIVE_PAYOUT_STATUS_PAID?>" <?= $isPaid ? 'selected' : '' ?>>Ödendi</option>
+                              <option value="<?=REPRESENTATIVE_PAYOUT_STATUS_REJECTED?>" <?= $isRejected ? 'selected' : '' ?>>Reddedildi</option>
+                            </select>
+                            <input type="text" name="response_note" class="form-control form-control-sm" placeholder="Yanıt notu" value="<?=h($row['response_note'] ?? '')?>">
+                            <button class="btn btn-sm btn-primary" type="submit">Kaydet</button>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  <?php endforeach; ?>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mt-1">
+    <div class="col-12">
       <div class="card finance-card h-100">
         <div class="card-header d-flex justify-content-between align-items-start">
           <div>
@@ -316,13 +448,13 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
           <div class="table-responsive">
             <table class="table align-middle mb-0">
               <thead class="table-light">
-                <tr><th scope="col">Temsilci</th><th scope="col">Bayi</th><th scope="col">Komisyon</th><th scope="col">Durum</th><th scope="col" class="text-end">İşlem</th></tr>
+                <tr><th scope="col">Temsilci</th><th scope="col">Bayi</th><th scope="col">Satış</th><th scope="col">Komisyon</th><th scope="col">Durum</th><th scope="col" class="text-end">İşlem</th></tr>
               </thead>
               <tbody>
                 <?php if (!$pendingCommissions): ?>
-                  <tr><td colspan="5" class="text-center text-muted py-4">İşlem gerektiren komisyon bulunmuyor.</td></tr>
+                  <tr><td colspan="6" class="text-center text-muted py-4">İşlem gerektiren komisyon bulunmuyor.</td></tr>
                 <?php else: ?>
-                  <?php foreach ($pendingCommissions as $row): ?>
+                    <?php foreach ($pendingCommissions as $row): ?>
                     <?php
                       $status = $row['status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
                       $chipClass = 'status-badge pending';
@@ -337,6 +469,8 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
                       $isApproved = $status === REPRESENTATIVE_COMMISSION_STATUS_APPROVED;
                       $isPaid = $status === REPRESENTATIVE_COMMISSION_STATUS_PAID;
                       $isRejected = $status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED;
+                      $saleAmount = $row['order_price_cents'] ?? $row['purchase_price_cents'] ?? $row['amount_cents'] ?? 0;
+                      $saleDate = $row['order_paid_at'] ?? $row['purchase_created_at'] ?? $row['created_at'] ?? null;
                     ?>
                     <tr>
                       <td>
@@ -348,8 +482,15 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
                         <?php if (!empty($row['dealer_code'])): ?><div class="small text-muted">Kod: <?=h($row['dealer_code'])?></div><?php endif; ?>
                       </td>
                       <td>
+                        <div class="fw-semibold mb-1"><?=h($row['package_name'] ?? ($row['source_label'] ?? '—'))?></div>
+                        <?php if (!empty($row['source_label'])): ?><div class="small text-muted"><?=h($row['source_label'])?></div><?php endif; ?>
+                        <div class="small text-muted">Tutar: <?=format_currency($saleAmount)?></div>
+                        <div class="small text-muted">Satın alma: <?= $saleDate ? h(date('d.m.Y H:i', strtotime($saleDate))) : '—' ?></div>
+                        <?php if (!empty($row['customer_name'])): ?><div class="small text-muted">Müşteri: <?=h($row['customer_name'])?></div><?php endif; ?>
+                      </td>
+                      <td>
                         <div class="fw-semibold text-success mb-1"><?=format_currency($row['commission_cents'] ?? 0)?></div>
-                        <div class="small text-muted">Yükleme: <?=format_currency($row['topup_amount_cents'] ?? 0)?></div>
+                        <?php if (!empty($row['notes'])): ?><div class="small text-muted">Not: <?=h($row['notes'])?></div><?php endif; ?>
                       </td>
                       <td>
                         <span class="<?=$chipClass?>"><?=h(representative_commission_status_label($status))?></span>

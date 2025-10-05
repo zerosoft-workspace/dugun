@@ -29,11 +29,31 @@ if ($selectedDealerId && !isset($dealerLookup[$selectedDealerId])) {
   $selectedDealerId = 0;
 }
 
+$action = $_POST['do'] ?? '';
+if ($action === 'request_payout') {
+  csrf_or_die();
+  try {
+    $invoicePath = representative_process_invoice_upload($_FILES['invoice'] ?? null, true);
+    $note = trim($_POST['note'] ?? '');
+    representative_payout_request_create($representativeId, $invoicePath, $note !== '' ? $note : null);
+    flash('ok', 'Ödeme talebiniz alındı. Talepler finans ekibi tarafından incelenecektir.');
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+  }
+  redirect('commissions.php');
+}
+
 $totalsAll = representative_commission_totals($representativeId);
 $totalsDealer = $selectedDealerId ? representative_commission_totals($representativeId, $selectedDealerId) : $totalsAll;
 
-$recentTopups = representative_completed_topups($representativeId, 8, $selectedDealerId ?: null);
+$recentSales = representative_recent_sales($representativeId, 8, $selectedDealerId ?: null);
 $recentCommissions = representative_recent_commissions($representativeId, 10, $selectedDealerId ?: null);
+
+$availableAmount = (int)($totalsAll['available_amount'] ?? 0);
+$availableCount = (int)($totalsAll['available_count'] ?? 0);
+$nextReleaseAt = $totalsAll['next_release_at'] ?? null;
+$payoutRequests = representative_payout_requests($representativeId, 6);
+$taxDocumentUrl = rtrim(BASE_URL, '/').'/public/docs/vergi-levhasi.pdf';
 
 $pageStyles = <<<'CSS'
 <style>
@@ -83,6 +103,11 @@ representative_layout_start([
     <small><?=h((int)($totalsAll['total_count'] ?? 0))?> işlem kaydedildi.</small>
   </div>
   <div class="summary-card">
+    <span>Çekilebilir</span>
+    <strong><?=h(format_currency($availableAmount))?></strong>
+    <small><?=h($availableCount)?> komisyon çekime hazır<?= $nextReleaseAt ? '. Sonraki tarih: '.h(date('d.m.Y', strtotime($nextReleaseAt))) : '' ?>.</small>
+  </div>
+  <div class="summary-card">
     <span>Bekleyen</span>
     <strong><?=h(format_currency($totalsDealer['pending_amount'] ?? 0))?></strong>
     <small><?= $selectedDealerId ? 'Seçili bayi için bekleyen komisyon.' : 'Tüm bayiler için bekleyen komisyon toplamı.' ?></small>
@@ -90,7 +115,7 @@ representative_layout_start([
   <div class="summary-card">
     <span>Onaylanan</span>
     <strong><?=h(format_currency($totalsDealer['approved_amount'] ?? 0))?></strong>
-    <small><?= $selectedDealerId ? 'Seçili bayi için onaylı ödemeler.' : 'Tüm bayiler için onaylanmış komisyonlar.' ?></small>
+    <small><?= $selectedDealerId ? 'Seçili bayi için onaylanan ödemeler.' : 'Ödeme planına alınan komisyonlar.' ?></small>
   </div>
   <div class="summary-card">
     <span>Ödenen</span>
@@ -140,19 +165,55 @@ representative_layout_start([
 
 <section class="card-lite mb-4">
   <div class="section-heading">
-    <h5>Son Yüklemeler</h5>
-    <small><?= $selectedDealerId ? 'Seçili bayi için' : 'Tüm bayiler için' ?> en son işlemler</small>
+    <h5>Ödeme Talebi</h5>
+    <small>30 günlük bekleme süresini tamamlayan komisyonlar için fatura yükleyerek ödeme talep edin.</small>
+  </div>
+  <div class="row g-4 align-items-start">
+    <div class="col-lg-6">
+      <p class="mb-3">Komisyonlar paket satışı tamamlandıktan sonra 30 gün içinde itiraz süreci için bekletilir. Süre tamamlandığında ve müşteriniz hizmeti kullandıysa tutarı çekebilirsiniz.</p>
+      <ul class="list-unstyled mb-3">
+        <li class="mb-2"><strong><?=h(format_currency($availableAmount))?></strong> çekilebilir tutar.</li>
+        <li class="mb-2"><strong><?=h($availableCount)?></strong> komisyon talebe dahil edilebilir.</li>
+        <li class="mb-2"><?= $nextReleaseAt ? 'Sonraki komisyon serbest kalma tarihi: <strong>'.h(date('d.m.Y', strtotime($nextReleaseAt))).'</strong>' : 'Tüm uygun komisyonlar talep edilebilir durumda.' ?></li>
+      </ul>
+      <p class="small text-muted">Ödeme talebi sırasında kesilen faturayı yüklemeniz ve şirketimizin vergi levhasına göre düzenlemeniz gerekir.</p>
+      <a class="btn btn-outline-secondary btn-sm" target="_blank" href="<?=h($taxDocumentUrl)?>">Vergi levhasını indir</a>
+    </div>
+    <div class="col-lg-6">
+      <form method="post" enctype="multipart/form-data" class="row g-3">
+        <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+        <input type="hidden" name="do" value="request_payout">
+        <div class="col-12">
+          <label class="form-label">Fatura<span class="text-danger">*</span></label>
+          <input type="file" name="invoice" accept=".pdf,.jpg,.jpeg,.png" class="form-control" required <?= $availableCount ? '' : 'disabled' ?>>
+          <div class="form-text">PDF veya görsel yükleyebilirsiniz.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Not (opsiyonel)</label>
+          <textarea name="note" class="form-control" rows="3" placeholder="Örn. ödeme için banka bilgileri" <?= $availableCount ? '' : 'disabled' ?>></textarea>
+        </div>
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary w-100" <?= $availableCount ? '' : 'disabled' ?>><?= $availableCount ? 'Ödeme talebi oluştur' : 'Çekilebilir komisyon yok' ?></button>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+<section class="card-lite mb-4">
+  <div class="section-heading">
+    <h5>Son Satışlar</h5>
+    <small><?= $selectedDealerId ? 'Seçili bayi için' : 'Tüm bayiler için' ?> tamamlanan en son paket veya web satışları</small>
   </div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>#</th><th>Bayi</th><th>Yükleme</th><th>Komisyon</th><th>Durum</th><th>Tarih</th></tr></thead>
+      <thead><tr><th>Satış</th><th>Bayi</th><th>Tutar</th><th>Komisyon</th><th>Durum</th><th>Tarih</th></tr></thead>
       <tbody>
-        <?php if (!$recentTopups): ?>
-          <tr><td colspan="6" class="text-center text-muted">Listelenecek yükleme bulunmuyor.</td></tr>
+        <?php if (!$recentSales): ?>
+          <tr><td colspan="6" class="text-center text-muted">Listelenecek satış bulunmuyor.</td></tr>
         <?php else: ?>
-          <?php foreach ($recentTopups as $topup): ?>
+          <?php foreach ($recentSales as $sale): ?>
             <?php
-              $status = $topup['commission_status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
+              $status = $sale['commission_status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
               $label = representative_commission_status_label($status);
               $pillClass = 'status-pill default';
               if ($status === REPRESENTATIVE_COMMISSION_STATUS_PENDING) {
@@ -164,15 +225,71 @@ representative_layout_start([
               } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED) {
                 $pillClass = 'status-pill negative';
               }
-              $dealerName = isset($topup['dealer_id']) && isset($dealerLookup[$topup['dealer_id']]) ? $dealerLookup[$topup['dealer_id']]['name'] : '—';
+              $dealerName = isset($sale['dealer_id']) && isset($dealerLookup[$sale['dealer_id']]) ? $dealerLookup[$sale['dealer_id']]['name'] : '—';
+              $reference = $sale['site_order_id'] ? 'Sipariş #'.$sale['site_order_id'] : ($sale['package_purchase_id'] ? 'Paket #'.$sale['package_purchase_id'] : '#'.$sale['commission_id']);
+              $title = $sale['package_name'] ?? ($sale['source_label'] ?? $reference);
+              $saleAmount = $sale['amount_cents'] ?? 0;
+              $saleDate = $sale['sale_at'] ?? $sale['created_at'] ?? null;
             ?>
             <tr>
-              <td>#<?=h($topup['id'])?></td>
+              <td>
+                <div class="fw-semibold mb-1"><?=h($title)?></div>
+                <div class="small text-muted"><?=h($reference)?></div>
+                <?php if (!empty($sale['customer_name'])): ?><div class="small text-muted">Müşteri: <?=h($sale['customer_name'])?></div><?php endif; ?>
+              </td>
               <td><?=h($dealerName)?></td>
-              <td><?=h(format_currency($topup['amount_cents']))?></td>
-              <td><?= $topup['commission_cents'] !== null ? h(format_currency($topup['commission_cents'])) : '—' ?></td>
+              <td><?=h(format_currency($saleAmount))?></td>
+              <td><?=h(format_currency($sale['commission_cents'] ?? 0))?></td>
               <td><span class="<?=$pillClass?>"><?=h($label)?></span></td>
-              <td><?= $topup['completed_at'] ? h(date('d.m.Y H:i', strtotime($topup['completed_at']))) : h(date('d.m.Y H:i', strtotime($topup['created_at'] ?? 'now'))) ?></td>
+              <td><?= $saleDate ? h(date('d.m.Y H:i', strtotime($saleDate))) : '—' ?></td>
+            </tr>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card-lite mb-4">
+  <div class="section-heading">
+    <h5>Ödeme Taleplerim</h5>
+    <small>Son talep edilen ödemeler ve inceleme durumları</small>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Tarih</th><th>Tutar</th><th>Komisyon</th><th>Durum</th><th>Fatura</th><th>Yanıt</th></tr></thead>
+      <tbody>
+        <?php if (!$payoutRequests): ?>
+          <tr><td colspan="6" class="text-center text-muted">Henüz ödeme talebiniz bulunmuyor.</td></tr>
+        <?php else: ?>
+          <?php foreach ($payoutRequests as $request): ?>
+            <?php
+              $status = $request['status'] ?? REPRESENTATIVE_PAYOUT_STATUS_PENDING;
+              $label = representative_payout_status_label($status);
+              $badgeClass = 'status-pill pending';
+              if ($status === REPRESENTATIVE_PAYOUT_STATUS_APPROVED) {
+                $badgeClass = 'status-pill approved';
+              } elseif ($status === REPRESENTATIVE_PAYOUT_STATUS_PAID) {
+                $badgeClass = 'status-pill paid';
+              } elseif ($status === REPRESENTATIVE_PAYOUT_STATUS_REJECTED) {
+                $badgeClass = 'status-pill negative';
+              }
+              $invoiceUrl = $request['invoice_url'] ?? representative_payout_invoice_url($request['invoice_path'] ?? null);
+            ?>
+            <tr>
+              <td><?= $request['requested_at'] ? h(date('d.m.Y H:i', strtotime($request['requested_at']))) : '—' ?></td>
+              <td><?=h(format_currency($request['amount_cents'] ?? 0))?></td>
+              <td><?=h((int)($request['commission_count'] ?? 0))?></td>
+              <td><span class="<?=$badgeClass?>"><?=h($label)?></span></td>
+              <td><?php if ($invoiceUrl): ?><a class="text-decoration-none" target="_blank" href="<?=h($invoiceUrl)?>">Faturayı görüntüle</a><?php else: ?>—<?php endif; ?></td>
+              <td>
+                <?php if (!empty($request['response_note'])): ?>
+                  <div class="small text-muted"><?=h($request['response_note'])?></div>
+                <?php endif; ?>
+                <?php if (!empty($request['reviewed_at'])): ?>
+                  <div class="small text-muted">Güncelleme: <?=h(date('d.m.Y H:i', strtotime($request['reviewed_at'])))?></div>
+                <?php endif; ?>
+              </td>
             </tr>
           <?php endforeach; ?>
         <?php endif; ?>
@@ -188,7 +305,7 @@ representative_layout_start([
   </div>
   <div class="table-responsive">
     <table class="table table-sm align-middle mb-0">
-      <thead><tr><th>#</th><th>Bayi</th><th>Komisyon</th><th>Durum</th><th>Oluşturulma</th><th>Ödeme</th></tr></thead>
+      <thead><tr><th>Satış</th><th>Bayi</th><th>Komisyon</th><th>Durum</th><th>Oluşturulma</th><th>Ödeme</th></tr></thead>
       <tbody>
         <?php if (!$recentCommissions): ?>
           <tr><td colspan="6" class="text-center text-muted">Komisyon kaydı bulunmuyor.</td></tr>
@@ -208,9 +325,14 @@ representative_layout_start([
                 $pillClass = 'status-pill negative';
               }
               $dealerName = isset($row['dealer_id']) && isset($dealerLookup[$row['dealer_id']]) ? $dealerLookup[$row['dealer_id']]['name'] : '—';
+              $reference = $row['site_order_id'] ? 'Sipariş #'.$row['site_order_id'] : ($row['package_purchase_id'] ? 'Paket #'.$row['package_purchase_id'] : '#'.$row['id']);
+              $title = $row['package_name'] ?? ($row['source_label'] ?? $reference);
             ?>
             <tr>
-              <td>#<?=h($row['dealer_topup_id'])?></td>
+              <td>
+                <div class="fw-semibold mb-1"><?=h($title)?></div>
+                <div class="small text-muted"><?=h($reference)?></div>
+              </td>
               <td><?=h($dealerName)?></td>
               <td><?=h(format_currency($row['commission_cents']))?></td>
               <td><span class="<?=$pillClass?>"><?=h($label)?></span></td>

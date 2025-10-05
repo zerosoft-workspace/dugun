@@ -873,6 +873,10 @@ function site_finalize_order(int $order_id, array $options = []): array {
           $now,
           $now,
         ]);
+        $purchaseId = (int)$pdo->lastInsertId();
+        if ($purchaseId > 0) {
+          representative_create_commission_for_package_purchase($purchaseId);
+        }
       }
     }
   }
