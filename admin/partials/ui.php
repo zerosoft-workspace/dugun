@@ -265,6 +265,32 @@ if (!function_exists('admin_base_styles')) {
         box-shadow:0 32px 60px -42px rgba(14,165,181,.8);
       }
 
+      .admin-hero-card-with-icon {
+        display:flex;
+        align-items:center;
+        gap:22px;
+      }
+
+      .admin-hero-icon {
+        width:68px;
+        height:68px;
+        border-radius:20px;
+        background:rgba(255,255,255,.28);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        color:#0e7490;
+        box-shadow:0 28px 48px -32px rgba(14,165,181,.55);
+      }
+
+      .admin-hero-icon i {
+        font-size:2rem;
+      }
+
+      .admin-hero-card-with-icon .admin-hero-text {
+        flex:1;
+      }
+
       .admin-hero h1 {
         font-weight:700;
         margin-bottom:12px;
@@ -453,7 +479,7 @@ if (!function_exists('admin_base_styles')) {
 CSS;
   }
 
-  function admin_layout_start(string $active = '', string $title = '', string $subtitle = ''): void {
+  function admin_layout_start(string $active = '', string $title = '', string $subtitle = '', ?string $heroIcon = null): void {
     $me = admin_user();
     $links = [
       'dashboard' => ['href' => BASE_URL.'/admin/dashboard.php', 'label' => 'Genel Bakış', 'icon' => 'bi-speedometer2'],
@@ -463,7 +489,7 @@ CSS;
       'dealers'   => ['href' => BASE_URL.'/admin/dealers.php', 'label' => 'Bayiler', 'icon' => 'bi-shop'],
       'representatives' => ['href' => BASE_URL.'/admin/representatives.php', 'label' => 'Temsilciler', 'icon' => 'bi-person-badge'],
       'crm' => ['href' => BASE_URL.'/admin/representative_crm.php', 'label' => 'Temsilci CRM', 'icon' => 'bi-kanban'],
-      'finance' => ['href' => BASE_URL.'/admin/finance.php', 'label' => 'Finans', 'icon' => 'bi-currency-lira'],
+      'finance' => ['href' => BASE_URL.'/admin/finance.php', 'label' => 'Finans', 'icon' => 'bi-wallet2'],
       'analytics' => ['href' => BASE_URL.'/admin/representative_analytics.php', 'label' => 'Analizler', 'icon' => 'bi-graph-up'],
     ];
     if (is_superadmin()) {
@@ -514,10 +540,18 @@ CSS;
 
     if ($title !== '') {
       echo '<section class="admin-hero">';
-      echo '<div class="admin-hero-card">';
+      $heroClass = 'admin-hero-card'.($heroIcon ? ' admin-hero-card-with-icon' : '');
+      echo '<div class="'.$heroClass.'">';
+      if ($heroIcon) {
+        echo '<div class="admin-hero-icon"><i class="bi '.h($heroIcon).'"></i></div>';
+        echo '<div class="admin-hero-text">';
+      }
       echo '<h1>'.h($title).'</h1>';
       if ($subtitle !== '') {
         echo '<p>'.h($subtitle).'</p>';
+      }
+      if ($heroIcon) {
+        echo '</div>';
       }
       echo '</div>';
       echo '</section>';

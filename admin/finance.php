@@ -141,13 +141,23 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
   .status-chip.approved { background:rgba(45,212,191,.2); color:#0f766e; }
   .status-chip.paid { background:rgba(34,197,94,.2); color:#166534; }
   .status-chip.rejected { background:rgba(248,113,113,.25); color:#b91c1c; }
+  .commission-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  .commission-actions form { display:inline-flex; }
+  .commission-actions .btn { display:inline-flex; align-items:center; gap:6px; }
+  .commission-actions .btn i { font-size:1rem; }
+  @media (min-width: 992px) {
+    .commission-actions { justify-content:flex-start; }
+  }
+  @media (max-width: 991px) {
+    .commission-actions { justify-content:flex-end; }
+  }
   @media (max-width: 991px) {
     .finance-grid { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
   }
 </style>
 </head>
 <body class="admin-body">
-<?php admin_layout_start('finance', $title, $subtitle); ?>
+<?php admin_layout_start('finance', $title, $subtitle, 'bi-wallet2'); ?>
 <?=flash_messages()?>
 
 <section class="mb-4">
@@ -304,6 +314,10 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
                     } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED) {
                       $chipClass = 'status-chip rejected';
                     }
+                    $isPending = $status === REPRESENTATIVE_COMMISSION_STATUS_PENDING;
+                    $isApproved = $status === REPRESENTATIVE_COMMISSION_STATUS_APPROVED;
+                    $isPaid = $status === REPRESENTATIVE_COMMISSION_STATUS_PAID;
+                    $isRejected = $status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED;
                   ?>
                   <tr>
                     <td>
@@ -322,19 +336,76 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
                       <span class="<?=$chipClass?>"><?=h(representative_commission_status_label($status))?></span>
                       <div class="small text-muted">Oluşturma: <?= $row['created_at'] ? h(date('d.m.Y H:i', strtotime($row['created_at']))) : '—' ?></div>
                     </td>
-                    <td>
-                      <form method="post" class="d-flex flex-column flex-lg-row gap-2">
+                    <td class="text-end text-lg-start">
+                      <?php if ($isPending || $isApproved || $isPaid || $isRejected): ?>
+                        <div class="commission-actions mb-2">
+                          <?php if ($isPending): ?>
+                            <form method="post">
+                              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                              <input type="hidden" name="do" value="commission_update">
+                              <input type="hidden" name="commission_id" value="<?= (int)$row['id'] ?>">
+                              <input type="hidden" name="status" value="<?=REPRESENTATIVE_COMMISSION_STATUS_APPROVED?>">
+                              <input type="hidden" name="note" value="Finans panelinden onaylandı.">
+                              <button class="btn btn-sm btn-success" type="submit"><i class="bi bi-check-circle"></i><span>Onayla</span></button>
+                            </form>
+                            <form method="post">
+                              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                              <input type="hidden" name="do" value="commission_update">
+                              <input type="hidden" name="commission_id" value="<?= (int)$row['id'] ?>">
+                              <input type="hidden" name="status" value="<?=REPRESENTATIVE_COMMISSION_STATUS_REJECTED?>">
+                              <input type="hidden" name="note" value="Finans panelinden reddedildi.">
+                              <button class="btn btn-sm btn-outline-danger" type="submit"><i class="bi bi-x-circle"></i><span>Reddet</span></button>
+                            </form>
+                          <?php elseif ($isApproved): ?>
+                            <form method="post">
+                              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                              <input type="hidden" name="do" value="commission_update">
+                              <input type="hidden" name="commission_id" value="<?= (int)$row['id'] ?>">
+                              <input type="hidden" name="status" value="<?=REPRESENTATIVE_COMMISSION_STATUS_PAID?>">
+                              <input type="hidden" name="note" value="Ödeme transferi tamamlandı.">
+                              <button class="btn btn-sm btn-primary" type="submit"><i class="bi bi-cash-coin"></i><span>Ödendi</span></button>
+                            </form>
+                            <form method="post">
+                              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                              <input type="hidden" name="do" value="commission_update">
+                              <input type="hidden" name="commission_id" value="<?= (int)$row['id'] ?>">
+                              <input type="hidden" name="status" value="<?=REPRESENTATIVE_COMMISSION_STATUS_PENDING?>">
+                              <input type="hidden" name="note" value="Tekrar incelemeye alındı.">
+                              <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-arrow-counterclockwise"></i><span>İncelemeye Al</span></button>
+                            </form>
+                          <?php elseif ($isPaid): ?>
+                            <form method="post">
+                              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                              <input type="hidden" name="do" value="commission_update">
+                              <input type="hidden" name="commission_id" value="<?= (int)$row['id'] ?>">
+                              <input type="hidden" name="status" value="<?=REPRESENTATIVE_COMMISSION_STATUS_APPROVED?>">
+                              <input type="hidden" name="note" value="Ödeme sonrası tekrar onaya alındı.">
+                              <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-arrow-repeat"></i><span>Onaya Al</span></button>
+                            </form>
+                          <?php elseif ($isRejected): ?>
+                            <form method="post">
+                              <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                              <input type="hidden" name="do" value="commission_update">
+                              <input type="hidden" name="commission_id" value="<?= (int)$row['id'] ?>">
+                              <input type="hidden" name="status" value="<?=REPRESENTATIVE_COMMISSION_STATUS_PENDING?>">
+                              <input type="hidden" name="note" value="Reddedilen komisyon tekrar incelenecek.">
+                              <button class="btn btn-sm btn-outline-secondary" type="submit"><i class="bi bi-arrow-clockwise"></i><span>Tekrar İncele</span></button>
+                            </form>
+                          <?php endif; ?>
+                        </div>
+                      <?php endif; ?>
+                      <form method="post" class="commission-edit-form d-flex flex-column flex-lg-row gap-2">
                         <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
                         <input type="hidden" name="do" value="commission_update">
                         <input type="hidden" name="commission_id" value="<?= (int)$row['id'] ?>">
                         <select name="status" class="form-select form-select-sm">
-                          <option value="<?=REPRESENTATIVE_COMMISSION_STATUS_PENDING?>" <?= $status === REPRESENTATIVE_COMMISSION_STATUS_PENDING ? 'selected' : '' ?>>Onay Bekliyor</option>
-                          <option value="<?=REPRESENTATIVE_COMMISSION_STATUS_APPROVED?>" <?= $status === REPRESENTATIVE_COMMISSION_STATUS_APPROVED ? 'selected' : '' ?>>Ödeme Hazır</option>
-                          <option value="<?=REPRESENTATIVE_COMMISSION_STATUS_PAID?>" <?= $status === REPRESENTATIVE_COMMISSION_STATUS_PAID ? 'selected' : '' ?>>Ödendi</option>
-                          <option value="<?=REPRESENTATIVE_COMMISSION_STATUS_REJECTED?>" <?= $status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED ? 'selected' : '' ?>>Reddedildi</option>
+                          <option value="<?=REPRESENTATIVE_COMMISSION_STATUS_PENDING?>" <?= $isPending ? 'selected' : '' ?>>Onay Bekliyor</option>
+                          <option value="<?=REPRESENTATIVE_COMMISSION_STATUS_APPROVED?>" <?= $isApproved ? 'selected' : '' ?>>Ödeme Hazır</option>
+                          <option value="<?=REPRESENTATIVE_COMMISSION_STATUS_PAID?>" <?= $isPaid ? 'selected' : '' ?>>Ödendi</option>
+                          <option value="<?=REPRESENTATIVE_COMMISSION_STATUS_REJECTED?>" <?= $isRejected ? 'selected' : '' ?>>Reddedildi</option>
                         </select>
                         <input type="text" name="note" class="form-control form-control-sm" placeholder="Not (opsiyonel)" value="<?=h($row['notes'] ?? '')?>">
-                        <button class="btn btn-sm btn-outline-primary" type="submit">Kaydet</button>
+                        <button class="btn btn-sm btn-outline-primary" type="submit"><i class="bi bi-save"></i><span>Kaydet</span></button>
                       </form>
                     </td>
                   </tr>
