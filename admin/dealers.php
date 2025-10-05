@@ -817,23 +817,23 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
             </div>
             <div class="col-md-6">
               <label class="form-label">Fatura Ünvanı</label>
-              <input class="form-control" name="billing_title" value="<?=h($selectedDealer['billing_title'])?>" required>
+              <input class="form-control" name="billing_title" value="<?=h($selectedDealer['billing_title'] ?? '')?>" required>
             </div>
             <div class="col-md-6">
               <label class="form-label">Fatura E-postası</label>
-              <input type="email" class="form-control" name="invoice_email" value="<?=h($selectedDealer['invoice_email'])?>" placeholder="finans@firma.com">
+              <input type="email" class="form-control" name="invoice_email" value="<?=h($selectedDealer['invoice_email'] ?? '')?>" placeholder="finans@firma.com">
             </div>
             <div class="col-md-6">
               <label class="form-label">Vergi Dairesi</label>
-              <input class="form-control" name="tax_office" value="<?=h($selectedDealer['tax_office'])?>" required>
+              <input class="form-control" name="tax_office" value="<?=h($selectedDealer['tax_office'] ?? '')?>" required>
             </div>
             <div class="col-md-6">
               <label class="form-label">Vergi Numarası</label>
-              <input class="form-control" name="tax_number" value="<?=h($selectedDealer['tax_number'])?>" required>
+              <input class="form-control" name="tax_number" value="<?=h($selectedDealer['tax_number'] ?? '')?>" required>
             </div>
             <div class="col-12">
               <label class="form-label">Fatura Adresi</label>
-              <textarea class="form-control" name="billing_address" rows="2" required><?=h($selectedDealer['billing_address'])?></textarea>
+              <textarea class="form-control" name="billing_address" rows="2" required><?=h($selectedDealer['billing_address'] ?? '')?></textarea>
             </div>
             <div class="col-md-6">
               <label class="form-label d-flex justify-content-between align-items-center">
