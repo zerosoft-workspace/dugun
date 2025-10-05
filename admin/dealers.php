@@ -1066,7 +1066,12 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
             <input type="hidden" name="do" value="assign_venues">
             <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
             <div class="col-12">
-              <select class="form-select js-assignment-select" id="dealer-venues-select" name="venue_ids[]" multiple data-selected="<?=h(implode(',', $assignedVenueIds))?>" data-options-key="venues" data-summary="#dealer-venue-summary" data-empty-text="Bu bayiye henüz salon atanmadı." data-placeholder="Salon arayın"></select>
+              <select class="form-select js-assignment-select" id="dealer-venues-select" name="venue_ids[]" multiple data-selected="<?=h(implode(',', $assignedVenueIds))?>" data-options-key="venues" data-summary="#dealer-venue-summary" data-empty-text="Bu bayiye henüz salon atanmadı." data-placeholder="Salon arayın">
+                <?php foreach ($allVenues as $option): ?>
+                  <?php $optId = (int)$option['id']; ?>
+                  <option value="<?= $optId ?>" <?= in_array($optId, $assignedVenueIds, true) ? 'selected' : '' ?>><?=h($option['name'])?></option>
+                <?php endforeach; ?>
+              </select>
             </div>
             <div class="col-12 d-flex flex-wrap gap-2 justify-content-end">
               <button class="btn btn-outline-secondary" type="button" data-ts-clear="dealer-venues-select">Temizle</button>
@@ -1148,7 +1153,12 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
                         <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
                         <input type="hidden" name="do" value="assign_venue_dealers">
                         <input type="hidden" name="venue_id" value="<?= (int)$venue['id'] ?>">
-                        <select class="form-select js-assignment-select" id="venue-select-<?= (int)$venue['id'] ?>" name="dealer_ids[]" multiple data-selected="<?=h(implode(',', $assignedIds))?>" data-options-key="dealers" data-summary="#venue-summary-<?= (int)$venue['id'] ?>" data-empty-text="Bu salona henüz bayi atanmadı." data-placeholder="Bayi arayın"></select>
+                        <select class="form-select js-assignment-select" id="venue-select-<?= (int)$venue['id'] ?>" name="dealer_ids[]" multiple data-selected="<?=h(implode(',', $assignedIds))?>" data-options-key="dealers" data-summary="#venue-summary-<?= (int)$venue['id'] ?>" data-empty-text="Bu salona henüz bayi atanmadı." data-placeholder="Bayi arayın">
+                          <?php foreach ($allDealers as $option): ?>
+                            <?php $optId = (int)$option['id']; ?>
+                            <option value="<?= $optId ?>" <?= in_array($optId, $assignedIds, true) ? 'selected' : '' ?>><?=h($option['name'])?><?= $option['code'] ? ' • '.h($option['code']) : '' ?><?= $option['email'] ? ' — '.h($option['email']) : '' ?></option>
+                          <?php endforeach; ?>
+                        </select>
                         <div class="d-flex flex-wrap gap-2 justify-content-end mt-3">
                           <button class="btn btn-outline-secondary btn-sm" type="button" data-ts-clear="venue-select-<?= (int)$venue['id'] ?>">Temizle</button>
                           <button class="btn btn-brand btn-sm" type="submit">Kaydet</button>

@@ -22,5 +22,17 @@ if ($dc && $dc['ev_id']){
   redirect($dest, 301);
 }
 
+$st3=pdo()->prepare(
+  "SELECT dq.*, e.id AS ev_id FROM dealer_qr_codes dq "
+ ."LEFT JOIN events e ON e.id=dq.target_event_id "
+ ."WHERE dq.code=? LIMIT 1"
+);
+$st3->execute([$code]);
+$dq=$st3->fetch();
+if ($dq && $dq['ev_id']){
+  $dest = public_upload_url((int)$dq['ev_id']);
+  redirect($dest, 301);
+}
+
 http_response_code(404);
 exit('Hedef yok');
