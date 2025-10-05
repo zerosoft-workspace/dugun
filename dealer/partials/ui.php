@@ -420,7 +420,6 @@ CSS;
     $links = [
       'dashboard' => ['href' => BASE_URL.'/dealer/dashboard.php', 'label' => 'Genel Bakış', 'icon' => 'bi-speedometer2'],
       'billing'   => ['href' => BASE_URL.'/dealer/billing.php', 'label' => 'Bakiye & Paketler', 'icon' => 'bi-wallet2'],
-      'leads'     => ['href' => BASE_URL.'/dealer/leads.php', 'label' => 'Potansiyel Müşteriler', 'icon' => 'bi-people'],
     ];
 
     echo '<nav class="sidebar-nav">';

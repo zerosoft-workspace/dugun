@@ -9,15 +9,23 @@ require_once __DIR__.'/representatives.php';
 
 const DEALER_LEAD_STATUS_NEW = 'new';
 const DEALER_LEAD_STATUS_CONTACTED = 'contacted';
+const DEALER_LEAD_STATUS_QUALIFIED = 'qualified';
+const DEALER_LEAD_STATUS_FOLLOW_UP = 'follow_up';
+const DEALER_LEAD_STATUS_PROPOSAL = 'proposal_sent';
 const DEALER_LEAD_STATUS_NEGOTIATION = 'negotiation';
+const DEALER_LEAD_STATUS_ON_HOLD = 'on_hold';
 const DEALER_LEAD_STATUS_WON = 'won';
 const DEALER_LEAD_STATUS_LOST = 'lost';
 
 function dealer_lead_status_options(): array {
   return [
     DEALER_LEAD_STATUS_NEW => 'Yeni',
-    DEALER_LEAD_STATUS_CONTACTED => 'İlk İletişim',
-    DEALER_LEAD_STATUS_NEGOTIATION => 'Teklif/Görüşme',
+    DEALER_LEAD_STATUS_CONTACTED => 'İlk Görüşme Yapıldı',
+    DEALER_LEAD_STATUS_QUALIFIED => 'İhtiyaç Analizi',
+    DEALER_LEAD_STATUS_FOLLOW_UP => 'Takip Ediliyor',
+    DEALER_LEAD_STATUS_PROPOSAL => 'Teklif Gönderildi',
+    DEALER_LEAD_STATUS_NEGOTIATION => 'Pazarlık / Görüşme',
+    DEALER_LEAD_STATUS_ON_HOLD => 'Beklemede',
     DEALER_LEAD_STATUS_WON => 'Kazanıldı',
     DEALER_LEAD_STATUS_LOST => 'Kaybedildi',
   ];
@@ -28,7 +36,11 @@ function dealer_lead_status_badge_class(string $status): string {
     DEALER_LEAD_STATUS_WON => 'success',
     DEALER_LEAD_STATUS_LOST => 'danger',
     DEALER_LEAD_STATUS_NEGOTIATION => 'warning',
+    DEALER_LEAD_STATUS_PROPOSAL => 'primary',
+    DEALER_LEAD_STATUS_QUALIFIED => 'primary',
+    DEALER_LEAD_STATUS_FOLLOW_UP => 'info',
     DEALER_LEAD_STATUS_CONTACTED => 'info',
+    DEALER_LEAD_STATUS_ON_HOLD => 'secondary',
     default => 'secondary',
   };
 }
@@ -139,7 +151,7 @@ function dealer_leads_list(int $dealer_id): array {
   return $rows;
 }
 
-function dealer_lead_update(int $lead_id, int $dealer_id, array $data): void {
+function dealer_lead_update(int $lead_id, int $dealer_id, array $data, ?int $representative_id = null): void {
   $lead = dealer_lead_get($lead_id, $dealer_id);
   if (!$lead) {
     throw new InvalidArgumentException('Kayıt bulunamadı.');
@@ -161,8 +173,9 @@ function dealer_lead_update(int $lead_id, int $dealer_id, array $data): void {
   $source = trim($data['source'] ?? ($lead['source'] ?? ''));
   $notes = trim($data['notes'] ?? ($lead['notes'] ?? ''));
   $nextAction = array_key_exists('next_action_at', $data) ? dealer_lead_parse_datetime($data['next_action_at']) : $lead['next_action_at'];
+  $representativeValue = $representative_id ?: (isset($data['representative_id']) ? (int)$data['representative_id'] : ($lead['representative_id'] ?? null));
 
-  pdo()->prepare("UPDATE dealer_leads SET name=?, email=?, phone=?, company=?, status=?, source=?, notes=?, next_action_at=?, updated_at=? WHERE id=? AND dealer_id=?")
+  pdo()->prepare("UPDATE dealer_leads SET name=?, email=?, phone=?, company=?, status=?, source=?, notes=?, next_action_at=?, representative_id=?, updated_at=? WHERE id=? AND dealer_id=?")
       ->execute([
         $name,
         $email !== '' ? $email : null,
@@ -172,6 +185,7 @@ function dealer_lead_update(int $lead_id, int $dealer_id, array $data): void {
         $source !== '' ? $source : null,
         $notes !== '' ? $notes : null,
         $nextAction,
+        $representativeValue ?: null,
         now(),
         $lead_id,
         $dealer_id,
@@ -201,10 +215,11 @@ function dealer_lead_add_note(int $lead_id, int $dealer_id, string $note, ?strin
         now(),
       ]);
 
-  $pdo->prepare("UPDATE dealer_leads SET last_contact_at=?, next_action_at=?, updated_at=? WHERE id=?")
+  $pdo->prepare("UPDATE dealer_leads SET last_contact_at=?, next_action_at=?, representative_id=?, updated_at=? WHERE id=?")
       ->execute([
         now(),
         $nextAction ?: $lead['next_action_at'],
+        $representative_id ?: ($lead['representative_id'] ?? null),
         now(),
         $lead_id,
       ]);
@@ -239,13 +254,11 @@ function dealer_lead_status_counts(int $dealer_id): array {
     $status = $row['status'] ?? DEALER_LEAD_STATUS_NEW;
     $summary[$status] = (int)($row['c'] ?? 0);
   }
+  $ordered = [];
   foreach (dealer_lead_status_options() as $key => $_) {
-    if (!isset($summary[$key])) {
-      $summary[$key] = 0;
-    }
+    $ordered[$key] = (int)($summary[$key] ?? 0);
   }
-  ksort($summary);
-  return $summary;
+  return $ordered;
 }
 
 function dealer_lead_upcoming_actions(int $dealer_id, int $limit = 5): array {

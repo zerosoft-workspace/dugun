@@ -461,6 +461,7 @@ CSS;
       'venues'    => ['href' => BASE_URL.'/admin/venues.php', 'label' => 'Salon Yönetimi', 'icon' => 'bi-building'],
       'users'     => ['href' => BASE_URL.'/admin/users.php', 'label' => 'Etkinlikler', 'icon' => 'bi-calendar3'],
       'dealers'   => ['href' => BASE_URL.'/admin/dealers.php', 'label' => 'Bayiler', 'icon' => 'bi-shop'],
+      'representatives' => ['href' => BASE_URL.'/admin/representatives.php', 'label' => 'Temsilciler', 'icon' => 'bi-person-badge'],
     ];
     if (is_superadmin()) {
       $links['packages'] = ['href' => BASE_URL.'/admin/dealer_packages.php', 'label' => 'Paketler', 'icon' => 'bi-boxes'];

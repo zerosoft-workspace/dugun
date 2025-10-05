@@ -320,9 +320,20 @@ function install_schema(){
     } catch (Throwable $e) {}
   }
 
+  try {
+    pdo()->exec("ALTER TABLE dealer_representatives MODIFY dealer_id INT NULL");
+  } catch (Throwable $e) {}
+  try {
+    pdo()->exec("ALTER TABLE dealer_representatives ADD COLUMN assigned_at DATETIME NULL AFTER dealer_id");
+  } catch (Throwable $e) {}
+  try {
+    pdo()->exec("UPDATE dealer_representatives SET assigned_at = COALESCE(assigned_at, created_at) WHERE dealer_id IS NOT NULL AND assigned_at IS NULL");
+  } catch (Throwable $e) {}
+
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representatives(
     id INT AUTO_INCREMENT PRIMARY KEY,
-    dealer_id INT NOT NULL,
+    dealer_id INT NULL,
+    assigned_at DATETIME NULL,
     name VARCHAR(190) NOT NULL,
     email VARCHAR(190) NOT NULL UNIQUE,
     phone VARCHAR(64) NULL,

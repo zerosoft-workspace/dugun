@@ -11,11 +11,12 @@ const REPRESENTATIVE_STATUS_INACTIVE = 'inactive';
 
 function representative_normalize_row(array $row): array {
   $row['id'] = (int)($row['id'] ?? 0);
-  $row['dealer_id'] = (int)($row['dealer_id'] ?? 0);
+  $row['dealer_id'] = isset($row['dealer_id']) ? (int)$row['dealer_id'] : 0;
   $row['commission_rate'] = isset($row['commission_rate']) ? (float)$row['commission_rate'] : 0.0;
   $row['last_login_at'] = $row['last_login_at'] ?? null;
   $row['created_at'] = $row['created_at'] ?? null;
   $row['updated_at'] = $row['updated_at'] ?? null;
+  $row['assigned_at'] = $row['assigned_at'] ?? null;
   return $row;
 }
 
@@ -50,17 +51,159 @@ function representative_for_dealer(int $dealer_id): ?array {
   return $row ? representative_normalize_row($row) : null;
 }
 
-function representative_save_for_dealer(int $dealer_id, array $data, ?int $representative_id = null): int {
-  $dealer_id = max(0, (int)$dealer_id);
-  if ($dealer_id <= 0) {
-    throw new InvalidArgumentException('Geçerli bir bayi seçin.');
+function representative_detail(int $representative_id): ?array {
+  if ($representative_id <= 0) {
+    return null;
   }
+  $sql = "SELECT r.*, d.name AS dealer_name, d.company AS dealer_company, d.status AS dealer_status, d.code AS dealer_code
+          FROM dealer_representatives r
+          LEFT JOIN dealers d ON d.id = r.dealer_id
+          WHERE r.id=? LIMIT 1";
+  $st = pdo()->prepare($sql);
+  $st->execute([$representative_id]);
+  $row = $st->fetch();
+  if (!$row) {
+    return null;
+  }
+  $rep = representative_normalize_row($row);
+  $rep['dealer_name'] = $row['dealer_name'] ?? null;
+  $rep['dealer_company'] = $row['dealer_company'] ?? null;
+  $rep['dealer_status'] = $row['dealer_status'] ?? null;
+  $rep['dealer_code'] = $row['dealer_code'] ?? null;
+  return $rep;
+}
+
+function representative_list(array $filters = []): array {
+  $statusFilter = $filters['status'] ?? 'all';
+  $assignedFilter = $filters['assigned'] ?? 'all';
+  $search = trim($filters['q'] ?? '');
+  $dealerFilter = isset($filters['dealer_id']) ? (int)$filters['dealer_id'] : 0;
+
+  $conditions = [];
+  $params = [];
+  if ($statusFilter !== 'all') {
+    $conditions[] = 'r.status=?';
+    $params[] = $statusFilter;
+  }
+  if ($assignedFilter === 'assigned') {
+    $conditions[] = 'r.dealer_id IS NOT NULL';
+  } elseif ($assignedFilter === 'unassigned') {
+    $conditions[] = 'r.dealer_id IS NULL';
+  }
+  if ($dealerFilter > 0) {
+    $conditions[] = 'r.dealer_id=?';
+    $params[] = $dealerFilter;
+  }
+  if ($search !== '') {
+    $conditions[] = '(r.name LIKE ? OR r.email LIKE ? OR r.phone LIKE ?)';
+    $like = '%'.$search.'%';
+    array_push($params, $like, $like, $like);
+  }
+
+  $sql = "SELECT r.*, d.name AS dealer_name, d.company AS dealer_company, d.status AS dealer_status, d.code AS dealer_code
+          FROM dealer_representatives r
+          LEFT JOIN dealers d ON d.id = r.dealer_id";
+  if ($conditions) {
+    $sql .= ' WHERE '.implode(' AND ', $conditions);
+  }
+  $sql .= ' ORDER BY r.created_at DESC';
+
+  $st = pdo()->prepare($sql);
+  $st->execute($params);
+  $rows = [];
+  foreach ($st as $row) {
+    $rep = representative_normalize_row($row);
+    $rep['dealer_name'] = $row['dealer_name'] ?? null;
+    $rep['dealer_company'] = $row['dealer_company'] ?? null;
+    $rep['dealer_status'] = $row['dealer_status'] ?? null;
+    $rep['dealer_code'] = $row['dealer_code'] ?? null;
+    $rows[] = $rep;
+  }
+  return $rows;
+}
+
+function representative_status_counts(): array {
+  $summary = [
+    'total' => 0,
+    REPRESENTATIVE_STATUS_ACTIVE => 0,
+    REPRESENTATIVE_STATUS_INACTIVE => 0,
+    'assigned' => 0,
+    'unassigned' => 0,
+  ];
+  $st = pdo()->query("SELECT status, COUNT(*) AS c FROM dealer_representatives GROUP BY status");
+  foreach ($st as $row) {
+    $status = $row['status'] ?? REPRESENTATIVE_STATUS_ACTIVE;
+    $summary[$status] = (int)($row['c'] ?? 0);
+    $summary['total'] += (int)($row['c'] ?? 0);
+  }
+  $assigned = (int)pdo()->query("SELECT COUNT(*) FROM dealer_representatives WHERE dealer_id IS NOT NULL")->fetchColumn();
+  $summary['assigned'] = $assigned;
+  $summary['unassigned'] = max(0, $summary['total'] - $assigned);
+  return $summary;
+}
+
+function representative_create(array $data): int {
   $name = trim($data['name'] ?? '');
   $email = trim($data['email'] ?? '');
   $phone = trim($data['phone'] ?? '');
   $status = $data['status'] ?? REPRESENTATIVE_STATUS_ACTIVE;
   $commissionRate = isset($data['commission_rate']) ? (float)$data['commission_rate'] : 10.0;
-  $passwordHash = $data['password_hash'] ?? null;
+  $password = $data['password'] ?? '';
+
+  if ($name === '' || $email === '') {
+    throw new InvalidArgumentException('Temsilci adı ve e-posta adresi zorunludur.');
+  }
+  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    throw new InvalidArgumentException('Geçerli bir e-posta adresi belirtin.');
+  }
+  if ($password === '') {
+    throw new InvalidArgumentException('Yeni temsilci için bir şifre belirleyin.');
+  }
+  if (!in_array($status, [REPRESENTATIVE_STATUS_ACTIVE, REPRESENTATIVE_STATUS_INACTIVE], true)) {
+    $status = REPRESENTATIVE_STATUS_ACTIVE;
+  }
+
+  $commissionRate = max(0.0, min(100.0, $commissionRate));
+
+  $duplicateCheck = pdo()->prepare("SELECT id FROM dealer_representatives WHERE email=? LIMIT 1");
+  $duplicateCheck->execute([$email]);
+  if ($duplicateCheck->fetchColumn()) {
+    throw new InvalidArgumentException('Bu e-posta adresi başka bir temsilcide kayıtlı.');
+  }
+
+  $hash = password_hash($password, PASSWORD_DEFAULT);
+
+  $pdo = pdo();
+  $pdo->prepare("INSERT INTO dealer_representatives (dealer_id, assigned_at, name, email, phone, password_hash, commission_rate, status, created_at, updated_at) VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)")
+      ->execute([
+        $name,
+        $email,
+        $phone !== '' ? $phone : null,
+        $hash,
+        number_format($commissionRate, 2, '.', ''),
+        $status,
+        now(),
+        now(),
+      ]);
+
+  $repId = (int)$pdo->lastInsertId();
+  $dealerId = isset($data['dealer_id']) ? (int)$data['dealer_id'] : 0;
+  if ($dealerId > 0) {
+    representative_assign_to_dealer($repId, $dealerId);
+  }
+  return $repId;
+}
+
+function representative_update(int $representative_id, array $data): void {
+  $rep = representative_get($representative_id);
+  if (!$rep) {
+    throw new InvalidArgumentException('Temsilci kaydı bulunamadı.');
+  }
+  $name = trim($data['name'] ?? $rep['name']);
+  $email = trim($data['email'] ?? $rep['email']);
+  $phone = trim($data['phone'] ?? ($rep['phone'] ?? ''));
+  $status = $data['status'] ?? ($rep['status'] ?? REPRESENTATIVE_STATUS_ACTIVE);
+  $commissionRate = isset($data['commission_rate']) ? (float)$data['commission_rate'] : ($rep['commission_rate'] ?? 10.0);
 
   if ($name === '' || $email === '') {
     throw new InvalidArgumentException('Temsilci adı ve e-posta adresi zorunludur.');
@@ -72,68 +215,82 @@ function representative_save_for_dealer(int $dealer_id, array $data, ?int $repre
     $status = REPRESENTATIVE_STATUS_ACTIVE;
   }
   $commissionRate = max(0.0, min(100.0, $commissionRate));
-  $existing = null;
-  if ($representative_id) {
-    $existing = representative_get((int)$representative_id);
-    if (!$existing || (int)$existing['dealer_id'] !== $dealer_id) {
-      throw new InvalidArgumentException('Temsilci kaydı bulunamadı.');
-    }
-  } else {
-    $existing = representative_for_dealer($dealer_id);
-  }
 
-  $excludeId = $existing ? (int)$existing['id'] : 0;
   $duplicateCheck = pdo()->prepare("SELECT id FROM dealer_representatives WHERE email=? AND id<>? LIMIT 1");
-  $duplicateCheck->execute([$email, $excludeId]);
+  $duplicateCheck->execute([$email, $representative_id]);
   if ($duplicateCheck->fetchColumn()) {
     throw new InvalidArgumentException('Bu e-posta adresi başka bir temsilcide kayıtlı.');
   }
 
-  $pdo = pdo();
-  if ($existing) {
-    $pdo->prepare("UPDATE dealer_representatives SET name=?, email=?, phone=?, commission_rate=?, status=?, updated_at=? WHERE id=?")
-        ->execute([
-          $name,
-          $email,
-          $phone ?: null,
-          number_format($commissionRate, 2, '.', ''),
-          $status,
-          now(),
-          (int)$existing['id'],
-        ]);
-    $repId = (int)$existing['id'];
-    if ($passwordHash) {
-      $pdo->prepare("UPDATE dealer_representatives SET password_hash=?, updated_at=? WHERE id=?")
-          ->execute([$passwordHash, now(), $repId]);
-    }
-    return $repId;
-  }
-
-  if (!$passwordHash) {
-    throw new InvalidArgumentException('Yeni temsilci için bir şifre belirleyin.');
-  }
-
-  $pdo->prepare("INSERT INTO dealer_representatives (dealer_id, name, email, phone, password_hash, commission_rate, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
+  pdo()->prepare("UPDATE dealer_representatives SET name=?, email=?, phone=?, commission_rate=?, status=?, updated_at=? WHERE id=?")
       ->execute([
-        $dealer_id,
         $name,
         $email,
-        $phone ?: null,
-        $passwordHash,
+        $phone !== '' ? $phone : null,
         number_format($commissionRate, 2, '.', ''),
         $status,
         now(),
-        now(),
+        $representative_id,
       ]);
-  return (int)$pdo->lastInsertId();
+
+  if (!empty($data['password'])) {
+    representative_update_password($representative_id, $data['password']);
+  }
 }
 
-function representative_delete_for_dealer(int $dealer_id): void {
-  $rep = representative_for_dealer($dealer_id);
-  if ($rep) {
-    pdo()->prepare("DELETE FROM dealer_representatives WHERE id=?")
-        ->execute([(int)$rep['id']]);
+function representative_assign_to_dealer(int $representative_id, ?int $dealer_id): void {
+  $rep = representative_get($representative_id);
+  if (!$rep) {
+    throw new InvalidArgumentException('Temsilci kaydı bulunamadı.');
   }
+
+  $pdo = pdo();
+  $pdo->beginTransaction();
+  try {
+    $newDealerId = $dealer_id && $dealer_id > 0 ? $dealer_id : null;
+    if ($newDealerId) {
+      $check = $pdo->prepare("SELECT id FROM dealers WHERE id=? LIMIT 1");
+      $check->execute([$newDealerId]);
+      if (!$check->fetch()) {
+        throw new InvalidArgumentException('Seçilen bayi bulunamadı.');
+      }
+
+      $currentForDealer = representative_for_dealer($newDealerId);
+      if ($currentForDealer && (int)$currentForDealer['id'] !== $representative_id) {
+        $pdo->prepare("UPDATE dealer_representatives SET dealer_id=NULL, assigned_at=NULL, updated_at=? WHERE id=?")
+            ->execute([now(), (int)$currentForDealer['id']]);
+      }
+    }
+
+    if (!empty($rep['dealer_id']) && $rep['dealer_id'] !== $newDealerId) {
+      $pdo->prepare("UPDATE dealer_representatives SET dealer_id=NULL, assigned_at=NULL, updated_at=? WHERE id=?")
+          ->execute([now(), $representative_id]);
+      $rep['dealer_id'] = 0;
+    }
+
+    if ($newDealerId) {
+      $pdo->prepare("UPDATE dealer_representatives SET dealer_id=?, assigned_at=?, updated_at=? WHERE id=?")
+          ->execute([$newDealerId, now(), now(), $representative_id]);
+    }
+
+    if (!$newDealerId) {
+      $pdo->prepare("UPDATE dealer_representatives SET dealer_id=NULL, assigned_at=NULL, updated_at=? WHERE id=?")
+          ->execute([now(), $representative_id]);
+    }
+
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
+  }
+}
+
+function representative_unassign_dealer(int $dealer_id): void {
+  if ($dealer_id <= 0) {
+    return;
+  }
+  pdo()->prepare("UPDATE dealer_representatives SET dealer_id=NULL, assigned_at=NULL, updated_at=? WHERE dealer_id=?")
+      ->execute([now(), $dealer_id]);
 }
 
 function representative_update_password(int $representative_id, string $plainPassword): void {

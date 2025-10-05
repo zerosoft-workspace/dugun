@@ -267,63 +267,6 @@ if ($action === 'topup_cancel_admin') {
   redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#finance');
 }
 
-if ($action === 'representative_save') {
-  $dealerId = (int)($_POST['dealer_id'] ?? 0);
-  $dealer = dealer_get($dealerId);
-  if (!$dealer) {
-    flash('err', 'Bayi bulunamadı.');
-    redirect($_SERVER['PHP_SELF']);
-  }
-  $existingRep = representative_for_dealer($dealerId);
-  $name = trim($_POST['rep_name'] ?? '');
-  $email = trim($_POST['rep_email'] ?? '');
-  $phone = trim($_POST['rep_phone'] ?? '');
-  $status = $_POST['rep_status'] ?? REPRESENTATIVE_STATUS_ACTIVE;
-  $commissionRate = (float)($_POST['rep_commission_rate'] ?? 10.0);
-  $password = trim($_POST['rep_password'] ?? '');
-  try {
-    $payload = [
-      'name' => $name,
-      'email' => $email,
-      'phone' => $phone,
-      'status' => $status,
-      'commission_rate' => $commissionRate,
-    ];
-    if ($password !== '') {
-      $payload['password_hash'] = password_hash($password, PASSWORD_DEFAULT);
-    }
-    representative_save_for_dealer($dealerId, $payload, $existingRep['id'] ?? null);
-    if ($existingRep) {
-      $msg = 'Temsilci bilgileri güncellendi.';
-      if ($password !== '') {
-        $msg = 'Temsilci bilgileri ve şifresi güncellendi.';
-      }
-    } else {
-      $msg = 'Yeni temsilci hesabı oluşturuldu.';
-    }
-    flash('ok', $msg);
-  } catch (Throwable $e) {
-    flash('err', 'Temsilci kaydedilemedi: '.$e->getMessage());
-  }
-  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#representative');
-}
-
-if ($action === 'representative_remove') {
-  $dealerId = (int)($_POST['dealer_id'] ?? 0);
-  $dealer = dealer_get($dealerId);
-  if (!$dealer) {
-    flash('err', 'Bayi bulunamadı.');
-    redirect($_SERVER['PHP_SELF']);
-  }
-  try {
-    representative_delete_for_dealer($dealerId);
-    flash('ok', 'Temsilci kaydı kaldırıldı.');
-  } catch (Throwable $e) {
-    flash('err', 'Temsilci silinemedi: '.$e->getMessage());
-  }
-  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#representative');
-}
-
 $statusFilter = $_GET['status'] ?? 'all';
 $validStatusFilters = ['all', 'active', 'pending', 'inactive'];
 if (!in_array($statusFilter, $validStatusFilters, true)) {
@@ -938,24 +881,12 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
           <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
             <div>
               <h5 class="mb-1">Bayi Temsilcisi</h5>
-              <p class="text-muted small mb-0">Temsilciler tamamlanan bayi yüklemelerinden otomatik olarak komisyon kazanır.</p>
+              <p class="text-muted small mb-0">Temsilci atamalarını temsilci yönetimi ekranından yapabilirsiniz.</p>
             </div>
-            <div class="d-flex align-items-center gap-2">
-              <?php if ($representative): ?>
-                <span class="badge bg-success-subtle text-success-emphasis fw-semibold">Aktif</span>
-                <form method="post" class="m-0" onsubmit="return confirm('Temsilci kaydını kaldırmak istediğinize emin misiniz?');">
-                  <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                  <input type="hidden" name="do" value="representative_remove">
-                  <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
-                  <button class="btn btn-sm btn-outline-danger" type="submit">Temsilciyi Kaldır</button>
-                </form>
-              <?php else: ?>
-                <span class="badge bg-secondary-subtle text-secondary-emphasis fw-semibold">Atanmadı</span>
-              <?php endif; ?>
-            </div>
+            <a class="btn btn-outline-brand" href="<?=h(BASE_URL.'/admin/representatives.php'.($selectedDealer ? '?dealer_id='.(int)$selectedDealer['id'] : ''))?>">Temsilciyi Yönet</a>
           </div>
           <?php if ($representative): ?>
-            <div class="row g-3 mb-4">
+            <div class="row g-3">
               <div class="col-md-4">
                 <div class="rep-stat">
                   <div class="label">Temsilci</div>
@@ -973,52 +904,15 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
               </div>
               <div class="col-md-4">
                 <div class="rep-stat">
-                  <div class="label">Toplam Komisyon</div>
+                  <div class="label">Komisyon Özeti</div>
                   <div class="value"><?=h(format_currency($representativeTotals['total_amount'] ?? 0))?></div>
                   <div class="muted">Bekleyen: <?=h(format_currency($representativeTotals['pending_amount'] ?? 0))?></div>
                 </div>
               </div>
             </div>
+          <?php else: ?>
+            <div class="alert alert-warning mb-0">Bu bayiye henüz bir temsilci atanmamış. Temsilci oluşturup atamak için temsilci yönetimi sayfasını kullanın.</div>
           <?php endif; ?>
-          <form method="post" class="row g-3">
-            <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-            <input type="hidden" name="do" value="representative_save">
-            <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
-            <div class="col-md-4">
-              <label class="form-label">Ad Soyad</label>
-              <input type="text" class="form-control" name="rep_name" value="<?=h($representative['name'] ?? '')?>" required>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">E-posta</label>
-              <input type="email" class="form-control" name="rep_email" value="<?=h($representative['email'] ?? '')?>" required>
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Telefon</label>
-              <input type="text" class="form-control" name="rep_phone" value="<?=h($representative['phone'] ?? '')?>">
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Durum</label>
-              <select class="form-select" name="rep_status">
-                <option value="active" <?= ($representative['status'] ?? '') === 'active' ? 'selected' : '' ?>>Aktif</option>
-                <option value="inactive" <?= ($representative['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Pasif</option>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label class="form-label">Komisyon (%)</label>
-              <div class="input-group">
-                <input type="number" step="0.1" min="0" max="100" class="form-control" name="rep_commission_rate" value="<?=h(number_format($representative['commission_rate'] ?? 10.0, 1, '.', ''))?>" required>
-                <span class="input-group-text">%</span>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <label class="form-label">Şifre</label>
-              <input type="password" class="form-control" name="rep_password" placeholder="<?= $representative ? 'Boş bırakırsanız mevcut şifre korunur' : 'Yeni şifre oluşturun' ?>" <?= $representative ? '' : 'required' ?>>
-              <div class="form-text">Temsilci paneli adresi: <?=h(rtrim(BASE_URL, '/'))?>/representative</div>
-            </div>
-            <div class="col-12 d-flex justify-content-end">
-              <button class="btn btn-brand" type="submit">Temsilci Bilgilerini Kaydet</button>
-            </div>
-          </form>
         </div>
 
         <div class="card-lite p-4 mb-4" id="finance">
