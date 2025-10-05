@@ -46,17 +46,24 @@ if (!function_exists('admin_base_styles')) {
         padding:28px 22px 32px;
         position:relative;
         z-index:1030;
-        transition:transform .3s ease;
+        transition:transform .3s ease,width .3s ease,padding .3s ease;
       }
 
       .admin-sidebar .sidebar-brand {
         display:flex;
         align-items:center;
+        justify-content:space-between;
         gap:12px;
         font-weight:700;
         font-size:1.18rem;
         letter-spacing:.3px;
         margin-bottom:2.2rem;
+      }
+
+      .admin-sidebar .sidebar-brand .brand-mark {
+        display:flex;
+        align-items:center;
+        gap:12px;
       }
 
       .admin-sidebar .sidebar-brand span {
@@ -68,6 +75,22 @@ if (!function_exists('admin_base_styles')) {
         border-radius:12px;
         background:rgba(255,255,255,.16);
         font-weight:700;
+      }
+
+      .admin-sidebar .sidebar-brand strong {
+        font-size:1.05rem;
+      }
+
+      .sidebar-collapse {
+        border:none;
+        background:rgba(255,255,255,.14);
+        color:#fff;
+        width:38px;
+        height:38px;
+        border-radius:12px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
       }
 
       .sidebar-nav {
@@ -350,6 +373,49 @@ if (!function_exists('admin_base_styles')) {
         box-shadow:0 0 0 .2rem rgba(14,165,181,.15);
       }
 
+      body.sidebar-collapsed .admin-sidebar {
+        width:90px;
+        padding:28px 14px 32px;
+      }
+
+      body.sidebar-collapsed .admin-sidebar .sidebar-brand {
+        justify-content:center;
+      }
+
+      body.sidebar-collapsed .admin-sidebar .sidebar-brand strong {
+        display:none;
+      }
+
+      body.sidebar-collapsed .sidebar-footer {
+        display:none;
+      }
+
+      body.sidebar-collapsed .sidebar-link {
+        justify-content:center;
+        padding:12px;
+      }
+
+      body.sidebar-collapsed .sidebar-link span,
+      body.sidebar-collapsed .sidebar-link .sidebar-label {
+        display:none;
+      }
+
+      body.sidebar-collapsed .sidebar-link i {
+        font-size:1.2rem;
+      }
+
+      body.sidebar-collapsed .admin-toolbar {
+        padding-left:22px;
+      }
+
+      body.sidebar-collapsed .toolbar-search {
+        max-width:420px;
+      }
+
+      body.sidebar-collapsed .toolbar-user span strong {
+        max-width:140px;
+      }
+
       @media (max-width: 991px) {
         .admin-sidebar {
           position:fixed;
@@ -383,12 +449,6 @@ if (!function_exists('admin_base_styles')) {
           display:none;
         }
       }
-
-      @media (min-width: 992px) {
-        .sidebar-toggle {
-          display:none;
-        }
-      }
     </style>
 CSS;
   }
@@ -416,11 +476,14 @@ CSS;
 
     echo '<div class="admin-app">';
     echo '<aside class="admin-sidebar" id="adminSidebar">';
-    echo '<div class="sidebar-brand"><span>'.mb_strtoupper(mb_substr(APP_NAME, 0, 2, 'UTF-8')).'</span>'.h(APP_NAME).' Panel</div>';
+    echo '<div class="sidebar-brand">';
+    echo '<div class="brand-mark"><span>'.mb_strtoupper(mb_substr(APP_NAME, 0, 2, 'UTF-8')).'</span><strong>'.h(APP_NAME).' Panel</strong></div>';
+    echo '<button class="sidebar-collapse" type="button" data-sidebar-toggle aria-label="Menüyü daralt"><i class="bi bi-chevron-double-left"></i></button>';
+    echo '</div>';
     echo '<nav class="sidebar-nav">';
     foreach ($links as $key => $link) {
       $cls = 'sidebar-link'.($active === $key ? ' active' : '');
-      echo '<a class="'.$cls.'" href="'.h($link['href']).'"><i class="bi '.$link['icon'].'"></i><span>'.h($link['label']).'</span></a>';
+      echo '<a class="'.$cls.'" href="'.h($link['href']).'" title="'.h($link['label']).'"><i class="bi '.$link['icon'].'"></i><span class="sidebar-label">'.h($link['label']).'</span></a>';
     }
     echo '</nav>';
     echo '<div class="sidebar-footer">';
@@ -432,7 +495,7 @@ CSS;
     echo '<div class="admin-workspace">';
     echo '<header class="admin-toolbar">';
     echo '<div class="toolbar-left">';
-    echo '<button class="sidebar-toggle" type="button" data-sidebar-toggle><i class="bi bi-list"></i></button>';
+    echo '<button class="sidebar-toggle" type="button" data-sidebar-toggle aria-label="Menüyü aç/kapat"><i class="bi bi-list"></i></button>';
     echo '<div class="toolbar-search"><i class="bi bi-search"></i><input type="search" placeholder="Panelde ara..." aria-label="Panelde ara"></div>';
     echo '</div>';
     echo '<div class="toolbar-right">';
@@ -465,6 +528,11 @@ CSS;
     echo '</main>';
     echo '</div>'; // admin-workspace
     echo '</div>'; // admin-app
-    echo '<script>document.querySelectorAll("[data-sidebar-toggle]").forEach(function(btn){btn.addEventListener("click",function(){document.body.classList.toggle("sidebar-open");});});document.addEventListener("click",function(ev){if(!document.body.classList.contains("sidebar-open")) return;var sidebar=document.getElementById("adminSidebar");if(!sidebar) return;if(sidebar.contains(ev.target)) return;var toggle=ev.target.closest("[data-sidebar-toggle]");if(toggle) return;document.body.classList.remove("sidebar-open");});</script>';
+    echo '<script>(function(){var body=document.body;var sidebar=document.getElementById("adminSidebar");var collapseBtn=sidebar?sidebar.querySelector(".sidebar-collapse"):null;var collapseIcon=collapseBtn?collapseBtn.querySelector("i"):null;var mql=window.matchMedia("(max-width: 991px)");var key="adminSidebarCollapsed";function isMobile(){return mql.matches;}function updateIcon(state){if(!collapseIcon) return;if(state){collapseIcon.classList.remove("bi-chevron-double-left");collapseIcon.classList.add("bi-chevron-double-right");}else{collapseIcon.classList.add("bi-chevron-double-left");collapseIcon.classList.remove("bi-chevron-double-right");}}function setCollapsed(state){if(state){body.classList.add("sidebar-collapsed");localStorage.setItem(key,"1");}else{body.classList.remove("sidebar-collapsed");localStorage.removeItem(key);}updateIcon(state);}function toggle(){if(isMobile()){body.classList.toggle("sidebar-open");return;}setCollapsed(!body.classList.contains("sidebar-collapsed"));}
+    document.querySelectorAll("[data-sidebar-toggle]").forEach(function(btn){btn.addEventListener("click",function(ev){ev.preventDefault();toggle();});});
+    document.addEventListener("click",function(ev){if(!body.classList.contains("sidebar-open")) return;if(sidebar && sidebar.contains(ev.target)) return;var toggleBtn=ev.target.closest("[data-sidebar-toggle]");if(toggleBtn) return;body.classList.remove("sidebar-open");});
+    function applyStored(){if(isMobile()){body.classList.remove("sidebar-collapsed");updateIcon(false);return;}var stored=localStorage.getItem(key)==="1";setCollapsed(stored);}applyStored();
+    if(mql.addEventListener){mql.addEventListener("change",function(){applyStored();body.classList.remove("sidebar-open");});}else if(mql.addListener){mql.addListener(function(){applyStored();body.classList.remove("sidebar-open");});}
+    })();</script>';
   }
 }

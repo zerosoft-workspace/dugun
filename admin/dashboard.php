@@ -14,6 +14,49 @@ $venue = require_current_venue_or_redirect();
 $VID   = (int)$venue['id'];
 $VNAME = $venue['name'];
 $VSLUG = $venue['slug'];
+$today = date('Y-m-d');
+
+$stats = [
+  'total_events'    => 0,
+  'active_events'   => 0,
+  'upcoming_events' => 0,
+  'upload_count'    => 0,
+  'storage_bytes'   => 0,
+  'active_campaigns'=> 0,
+  'qr_codes'        => 0,
+];
+
+try {
+  $eventAgg = pdo()->prepare("SELECT COUNT(*) AS total_events, SUM(CASE WHEN is_active=1 THEN 1 ELSE 0 END) AS active_events, SUM(CASE WHEN is_active=1 AND event_date IS NOT NULL AND event_date >= ? THEN 1 ELSE 0 END) AS upcoming_events FROM events WHERE venue_id = ?");
+  $eventAgg->execute([$today, $VID]);
+  if ($row = $eventAgg->fetch()) {
+    $stats['total_events']    = (int)$row['total_events'];
+    $stats['active_events']   = (int)($row['active_events'] ?? 0);
+    $stats['upcoming_events'] = (int)($row['upcoming_events'] ?? 0);
+  }
+} catch (Throwable $e) {}
+
+try {
+  $uploadAgg = pdo()->prepare("SELECT COUNT(*) AS upload_count, COALESCE(SUM(file_size),0) AS total_bytes FROM uploads WHERE venue_id = ?");
+  $uploadAgg->execute([$VID]);
+  if ($row = $uploadAgg->fetch()) {
+    $stats['upload_count']  = (int)($row['upload_count'] ?? 0);
+    $stats['storage_bytes'] = (int)($row['total_bytes'] ?? 0);
+  }
+} catch (Throwable $e) {}
+
+try {
+  $campaignAgg = pdo()->prepare("SELECT COUNT(*) FROM campaigns WHERE venue_id = ? AND is_active = 1");
+  $campaignAgg->execute([$VID]);
+  $stats['active_campaigns'] = (int)$campaignAgg->fetchColumn();
+} catch (Throwable $e) {}
+
+$upcomingEvents = [];
+try {
+  $upcomingStmt = pdo()->prepare("SELECT id, title, event_date FROM events WHERE venue_id = ? AND is_active = 1 AND event_date IS NOT NULL AND event_date >= ? ORDER BY event_date ASC LIMIT 5");
+  $upcomingStmt->execute([$VID, $today]);
+  $upcomingEvents = $upcomingStmt->fetchAll();
+} catch (Throwable $e) {}
 
 /* ---- Migrasyonlar (gerekirse) ---- */
 try { pdo()->query("SELECT event_date FROM events LIMIT 1"); }
@@ -181,11 +224,30 @@ $qr = pdo()->prepare("
   WHERE q.venue_id=? ORDER BY q.id DESC
 ");
 $qr->execute([$VID]); $qr=$qr->fetchAll();
+$stats['qr_codes'] = count($qr);
 
 function fmt_bytes($b){
   if ($b<=0) return '0 MB';
   $mb=$b/1048576; if ($mb<1024) return number_format($mb,1).' MB';
   return number_format($mb/1024,2).' GB';
+}
+
+function fmt_count($n){
+  return number_format((int)$n,0,',','.');
+}
+
+function days_until_label(?string $date): string {
+  if (!$date) return '';
+  try {
+    $event = new DateTime($date);
+    $today = new DateTime('today');
+  } catch (Throwable $e) {
+    return '';
+  }
+  $diff = (int)$today->diff($event)->format('%r%a');
+  if ($diff === 0) return 'Bugün';
+  if ($diff > 0) return $diff.' gün kaldı';
+  return abs($diff).' gün önce';
 }
 ?>
 <!doctype html>
@@ -207,6 +269,28 @@ function fmt_bytes($b){
   .btn-zs:hover{ background:var(--brand-dark); color:#fff; }
   .btn-zs-outline{ background:#fff; border:1px solid rgba(14,165,181,.55); color:var(--brand); border-radius:12px; font-weight:600; }
   .btn-zs-outline:hover{ background:rgba(14,165,181,.12); color:var(--brand-dark); }
+  .stats-row .stat-card{ display:flex; align-items:flex-start; gap:16px; position:relative; overflow:hidden; }
+  .stat-icon{ width:56px; height:56px; border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; background:rgba(14,165,181,.12); color:var(--brand); }
+  .stat-meta{ flex:1; }
+  .stat-value{ font-size:1.9rem; font-weight:700; margin-bottom:2px; }
+  .stat-title{ text-transform:uppercase; font-size:.72rem; letter-spacing:.12em; color:var(--muted); font-weight:600; }
+  .stat-sub{ font-size:.85rem; color:var(--admin-muted); }
+  .stat-card::after{ content:''; position:absolute; inset:auto -60px -60px auto; width:160px; height:160px; border-radius:50%; background:rgba(14,165,181,.08); }
+  .quick-links .quick-link{ display:flex; align-items:center; gap:14px; padding:12px 14px; border-radius:14px; border:1px solid rgba(14,165,181,.18); text-decoration:none; color:var(--ink); transition:all .2s ease; }
+  .quick-links .quick-link:hover{ background:rgba(14,165,181,.08); text-decoration:none; color:var(--ink); }
+  .quick-links .quick-link i{ width:42px; height:42px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:rgba(14,165,181,.14); color:var(--brand); font-size:1.2rem; }
+  .quick-links .quick-link strong{ display:block; font-weight:600; }
+  .quick-links .quick-link span{ display:block; font-size:.85rem; color:var(--muted); }
+  .quick-links ul{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:12px; }
+  .upcoming-card .upcoming-item{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid rgba(15,23,42,.08); }
+  .upcoming-card .upcoming-item:last-child{ border-bottom:none; }
+  .upcoming-card .upcoming-item strong{ display:block; font-weight:600; }
+  .upcoming-card .upcoming-item small{ color:var(--muted); }
+  .badge-soon{ background:rgba(14,165,181,.12); color:var(--brand-dark); border-radius:999px; padding:.35rem .9rem; font-size:.75rem; font-weight:600; }
+  .upcoming-card .empty{ color:var(--muted); font-size:.9rem; padding:8px 0; }
+  @media (max-width: 575px){
+    .stat-card{ flex-direction:row; }
+  }
 </style>
 <script>
 function confirmSoftDelete(){
@@ -219,6 +303,126 @@ function confirmSoftDelete(){
 <?php admin_layout_start('dashboard', 'Panel Genel Bakış', 'Salon: '.$VNAME.' • Etkinlik ve QR yönetimi'); ?>
 
     <?php flash_box(); ?>
+
+  <div class="stats-row row g-3 mb-4">
+    <div class="col-xl-3 col-md-6">
+      <div class="card-lite stat-card">
+        <div class="stat-icon"><i class="bi bi-lightning-charge"></i></div>
+        <div class="stat-meta">
+          <div class="stat-title">Aktif Etkinlik</div>
+          <div class="stat-value"><?=fmt_count($stats['active_events'])?></div>
+          <div class="stat-sub">Toplam <?=fmt_count($stats['total_events'])?> etkinliğin <strong><?=fmt_count($stats['active_events'])?></strong>'i yayında.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+      <div class="card-lite stat-card">
+        <div class="stat-icon"><i class="bi bi-calendar-event"></i></div>
+        <div class="stat-meta">
+          <div class="stat-title">Yaklaşan</div>
+          <div class="stat-value"><?=fmt_count($stats['upcoming_events'])?></div>
+          <div class="stat-sub">Takvimde planlanan etkinlikler arasında.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+      <div class="card-lite stat-card">
+        <div class="stat-icon"><i class="bi bi-people"></i></div>
+        <div class="stat-meta">
+          <div class="stat-title">Misafir Yüklemeleri</div>
+          <div class="stat-value"><?=fmt_count($stats['upload_count'])?></div>
+          <div class="stat-sub">Galeri alanında <?=fmt_bytes($stats['storage_bytes'])?> yer kullanılıyor.</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-xl-3 col-md-6">
+      <div class="card-lite stat-card">
+        <div class="stat-icon"><i class="bi bi-megaphone"></i></div>
+        <div class="stat-meta">
+          <div class="stat-title">Kampanyalar & QR</div>
+          <div class="stat-value"><?=fmt_count($stats['active_campaigns'])?></div>
+          <div class="stat-sub">Aktif kampanya · <?=fmt_count($stats['qr_codes'])?> kalıcı QR kodu hazır.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-xxl-5 col-xl-6">
+      <div class="card-lite quick-links h-100">
+        <div class="section-heading">
+          <h5>Kolay Erişim</h5>
+          <a class="btn btn-zs-outline" href="<?=h(BASE_URL)?>/admin/venues.php">Salon Seç</a>
+        </div>
+        <p class="muted small mb-3">Sık kullandığınız işlemler için kısayollar:</p>
+        <ul>
+          <li>
+            <a class="quick-link" href="<?=h(BASE_URL)?>/admin/venue_events.php">
+              <i class="bi bi-calendar-check"></i>
+              <div>
+                <strong>Etkinlikleri Yönet</strong>
+                <span><?=fmt_count($stats['active_events'])?> aktif etkinlik listeleniyor.</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="quick-link" href="#ev">
+              <i class="bi bi-plus-circle"></i>
+              <div>
+                <strong>Yeni Etkinlik Oluştur</strong>
+                <span>Çifte e-posta ile giriş bilgileri gönderilir.</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="quick-link" href="<?=h(BASE_URL)?>/admin/campaigns.php">
+              <i class="bi bi-megaphone"></i>
+              <div>
+                <strong>Kampanyaları Yönet</strong>
+                <span><?=fmt_count($stats['active_campaigns'])?> kampanya yayında.</span>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a class="quick-link" href="#qr">
+              <i class="bi bi-qr-code"></i>
+              <div>
+                <strong>Kalıcı QR Kodlar</strong>
+                <span><?=fmt_count($stats['qr_codes'])?> kod hazır, etkinlik ataması yapabilirsiniz.</span>
+              </div>
+            </a>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="col-xxl-7 col-xl-6">
+      <div class="card-lite upcoming-card h-100">
+        <div class="section-heading">
+          <h5>Yaklaşan Etkinlikler</h5>
+          <a class="btn btn-zs-outline" href="<?=h(BASE_URL)?>/admin/venue_events.php">Tümünü Gör</a>
+        </div>
+        <?php if($upcomingEvents): ?>
+          <?php foreach($upcomingEvents as $ev): ?>
+            <?php $dateLabel = $ev['event_date'] ? date('d.m.Y', strtotime($ev['event_date'])) : 'Tarih Belirsiz'; ?>
+            <div class="upcoming-item">
+              <div>
+                <strong><?=h($ev['title'])?></strong>
+                <small><?=h($dateLabel)?></small>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                <?php $badge = days_until_label($ev['event_date']); if ($badge): ?>
+                  <span class="badge-soon"><?=h($badge)?></span>
+                <?php endif; ?>
+                <a class="btn btn-zs-outline btn-sm" href="<?=h(BASE_URL)?>/admin/venue_events.php?highlight=<?=$ev['id']?>">Detay</a>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        <?php else: ?>
+          <div class="empty">Yakın tarihte planlanmış etkinlik bulunmuyor. Yeni etkinlikler oluşturduğunuzda burada listelenecek.</div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
 
   <!-- Yeni Etkinlik -->
   <div id="ev" class="card-lite mb-4">
