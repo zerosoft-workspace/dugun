@@ -53,8 +53,9 @@ $pageStyles = <<<'CSS'
   .status-pill {display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .75rem;border-radius:999px;font-size:.78rem;font-weight:600;}
   .status-pill.paid {background:rgba(34,197,94,.18);color:#166534;}
   .status-pill.pending {background:rgba(250,204,21,.25);color:#854d0e;}
-  .status-pill.processing {background:rgba(59,130,246,.2);color:#1d4ed8;}
+  .status-pill.approved {background:rgba(45,212,191,.22);color:#0f766e;}
   .status-pill.default {background:rgba(148,163,184,.22);color:#475569;}
+  .status-pill.negative {background:rgba(248,113,113,.24);color:#b91c1c;}
   .dealers-table td:first-child {font-weight:600;color:var(--rep-ink);}
   @media (max-width: 768px) {
     .summary-card {padding:1.2rem;}
@@ -79,16 +80,21 @@ representative_layout_start([
   <div class="summary-card">
     <span>Toplam Komisyon</span>
     <strong><?=h(format_currency($totalsAll['total_amount']))?></strong>
-    <small><?=h((int)$totalsAll['paid_count'])?> ödenen, <?=h((int)$totalsAll['pending_count'])?> bekleyen işlem.</small>
+    <small><?=h((int)($totalsAll['total_count'] ?? 0))?> işlem kaydedildi.</small>
   </div>
   <div class="summary-card">
     <span>Bekleyen</span>
-    <strong><?=h(format_currency($totalsDealer['pending_amount']))?></strong>
+    <strong><?=h(format_currency($totalsDealer['pending_amount'] ?? 0))?></strong>
     <small><?= $selectedDealerId ? 'Seçili bayi için bekleyen komisyon.' : 'Tüm bayiler için bekleyen komisyon toplamı.' ?></small>
   </div>
   <div class="summary-card">
+    <span>Onaylanan</span>
+    <strong><?=h(format_currency($totalsDealer['approved_amount'] ?? 0))?></strong>
+    <small><?= $selectedDealerId ? 'Seçili bayi için onaylı ödemeler.' : 'Tüm bayiler için onaylanmış komisyonlar.' ?></small>
+  </div>
+  <div class="summary-card">
     <span>Ödenen</span>
-    <strong><?=h(format_currency($totalsDealer['paid_amount']))?></strong>
+    <strong><?=h(format_currency($totalsDealer['paid_amount'] ?? 0))?></strong>
     <small><?= $selectedDealerId ? 'Seçili bayi için tamamlanan ödemeler.' : 'Tüm bayiler için ödenen komisyon toplamı.' ?></small>
   </div>
 </div>
@@ -146,18 +152,17 @@ representative_layout_start([
         <?php else: ?>
           <?php foreach ($recentTopups as $topup): ?>
             <?php
-              $status = $topup['commission_status'] ?? 'pending';
+              $status = $topup['commission_status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
+              $label = representative_commission_status_label($status);
               $pillClass = 'status-pill default';
-              $label = 'Bekliyor';
-              if ($status === 'paid') {
-                $pillClass = 'status-pill paid';
-                $label = 'Ödendi';
-              } elseif ($status === 'processing') {
-                $pillClass = 'status-pill processing';
-                $label = 'İşleniyor';
-              } elseif ($status === 'pending') {
+              if ($status === REPRESENTATIVE_COMMISSION_STATUS_PENDING) {
                 $pillClass = 'status-pill pending';
-                $label = 'Beklemede';
+              } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_APPROVED) {
+                $pillClass = 'status-pill approved';
+              } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_PAID) {
+                $pillClass = 'status-pill paid';
+              } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED) {
+                $pillClass = 'status-pill negative';
               }
               $dealerName = isset($topup['dealer_id']) && isset($dealerLookup[$topup['dealer_id']]) ? $dealerLookup[$topup['dealer_id']]['name'] : '—';
             ?>
@@ -190,18 +195,17 @@ representative_layout_start([
         <?php else: ?>
           <?php foreach ($recentCommissions as $row): ?>
             <?php
-              $status = $row['status'] ?? 'pending';
+              $status = $row['status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
+              $label = representative_commission_status_label($status);
               $pillClass = 'status-pill default';
-              $label = 'Beklemede';
-              if ($status === 'paid') {
-                $pillClass = 'status-pill paid';
-                $label = 'Ödendi';
-              } elseif ($status === 'processing') {
-                $pillClass = 'status-pill processing';
-                $label = 'İşleniyor';
-              } elseif ($status === 'pending') {
+              if ($status === REPRESENTATIVE_COMMISSION_STATUS_PENDING) {
                 $pillClass = 'status-pill pending';
-                $label = 'Beklemede';
+              } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_APPROVED) {
+                $pillClass = 'status-pill approved';
+              } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_PAID) {
+                $pillClass = 'status-pill paid';
+              } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED) {
+                $pillClass = 'status-pill negative';
               }
               $dealerName = isset($row['dealer_id']) && isset($dealerLookup[$row['dealer_id']]) ? $dealerLookup[$row['dealer_id']]['name'] : '—';
             ?>

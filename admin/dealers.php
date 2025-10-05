@@ -365,7 +365,18 @@ if ($selectedDealer) {
 
   dealer_refresh_purchase_states($selectedId);
   $representative = representative_for_dealer($selectedId);
-  $representativeTotals = $representative ? representative_commission_totals((int)$representative['id']) : ['pending_amount' => 0, 'paid_amount' => 0, 'pending_count' => 0, 'paid_count' => 0, 'total_amount' => 0];
+  $representativeTotals = $representative ? representative_commission_totals((int)$representative['id']) : [
+    'pending_amount' => 0,
+    'pending_count' => 0,
+    'approved_amount' => 0,
+    'approved_count' => 0,
+    'paid_amount' => 0,
+    'paid_count' => 0,
+    'rejected_amount' => 0,
+    'rejected_count' => 0,
+    'total_amount' => 0,
+    'total_count' => 0,
+  ];
   $walletBalance = dealer_get_balance($selectedId);
   $walletTransactions = dealer_wallet_transactions($selectedId, 10);
   $walletFlowTotals = dealer_wallet_flow_totals($selectedId);
@@ -389,7 +400,18 @@ if ($selectedDealer) {
   $cashbackPendingAmount = 0;
   $topupRequests = [];
   $representative = null;
-  $representativeTotals = ['pending_amount' => 0, 'paid_amount' => 0, 'pending_count' => 0, 'paid_count' => 0, 'total_amount' => 0];
+  $representativeTotals = [
+    'pending_amount' => 0,
+    'pending_count' => 0,
+    'approved_amount' => 0,
+    'approved_count' => 0,
+    'paid_amount' => 0,
+    'paid_count' => 0,
+    'rejected_amount' => 0,
+    'rejected_count' => 0,
+    'total_amount' => 0,
+    'total_count' => 0,
+  ];
 }
 $venueAssignments = dealer_fetch_venue_assignments();
 $unassignedVenueCount = 0;

@@ -135,6 +135,11 @@ $subtitle = 'Temsilci ekibinin performansını, pipeline sağlığını ve komis
       <small><?=$commissionSummary['pending_count'] ?? 0?> ödeme bekliyor.</small>
     </div>
     <div class="analytics-card">
+      <span>Onaylanan Komisyon</span>
+      <h4><?=format_currency($commissionSummary['approved_amount'] ?? 0)?></h4>
+      <small><?=$commissionSummary['approved_count'] ?? 0?> ödeme transfer için hazır.</small>
+    </div>
+    <div class="analytics-card">
       <span>Ödenen Komisyon</span>
       <h4><?=format_currency($commissionSummary['paid_amount'] ?? 0)?></h4>
       <small><?=$commissionSummary['paid_count'] ?? 0?> ödeme tamamlandı.</small>

@@ -67,7 +67,7 @@ $pageStyles = <<<'CSS'
   .status-pill {display:inline-flex;align-items:center;gap:.35rem;padding:.25rem .7rem;border-radius:999px;font-size:.75rem;font-weight:600;}
   .status-pill.pending {background:rgba(250,204,21,.22);color:#854d0e;}
   .status-pill.paid {background:rgba(34,197,94,.16);color:#166534;}
-  .status-pill.processing {background:rgba(59,130,246,.16);color:#1d4ed8;}
+  .status-pill.approved {background:rgba(45,212,191,.22);color:#0f766e;}
   .status-pill.default {background:rgba(148,163,184,.22);color:#475569;}
   .status-pill.negative {background:rgba(248,113,113,.2);color:#b91c1c;}
   @media (max-width: 768px) {
@@ -109,6 +109,16 @@ representative_layout_start([
     <span>Bekleyen Komisyon</span>
     <strong><?=h(format_currency($commissionTotals['pending_amount']))?></strong>
     <small><?=h((int)$commissionTotals['pending_count'])?> işlem ödeme bekliyor.</small>
+  </div>
+  <div class="summary-card">
+    <span>Onaylanan Komisyon</span>
+    <strong><?=h(format_currency($commissionTotals['approved_amount'] ?? 0))?></strong>
+    <small><?=h((int)($commissionTotals['approved_count'] ?? 0))?> ödeme transfer için hazır.</small>
+  </div>
+  <div class="summary-card">
+    <span>Ödenen Komisyon</span>
+    <strong><?=h(format_currency($commissionTotals['paid_amount'] ?? 0))?></strong>
+    <small><?=h((int)($commissionTotals['paid_count'] ?? 0))?> ödeme tamamlandı.</small>
   </div>
 </div>
 
@@ -179,7 +189,7 @@ representative_layout_start([
 <section class="card-lite mb-4">
   <div class="section-heading">
     <h5>Komisyon Özeti</h5>
-    <small><?=h((int)$commissionTotals['paid_count'])?> ödenen · <?=h((int)$commissionTotals['pending_count'])?> bekleyen işlem</small>
+    <small><?=h((int)($commissionTotals['paid_count'] ?? 0))?> ödenen · <?=h((int)($commissionTotals['approved_count'] ?? 0))?> onaylı · <?=h((int)($commissionTotals['pending_count'] ?? 0))?> bekleyen</small>
   </div>
   <div class="two-column">
     <div>
@@ -193,18 +203,17 @@ representative_layout_start([
             <?php else: ?>
               <?php foreach ($recentTopups as $topup): ?>
                 <?php
-                  $status = $topup['commission_status'] ?? 'pending';
+                  $status = $topup['commission_status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
+                  $label = representative_commission_status_label($status);
                   $pillClass = 'status-pill default';
-                  $label = 'Bekliyor';
-                  if ($status === 'paid') {
-                    $pillClass = 'status-pill paid';
-                    $label = 'Ödendi';
-                  } elseif ($status === 'processing') {
-                    $pillClass = 'status-pill processing';
-                    $label = 'İşleniyor';
-                  } elseif ($status === 'pending') {
+                  if ($status === REPRESENTATIVE_COMMISSION_STATUS_PENDING) {
                     $pillClass = 'status-pill pending';
-                    $label = 'Beklemede';
+                  } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_APPROVED) {
+                    $pillClass = 'status-pill approved';
+                  } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_PAID) {
+                    $pillClass = 'status-pill paid';
+                  } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED) {
+                    $pillClass = 'status-pill negative';
                   }
                 ?>
                 <tr>
@@ -230,18 +239,17 @@ representative_layout_start([
             <?php else: ?>
               <?php foreach ($recentCommissions as $row): ?>
                 <?php
-                  $status = $row['status'] ?? 'pending';
+                  $status = $row['status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
+                  $label = representative_commission_status_label($status);
                   $pillClass = 'status-pill default';
-                  $label = 'Bekliyor';
-                  if ($status === 'paid') {
-                    $pillClass = 'status-pill paid';
-                    $label = 'Ödendi';
-                  } elseif ($status === 'processing') {
-                    $pillClass = 'status-pill processing';
-                    $label = 'İşleniyor';
-                  } elseif ($status === 'pending') {
+                  if ($status === REPRESENTATIVE_COMMISSION_STATUS_PENDING) {
                     $pillClass = 'status-pill pending';
-                    $label = 'Beklemede';
+                  } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_APPROVED) {
+                    $pillClass = 'status-pill approved';
+                  } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_PAID) {
+                    $pillClass = 'status-pill paid';
+                  } elseif ($status === REPRESENTATIVE_COMMISSION_STATUS_REJECTED) {
+                    $pillClass = 'status-pill negative';
                   }
                 ?>
                 <tr>

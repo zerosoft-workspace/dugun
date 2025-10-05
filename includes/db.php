@@ -400,11 +400,18 @@ function install_schema(){
     notes VARCHAR(255) NULL,
     created_at DATETIME NOT NULL,
     paid_at DATETIME NULL,
+    approved_at DATETIME NULL,
     UNIQUE KEY uniq_commission_topup (dealer_topup_id),
     INDEX idx_commission_rep_status (representative_id, status),
     FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
     FOREIGN KEY (dealer_topup_id) REFERENCES dealer_topups(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('dealer_representative_commissions', 'approved_at')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_representative_commissions ADD approved_at DATETIME NULL AFTER paid_at");
+    } catch (Throwable $e) {}
+  }
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_leads(
     id INT AUTO_INCREMENT PRIMARY KEY,

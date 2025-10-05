@@ -9,6 +9,21 @@ require_once __DIR__.'/functions.php';
 const REPRESENTATIVE_STATUS_ACTIVE = 'active';
 const REPRESENTATIVE_STATUS_INACTIVE = 'inactive';
 
+const REPRESENTATIVE_COMMISSION_STATUS_PENDING   = 'pending';
+const REPRESENTATIVE_COMMISSION_STATUS_APPROVED  = 'approved';
+const REPRESENTATIVE_COMMISSION_STATUS_PAID      = 'paid';
+const REPRESENTATIVE_COMMISSION_STATUS_REJECTED  = 'rejected';
+
+function representative_commission_status_label(string $status): string {
+  return match ($status) {
+    REPRESENTATIVE_COMMISSION_STATUS_PENDING  => 'Onay Bekliyor',
+    REPRESENTATIVE_COMMISSION_STATUS_APPROVED => 'Ödeme Hazır',
+    REPRESENTATIVE_COMMISSION_STATUS_PAID     => 'Ödendi',
+    REPRESENTATIVE_COMMISSION_STATUS_REJECTED => 'Reddedildi',
+    default                                   => ucfirst($status),
+  };
+}
+
 function representative_assignments_support_commission_rate(): bool {
   static $hasColumn = null;
   if ($hasColumn === null) {
@@ -577,18 +592,23 @@ function representative_create_commission_for_topup(int $topup_id, int $dealer_i
         $topup_id,
         $amount_cents,
         $commission,
-        'pending',
+        REPRESENTATIVE_COMMISSION_STATUS_PENDING,
         now(),
       ]);
 }
 
 function representative_commission_totals(int $representative_id, ?int $dealer_id = null): array {
   $summary = [
-    'pending_amount' => 0,
-    'paid_amount' => 0,
-    'pending_count' => 0,
-    'paid_count' => 0,
-    'total_amount' => 0,
+    'pending_amount'  => 0,
+    'pending_count'   => 0,
+    'approved_amount' => 0,
+    'approved_count'  => 0,
+    'paid_amount'     => 0,
+    'paid_count'      => 0,
+    'rejected_amount' => 0,
+    'rejected_count'  => 0,
+    'total_amount'    => 0,
+    'total_count'     => 0,
   ];
   $sql = 'SELECT c.status, COUNT(*) AS c, COALESCE(SUM(c.commission_cents),0) AS total FROM dealer_representative_commissions c';
   $params = [$representative_id];
@@ -604,17 +624,29 @@ function representative_commission_totals(int $representative_id, ?int $dealer_i
   $st = pdo()->prepare($sql);
   $st->execute($params);
   foreach ($st as $row) {
-    $status = $row['status'] ?? '';
+    $status = (string)($row['status'] ?? '');
     $total = (int)($row['total'] ?? 0);
     $count = (int)($row['c'] ?? 0);
-    if ($status === 'paid') {
-      $summary['paid_amount'] = $total;
-      $summary['paid_count'] = $count;
-    } else {
-      $summary['pending_amount'] += $total;
-      $summary['pending_count'] += $count;
+    switch ($status) {
+      case REPRESENTATIVE_COMMISSION_STATUS_PAID:
+        $summary['paid_amount'] += $total;
+        $summary['paid_count']  += $count;
+        break;
+      case REPRESENTATIVE_COMMISSION_STATUS_APPROVED:
+        $summary['approved_amount'] += $total;
+        $summary['approved_count']  += $count;
+        break;
+      case REPRESENTATIVE_COMMISSION_STATUS_REJECTED:
+        $summary['rejected_amount'] += $total;
+        $summary['rejected_count']  += $count;
+        break;
+      default:
+        $summary['pending_amount'] += $total;
+        $summary['pending_count']  += $count;
+        break;
     }
     $summary['total_amount'] += $total;
+    $summary['total_count']  += $count;
   }
   return $summary;
 }
@@ -647,13 +679,170 @@ function representative_recent_commissions(int $representative_id, int $limit = 
       'commission_cents' => (int)$row['commission_cents'],
       'amount_cents' => (int)$row['amount_cents'],
       'topup_amount_cents' => (int)$row['topup_amount'],
-      'status' => $row['status'] ?? 'pending',
+      'status' => $row['status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING,
       'notes' => $row['notes'] ?? null,
       'created_at' => $row['created_at'] ?? null,
       'paid_at' => $row['paid_at'] ?? null,
       'topup_status' => $row['topup_status'] ?? null,
       'topup_completed_at' => $row['completed_at'] ?? null,
       'dealer_id' => isset($row['dealer_id']) ? (int)$row['dealer_id'] : null,
+    ];
+  }
+  return $rows;
+}
+
+function representative_commission_update_status(int $commission_id, string $status, array $options = []): void {
+  $commission_id = (int)$commission_id;
+  if ($commission_id <= 0) {
+    throw new InvalidArgumentException('Komisyon kaydı bulunamadı.');
+  }
+  $status = strtolower(trim($status));
+  $allowed = [
+    REPRESENTATIVE_COMMISSION_STATUS_PENDING,
+    REPRESENTATIVE_COMMISSION_STATUS_APPROVED,
+    REPRESENTATIVE_COMMISSION_STATUS_PAID,
+    REPRESENTATIVE_COMMISSION_STATUS_REJECTED,
+  ];
+  if (!in_array($status, $allowed, true)) {
+    throw new InvalidArgumentException('Geçersiz durum seçildi.');
+  }
+  $noteProvided = array_key_exists('note', $options);
+  $note = $noteProvided ? trim((string)$options['note']) : null;
+
+  $pdo = pdo();
+  $ownTxn = !$pdo->inTransaction();
+  if ($ownTxn) {
+    $pdo->beginTransaction();
+  }
+  try {
+    $st = $pdo->prepare('SELECT * FROM dealer_representative_commissions WHERE id=? FOR UPDATE');
+    $st->execute([$commission_id]);
+    $row = $st->fetch();
+    if (!$row) {
+      throw new RuntimeException('Komisyon kaydı bulunamadı.');
+    }
+
+    $currentStatus = $row['status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING;
+    $approvedAt = $row['approved_at'] ?? null;
+    $paidAt = $row['paid_at'] ?? null;
+
+    if ($status === $currentStatus && !$noteProvided) {
+      if ($ownTxn) {
+        $pdo->commit();
+      }
+      return;
+    }
+
+    $now = now();
+    switch ($status) {
+      case REPRESENTATIVE_COMMISSION_STATUS_PENDING:
+        $approvedAt = null;
+        $paidAt = null;
+        break;
+      case REPRESENTATIVE_COMMISSION_STATUS_APPROVED:
+        $approvedAt = $approvedAt ?: $now;
+        $paidAt = null;
+        break;
+      case REPRESENTATIVE_COMMISSION_STATUS_PAID:
+        $approvedAt = $approvedAt ?: $now;
+        $paidAt = $now;
+        break;
+      case REPRESENTATIVE_COMMISSION_STATUS_REJECTED:
+        $paidAt = null;
+        $approvedAt = null;
+        break;
+    }
+
+    $notesValue = $noteProvided ? ($note !== '' ? $note : null) : ($row['notes'] ?? null);
+
+    $update = $pdo->prepare('UPDATE dealer_representative_commissions SET status=?, notes=?, approved_at=?, paid_at=? WHERE id=?');
+    $update->execute([$status, $notesValue, $approvedAt, $paidAt, $commission_id]);
+
+    if ($ownTxn) {
+      $pdo->commit();
+    }
+  } catch (Throwable $e) {
+    if ($ownTxn && $pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    throw $e;
+  }
+}
+
+function representative_commission_admin_list(array $filters = []): array {
+  $statuses = $filters['statuses'] ?? [];
+  $representativeId = isset($filters['representative_id']) ? (int)$filters['representative_id'] : 0;
+  $dealerId = isset($filters['dealer_id']) ? (int)$filters['dealer_id'] : 0;
+  $limit = isset($filters['limit']) ? (int)$filters['limit'] : 20;
+  $limit = max(1, min($limit, 200));
+
+  $conditions = [];
+  $params = [];
+
+  if (!empty($statuses)) {
+    $statuses = array_values(array_filter(array_map('strval', $statuses)));
+    if ($statuses) {
+      $placeholders = implode(',', array_fill(0, count($statuses), '?'));
+      $conditions[] = 'c.status IN ('.$placeholders.')';
+      foreach ($statuses as $st) {
+        $params[] = $st;
+      }
+    }
+  }
+
+  if ($representativeId > 0) {
+    $conditions[] = 'c.representative_id=?';
+    $params[] = $representativeId;
+  }
+
+  if ($dealerId > 0) {
+    $conditions[] = 't.dealer_id=?';
+    $params[] = $dealerId;
+  }
+
+  $sql = "SELECT c.*, r.name AS representative_name, r.email AS representative_email, r.phone AS representative_phone,
+                 d.id AS dealer_id, d.name AS dealer_name, d.code AS dealer_code,
+                 t.amount_cents AS topup_amount_cents, t.status AS topup_status, t.created_at AS topup_created_at, t.completed_at AS topup_completed_at
+          FROM dealer_representative_commissions c
+          INNER JOIN dealer_representatives r ON r.id = c.representative_id
+          LEFT JOIN dealer_topups t ON t.id = c.dealer_topup_id
+          LEFT JOIN dealers d ON d.id = t.dealer_id";
+  if ($conditions) {
+    $sql .= ' WHERE '.implode(' AND ', $conditions);
+  }
+  $sql .= ' ORDER BY c.created_at DESC LIMIT ?';
+
+  $st = pdo()->prepare($sql);
+  $position = 1;
+  foreach ($params as $param) {
+    $st->bindValue($position++, $param);
+  }
+  $st->bindValue($position, $limit, PDO::PARAM_INT);
+  $st->execute();
+
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'id' => (int)$row['id'],
+      'representative_id' => (int)$row['representative_id'],
+      'representative_name' => $row['representative_name'] ?? null,
+      'representative_email' => $row['representative_email'] ?? null,
+      'representative_phone' => $row['representative_phone'] ?? null,
+      'dealer_id' => isset($row['dealer_id']) ? (int)$row['dealer_id'] : null,
+      'dealer_name' => $row['dealer_name'] ?? null,
+      'dealer_code' => $row['dealer_code'] ?? null,
+      'dealer_topup_id' => isset($row['dealer_topup_id']) ? (int)$row['dealer_topup_id'] : null,
+      'amount_cents' => isset($row['amount_cents']) ? (int)$row['amount_cents'] : 0,
+      'commission_cents' => isset($row['commission_cents']) ? (int)$row['commission_cents'] : 0,
+      'status' => $row['status'] ?? REPRESENTATIVE_COMMISSION_STATUS_PENDING,
+      'notes' => $row['notes'] ?? null,
+      'created_at' => $row['created_at'] ?? null,
+      'approved_at' => $row['approved_at'] ?? null,
+      'paid_at' => $row['paid_at'] ?? null,
+      'topup_amount_cents' => isset($row['topup_amount_cents']) ? (int)$row['topup_amount_cents'] : null,
+      'topup_status' => $row['topup_status'] ?? null,
+      'topup_created_at' => $row['topup_created_at'] ?? null,
+      'topup_completed_at' => $row['topup_completed_at'] ?? null,
     ];
   }
   return $rows;
@@ -709,12 +898,16 @@ function representative_has_commission(int $representative_id, int $topup_id): b
 
 function representative_admin_commission_overview(): array {
   $summary = [
-    'pending_amount' => 0,
-    'paid_amount' => 0,
-    'pending_count' => 0,
-    'paid_count' => 0,
-    'total_amount' => 0,
-    'total_count' => 0,
+    'pending_amount'  => 0,
+    'pending_count'   => 0,
+    'approved_amount' => 0,
+    'approved_count'  => 0,
+    'paid_amount'     => 0,
+    'paid_count'      => 0,
+    'rejected_amount' => 0,
+    'rejected_count'  => 0,
+    'total_amount'    => 0,
+    'total_count'     => 0,
   ];
   try {
     $sql = 'SELECT status, COUNT(*) AS c, COALESCE(SUM(commission_cents),0) AS total
@@ -724,15 +917,26 @@ function representative_admin_commission_overview(): array {
       $status = $row['status'] ?? '';
       $count = (int)($row['c'] ?? 0);
       $total = (int)($row['total'] ?? 0);
-      if ($status === 'paid') {
-        $summary['paid_amount'] += $total;
-        $summary['paid_count'] += $count;
-      } else {
-        $summary['pending_amount'] += $total;
-        $summary['pending_count'] += $count;
+      switch ($status) {
+        case REPRESENTATIVE_COMMISSION_STATUS_PAID:
+          $summary['paid_amount'] += $total;
+          $summary['paid_count']  += $count;
+          break;
+        case REPRESENTATIVE_COMMISSION_STATUS_APPROVED:
+          $summary['approved_amount'] += $total;
+          $summary['approved_count']  += $count;
+          break;
+        case REPRESENTATIVE_COMMISSION_STATUS_REJECTED:
+          $summary['rejected_amount'] += $total;
+          $summary['rejected_count']  += $count;
+          break;
+        default:
+          $summary['pending_amount'] += $total;
+          $summary['pending_count']  += $count;
+          break;
       }
       $summary['total_amount'] += $total;
-      $summary['total_count'] += $count;
+      $summary['total_count']  += $count;
     }
   } catch (Throwable $e) {
     // sessizce yok say
@@ -746,9 +950,14 @@ function representative_commission_leaderboard(int $limit = 5): array {
     $sql = 'SELECT r.id, r.name, r.email, r.phone, r.status,
                    COUNT(*) AS total_commission_count,
                    SUM(CASE WHEN c.status = "paid" THEN 1 ELSE 0 END) AS paid_commission_count,
+                   SUM(CASE WHEN c.status = "approved" THEN 1 ELSE 0 END) AS approved_commission_count,
+                   SUM(CASE WHEN c.status = "pending" THEN 1 ELSE 0 END) AS pending_commission_count,
+                   SUM(CASE WHEN c.status = "rejected" THEN 1 ELSE 0 END) AS rejected_commission_count,
                    COALESCE(SUM(c.commission_cents),0) AS total_commission_cents,
                    COALESCE(SUM(CASE WHEN c.status = "paid" THEN c.commission_cents ELSE 0 END),0) AS paid_commission_cents,
-                   COALESCE(SUM(CASE WHEN c.status <> "paid" THEN c.commission_cents ELSE 0 END),0) AS pending_commission_cents,
+                   COALESCE(SUM(CASE WHEN c.status = "approved" THEN c.commission_cents ELSE 0 END),0) AS approved_commission_cents,
+                   COALESCE(SUM(CASE WHEN c.status = "pending" THEN c.commission_cents ELSE 0 END),0) AS pending_commission_cents,
+                   COALESCE(SUM(CASE WHEN c.status = "rejected" THEN c.commission_cents ELSE 0 END),0) AS rejected_commission_cents,
                    COUNT(DISTINCT a.dealer_id) AS dealer_count,
                    MAX(c.created_at) AS latest_activity_at
             FROM dealer_representative_commissions c
@@ -771,9 +980,14 @@ function representative_commission_leaderboard(int $limit = 5): array {
         'dealer_count' => (int)($row['dealer_count'] ?? 0),
         'total_commission_cents' => (int)($row['total_commission_cents'] ?? 0),
         'paid_commission_cents' => (int)($row['paid_commission_cents'] ?? 0),
+        'approved_commission_cents' => (int)($row['approved_commission_cents'] ?? 0),
         'pending_commission_cents' => (int)($row['pending_commission_cents'] ?? 0),
+        'rejected_commission_cents' => (int)($row['rejected_commission_cents'] ?? 0),
         'total_commission_count' => (int)($row['total_commission_count'] ?? 0),
         'paid_commission_count' => (int)($row['paid_commission_count'] ?? 0),
+        'approved_commission_count' => (int)($row['approved_commission_count'] ?? 0),
+        'pending_commission_count' => (int)($row['pending_commission_count'] ?? 0),
+        'rejected_commission_count' => (int)($row['rejected_commission_count'] ?? 0),
         'latest_activity_at' => $row['latest_activity_at'] ?? null,
       ];
     }
