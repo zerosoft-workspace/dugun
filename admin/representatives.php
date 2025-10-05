@@ -123,8 +123,100 @@ function representative_filters(array $base = []): string {
   $query = array_filter($base, fn($value) => $value !== null && $value !== '' && $value !== 'all');
   return $query ? ('?'.http_build_query($query)) : '';
 }
-
-admin_layout_start('representatives', 'Bayi Temsilcileri', 'Temsilci hesaplarını yönetin, bayilere atayın ve komisyon durumlarını takip edin.');
+?>
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title><?=h(APP_NAME)?> — Bayi Temsilcileri</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<?=admin_base_styles()?>
+<style>
+  .card-lite h5 { font-weight: 600; }
+  .rep-stat {
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(14,165,181,.12), rgba(255,255,255,.92));
+    border: 1px solid rgba(14,165,181,.18);
+    padding: 18px 20px;
+    box-shadow: 0 22px 48px -32px rgba(14,165,181,.4);
+    min-height: 138px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+  .rep-stat .label {
+    font-size: .78rem;
+    text-transform: uppercase;
+    letter-spacing: .14em;
+    color: var(--admin-muted);
+    font-weight: 600;
+  }
+  .rep-stat .value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    color: var(--admin-ink);
+  }
+  .rep-stat .muted {
+    font-size: .85rem;
+    color: var(--admin-muted);
+  }
+  .card-lite form .form-label {
+    font-weight: 600;
+    color: var(--admin-ink);
+  }
+  .card-lite .form-control,
+  .card-lite .form-select {
+    border-radius: 12px;
+    border-color: rgba(15,23,42,.12);
+    padding: .55rem .75rem;
+  }
+  .card-lite .form-control:focus,
+  .card-lite .form-select:focus {
+    border-color: rgba(14,165,181,.45);
+    box-shadow: 0 0 0 .15rem rgba(14,165,181,.15);
+  }
+  .card-lite .input-group-text {
+    border-radius: 0 12px 12px 0;
+    border-color: rgba(15,23,42,.12);
+    background: rgba(14,165,181,.08);
+    color: var(--admin-brand);
+    font-weight: 600;
+  }
+  .table thead th {
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-size: .72rem;
+  }
+  .table tbody td {
+    font-size: .92rem;
+  }
+  .table-info {
+    --bs-table-bg: rgba(14,165,181,.08);
+    --bs-table-color: var(--admin-ink);
+  }
+  .btn-outline-brand {
+    border-radius: 12px;
+    border: 1px solid rgba(14,165,181,.45);
+    color: var(--admin-brand);
+    font-weight: 600;
+  }
+  .btn-outline-brand:hover,
+  .btn-outline-brand:focus {
+    background: rgba(14,165,181,.12);
+    color: var(--admin-brand-dark);
+  }
+  .badge.bg-success-subtle { background: rgba(34,197,94,.16)!important; color: #0f5132!important; }
+  .badge.bg-secondary-subtle { background: rgba(148,163,184,.18)!important; color: #334155!important; }
+  .list-unstyled strong { font-weight: 600; }
+  @media (max-width: 991px) {
+    .card-lite { padding: 20px; }
+    .card-lite form .form-label { font-size: .92rem; }
+  }
+</style>
+</head>
+<body class="admin-body">
+<?php admin_layout_start('representatives', 'Bayi Temsilcileri', 'Temsilci hesaplarını yönetin, bayilere atayın ve komisyon durumlarını takip edin.');
 ?>
 
   <?php flash_box(); ?>
@@ -347,3 +439,5 @@ admin_layout_start('representatives', 'Bayi Temsilcileri', 'Temsilci hesapların
   </div>
 
 <?php admin_layout_end(); ?>
+</body>
+</html>
