@@ -79,6 +79,18 @@ function flash_box(){
   }
 }
 
+if (!function_exists('flash_messages')) {
+  function flash_messages(): string {
+    if (!function_exists('flash_box')) {
+      return '';
+    }
+
+    ob_start();
+    flash_box();
+    return trim(ob_get_clean());
+  }
+}
+
 /* -------------------- CSRF -------------------- */
 function csrf_token(): string {
   if (empty($_SESSION['csrf'])) {
