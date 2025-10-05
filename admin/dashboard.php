@@ -104,6 +104,93 @@ $completedTopupAmount = $topupStats[DEALER_TOPUP_STATUS_COMPLETED]['amount'] ?? 
 $completedTopupCount  = $topupStats[DEALER_TOPUP_STATUS_COMPLETED]['count'] ?? 0;
 
 $subtitle = 'Salon: '.$VNAME.' • BİKARE platform göstergeleri';
+
+$statCards = [
+  [
+    'title' => 'Toplam Bayi',
+    'value' => fmt_count($dealerCounts['all'] ?? 0),
+    'sub'   => 'Aktif: '.fmt_count($dealerCounts['active'] ?? 0).' • Pasif: '.fmt_count($dealerCounts['inactive'] ?? 0),
+    'icon'  => 'bi-shop',
+    'href'  => BASE_URL.'/admin/dealers.php',
+  ],
+  [
+    'title' => 'Onay Bekleyen Bayi',
+    'value' => fmt_count($dealerCounts['pending'] ?? 0),
+    'sub'   => 'Başvuruları Bayiler sayfasından onaylayın.',
+    'icon'  => 'bi-person-check',
+    'href'  => BASE_URL.'/admin/dealers.php?filter=pending',
+  ],
+  [
+    'title' => 'Aktif Kampanyalar',
+    'value' => fmt_count($campaignCount),
+    'sub'   => 'Tüm etkinlik panellerinde yayında.',
+    'icon'  => 'bi-megaphone',
+    'href'  => BASE_URL.'/admin/campaigns.php',
+  ],
+  [
+    'title' => 'Aktif Etkinlik',
+    'value' => fmt_count($eventStats['active']),
+    'sub'   => 'Toplam etkinlik: '.fmt_count($eventStats['total']).'.',
+    'icon'  => 'bi-calendar-event',
+    'href'  => BASE_URL.'/admin/venue_events.php',
+  ],
+  [
+    'title' => 'Ödeme Bekleyen',
+    'value' => fmt_count($pendingTopupCount),
+    'sub'   => 'Toplam tutar '.format_currency($pendingTopupAmount).'.',
+    'icon'  => 'bi-credit-card',
+    'href'  => BASE_URL.'/admin/dealers.php?tab=finance',
+  ],
+  [
+    'title' => 'İnceleme Bekleyen',
+    'value' => fmt_count($reviewTopupCount),
+    'sub'   => 'Doğrulanmayı bekleyen tutar '.format_currency($reviewTopupAmount).'.',
+    'icon'  => 'bi-clipboard-check',
+    'href'  => BASE_URL.'/admin/dealers.php?tab=finance',
+  ],
+  [
+    'title' => 'Tamamlanan Ödemeler',
+    'value' => fmt_count($completedTopupCount),
+    'sub'   => 'Toplam tahsilat '.format_currency($completedTopupAmount).'.',
+    'icon'  => 'bi-cash-coin',
+    'href'  => BASE_URL.'/admin/dealers.php?tab=finance',
+  ],
+  [
+    'title' => 'Bekleyen Cashback',
+    'value' => fmt_count($cashbackSummary['count']),
+    'sub'   => 'Ödenecek tutar '.format_currency($cashbackSummary['amount']).'.',
+    'icon'  => 'bi-gift',
+    'href'  => BASE_URL.'/admin/dealers.php?tab=cashback',
+  ],
+  [
+    'title' => 'Yaklaşan Etkinlik',
+    'value' => fmt_count($eventStats['upcoming']),
+    'sub'   => 'Önümüzdeki tarihler için hazır.',
+    'icon'  => 'bi-flag',
+    'href'  => BASE_URL.'/admin/venue_events.php?filter=upcoming',
+  ],
+  [
+    'title' => 'Tamamlanan Etkinlik',
+    'value' => fmt_count($eventStats['completed']),
+    'sub'   => 'Arşivde güvenli şekilde saklanıyor.',
+    'icon'  => 'bi-check2-circle',
+    'href'  => BASE_URL.'/admin/venue_events.php?filter=past',
+  ],
+  [
+    'title' => 'Aktif Çiftler',
+    'value' => fmt_count($eventStats['active']),
+    'sub'   => 'Panel erişimi açık çift sayısı.',
+    'icon'  => 'bi-people',
+    'href'  => BASE_URL.'/admin/venue_events.php?filter=active',
+  ],
+  [
+    'title' => 'Günlük Güncelleme',
+    'value' => date('d.m'),
+    'sub'   => 'Raporlar güncel verilerden oluşturuldu.',
+    'icon'  => 'bi-arrow-repeat',
+    'href'  => null,
+  ],
+];
 ?>
 <!doctype html>
 <html lang="tr">
@@ -114,13 +201,18 @@ $subtitle = 'Salon: '.$VNAME.' • BİKARE platform göstergeleri';
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <?=admin_base_styles()?>
 <style>
-  .stat-grid .stat-card{ display:flex; gap:18px; align-items:flex-start; background:var(--surface); border-radius:22px; padding:22px; box-shadow:0 24px 60px -38px rgba(14,165,181,.55); position:relative; overflow:hidden; }
-  .stat-grid .stat-card::after{ content:''; position:absolute; inset:auto -70px -70px auto; width:160px; height:160px; border-radius:50%; background:rgba(14,165,181,.1); }
-  .stat-icon{ width:58px; height:58px; border-radius:18px; display:flex; align-items:center; justify-content:center; background:rgba(14,165,181,.15); color:var(--brand); font-size:1.5rem; flex-shrink:0; }
-  .stat-meta{ position:relative; z-index:1; }
-  .stat-title{ font-size:.78rem; letter-spacing:.16em; text-transform:uppercase; color:var(--admin-muted); font-weight:600; margin-bottom:6px; }
-  .stat-value{ font-size:2.1rem; font-weight:700; color:var(--ink); margin-bottom:4px; }
-  .stat-sub{ font-size:.9rem; color:var(--admin-muted); }
+  .stat-board{margin-bottom:3rem;}
+  .stat-card{position:relative; display:block; text-decoration:none; background:linear-gradient(145deg, rgba(14,165,181,.15), rgba(255,255,255,.9)); border:1px solid rgba(14,165,181,.18); border-radius:26px; padding:24px 26px; box-shadow:0 28px 60px -38px rgba(14,165,181,.45); color:var(--ink); min-height:180px; overflow:hidden; transition:transform .2s ease, box-shadow .2s ease, border-color .2s ease;}
+  .stat-card::after{content:""; position:absolute; inset:auto -70px -70px auto; width:180px; height:180px; background:rgba(14,165,181,.18); filter:blur(0); border-radius:50%; transition:opacity .3s ease;} 
+  .stat-card:hover{transform:translateY(-6px); box-shadow:0 38px 70px -36px rgba(14,165,181,.55); border-color:rgba(14,165,181,.35);} 
+  .stat-card.is-static{cursor:default;} 
+  .stat-card.is-static:hover{transform:none; box-shadow:0 28px 60px -38px rgba(14,165,181,.45); border-color:rgba(14,165,181,.18);} 
+  .stat-icon{width:58px; height:58px; border-radius:20px; display:flex; align-items:center; justify-content:center; background:rgba(14,165,181,.18); color:var(--brand); font-size:1.5rem; margin-bottom:18px;} 
+  .stat-title{font-size:.8rem; letter-spacing:.14em; text-transform:uppercase; color:var(--admin-muted); font-weight:600; margin-bottom:6px;} 
+  .stat-value{font-size:2.3rem; font-weight:700; color:var(--ink); margin-bottom:6px;} 
+  .stat-sub{font-size:.95rem; color:var(--admin-muted); max-width:220px;} 
+  .stat-arrow{position:absolute; right:24px; top:28px; font-size:1.2rem; color:rgba(14,165,181,.65); transition:transform .2s ease;} 
+  .stat-card:hover .stat-arrow{transform:translateX(4px);} 
   .quick-actions{ display:grid; gap:16px; }
   .quick-actions a{ display:flex; align-items:center; justify-content:space-between; background:var(--surface); border-radius:18px; padding:18px 20px; text-decoration:none; color:var(--ink); box-shadow:0 22px 60px -40px rgba(15,23,42,.55); transition:transform .2s ease, box-shadow .2s ease; }
   .quick-actions a:hover{ transform:translateY(-2px); box-shadow:0 30px 62px -42px rgba(14,165,181,.45); }
@@ -139,109 +231,21 @@ $subtitle = 'Salon: '.$VNAME.' • BİKARE platform göstergeleri';
 
   <?php flash_box(); ?>
 
-  <div class="stat-grid row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-shop"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Toplam Bayi</div>
-        <div class="stat-value"><?=fmt_count($dealerCounts['all'] ?? 0)?></div>
-        <div class="stat-sub">Aktif: <?=fmt_count($dealerCounts['active'] ?? 0)?> • Pasif: <?=fmt_count($dealerCounts['inactive'] ?? 0)?></div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-person-check"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Onay Bekleyen Bayi</div>
-        <div class="stat-value"><?=fmt_count($dealerCounts['pending'] ?? 0)?></div>
-        <div class="stat-sub">Yeni başvuruları Bayiler sayfasından inceleyin.</div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-megaphone"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Aktif Kampanyalar</div>
-        <div class="stat-value"><?=fmt_count($campaignCount)?></div>
-        <div class="stat-sub">Tüm etkinlik panellerinde yayında.</div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-calendar-event"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Aktif Etkinlik</div>
-        <div class="stat-value"><?=fmt_count($eventStats['active'])?></div>
-        <div class="stat-sub">Toplam etkinlik: <?=fmt_count($eventStats['total'])?>.</div>
-      </div>
-    </div></div>
-  </div>
-
-  <div class="stat-grid row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-4">
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-credit-card"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Ödeme Bekleyen</div>
-        <div class="stat-value"><?=fmt_count($pendingTopupCount)?></div>
-        <div class="stat-sub">Toplam tutar <?=format_currency($pendingTopupAmount)?>.</div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-clipboard-check"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">İnceleme Bekleyen</div>
-        <div class="stat-value"><?=fmt_count($reviewTopupCount)?></div>
-        <div class="stat-sub">Doğrulanmayı bekleyen tutar <?=format_currency($reviewTopupAmount)?>.</div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-cash-coin"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Tamamlanan Ödemeler</div>
-        <div class="stat-value"><?=fmt_count($completedTopupCount)?></div>
-        <div class="stat-sub">Toplam tahsilat <?=format_currency($completedTopupAmount)?>.</div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-gift"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Bekleyen Cashback</div>
-        <div class="stat-value"><?=fmt_count($cashbackSummary['count'])?></div>
-        <div class="stat-sub">Ödenecek tutar <?=format_currency($cashbackSummary['amount'])?>.</div>
-      </div>
-    </div></div>
-  </div>
-
-  <div class="stat-grid row row-cols-1 row-cols-md-2 row-cols-xl-4 g-3 mb-5">
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-flag"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Yaklaşan Etkinlik</div>
-        <div class="stat-value"><?=fmt_count($eventStats['upcoming'])?></div>
-        <div class="stat-sub">Önümüzdeki tarihler için hazır.</div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Tamamlanan Etkinlik</div>
-        <div class="stat-value"><?=fmt_count($eventStats['completed'])?></div>
-        <div class="stat-sub">Arşivde güvenli şekilde saklanıyor.</div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-people"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Aktif Çiftler</div>
-        <div class="stat-value"><?=fmt_count($eventStats['active'])?></div>
-        <div class="stat-sub">Panel erişimi açık çift sayısı.</div>
-      </div>
-    </div></div>
-    <div class="col"><div class="stat-card">
-      <div class="stat-icon"><i class="bi bi-arrow-repeat"></i></div>
-      <div class="stat-meta">
-        <div class="stat-title">Günlük Güncelleme</div>
-        <div class="stat-value"><?=date('d.m')?></div>
-        <div class="stat-sub">Raporlar güncel verilerden oluşturuldu.</div>
-      </div>
-    </div></div>
+  <div class="stat-board">
+    <div class="row g-3 row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4">
+      <?php foreach ($statCards as $card): ?>
+        <?php $isLink = !empty($card['href']); $tag = $isLink ? 'a' : 'div'; ?>
+        <div class="col">
+          <<?=$tag?> class="stat-card<?=$isLink ? '' : ' is-static'?>" <?php if ($isLink): ?>href="<?=h($card['href'])?>"<?php endif; ?>>
+            <span class="stat-icon"><i class="bi <?=h($card['icon'])?>"></i></span>
+            <div class="stat-title"><?=h($card['title'])?></div>
+            <div class="stat-value"><?=h($card['value'])?></div>
+            <div class="stat-sub"><?=h($card['sub'])?></div>
+            <?php if ($isLink): ?><span class="stat-arrow"><i class="bi bi-arrow-up-right"></i></span><?php endif; ?>
+          </<?=$tag?>>
+        </div>
+      <?php endforeach; ?>
+    </div>
   </div>
 
   <div class="row g-4 mb-5">
