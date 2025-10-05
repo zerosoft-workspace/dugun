@@ -11,6 +11,15 @@ if (session_status() === PHP_SESSION_NONE) {
 install_schema();
 
 $packages = site_public_packages();
+$content = site_public_content();
+$faqItems = $content['faq_items'];
+$footerNav = $content['footer_nav_links'];
+$contactWebsiteUrl = site_normalize_url($content['contact_website'] ?? '') ?? '';
+$contactWebsiteLabel = $content['contact_website_label'] ?? '';
+$contactPhoneHref = site_phone_href($content['contact_phone'] ?? '') ?? '';
+$contactPrimaryUrl = site_resolve_button_url($content['contact_primary_url'] ?? '') ?? '';
+$contactSecondaryUrl = site_resolve_button_url($content['contact_secondary_url'] ?? '') ?? '';
+$contactCtaButtonUrl = site_resolve_button_url($content['contact_cta_button_url'] ?? '') ?? '';
 $formData = $_SESSION['lead_form'] ?? [
   'customer_name' => '',
   'customer_email' => '',
@@ -68,11 +77,23 @@ unset($_SESSION['lead_success']);
   .muted{color:var(--muted);}
   .nav-link{font-weight:600;color:var(--muted)!important;}
   .nav-link:hover,.nav-link:focus{color:var(--brand)!important;}
+  .contact-card{border-radius:24px;background:#fff;box-shadow:0 24px 60px rgba(15,118,110,0.18);padding:32px;}
+  .contact-card ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;}
+  .contact-card ul li strong{color:var(--ink);min-width:84px;display:inline-block;}
+  .contact-card ul li a{color:var(--brand);font-weight:600;text-decoration:none;}
+  .contact-card ul li a:hover{color:var(--brand-dark);text-decoration:underline;}
+  .contact-card .btn-outline-secondary{border-color:rgba(14,165,181,0.35);color:var(--brand);background:rgba(14,165,181,0.08);}
+  .contact-card .btn-outline-secondary:hover{background:var(--brand);color:#fff;border-color:var(--brand);}
   .cta-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
   .navbar-toggler{border:none;box-shadow:none;}
-  footer{background:#0f172a;color:#e2e8f0;padding:36px 0;}
-  footer a{color:#94a3b8;text-decoration:none;}
-  footer a:hover{text-decoration:underline;}
+  footer{background:var(--brand);color:#f0fdfa;padding:48px 0 40px;margin-top:48px;}
+  footer h5, footer h6{color:#fff;}
+  footer a{color:rgba(255,255,255,0.9);font-weight:600;text-decoration:none;}
+  footer a:hover{color:#0f172a;text-decoration:underline;}
+  .footer-payment-logo{height:28px;filter:brightness(0) invert(1);opacity:0.85;transition:opacity .2s ease;}
+  .footer-payment-logo:hover{opacity:1;}
+  .footer-nav a{color:#fdfdfd;display:inline-block;margin-bottom:8px;}
+  .footer-nav a:hover{color:#0f172a;}
   @media(max-width:992px){.hero{padding:72px 28px;}.hero-visual img:nth-child(2){display:none;}}
   @media(max-width:768px){.form-section{padding:32px;}}
 </style>
@@ -311,40 +332,26 @@ unset($_SESSION['lead_success']);
         <p class="muted">BİKARE ile ilgili merak ettiğiniz konuları sizin için derledik. Daha fazlası için bizimle iletişime geçebilirsiniz.</p>
       </div>
       <div class="col-lg-7">
-        <div class="accordion" id="faqAccordion">
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="faqOne">
-              <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faqOneCollapse" aria-expanded="true" aria-controls="faqOneCollapse">Ödeme sonrasında panel ne kadar sürede hazır olur?</button>
-            </h2>
-            <div id="faqOneCollapse" class="accordion-collapse collapse show" aria-labelledby="faqOne" data-bs-parent="#faqAccordion">
-              <div class="accordion-body">PayTR üzerinden ödemeniz tamamlandığında sistemimiz etkinliğinizi birkaç dakika içinde kurar. QR kodlar ve giriş bilgileri otomatik olarak e-posta ile gönderilir.</div>
-            </div>
+        <?php if ($faqItems): ?>
+          <div class="accordion" id="faqAccordion">
+            <?php foreach ($faqItems as $i => $faq):
+              $headingId = 'faqHeading'.$i;
+              $collapseId = 'faqCollapse'.$i;
+              $isFirst = ($i === 0);
+            ?>
+              <div class="accordion-item">
+                <h2 class="accordion-header" id="<?=h($headingId)?>">
+                  <button class="accordion-button<?=$isFirst ? '' : ' collapsed'?>" type="button" data-bs-toggle="collapse" data-bs-target="#<?=h($collapseId)?>" aria-expanded="<?=$isFirst ? 'true' : 'false'?>" aria-controls="<?=h($collapseId)?>"><?=h($faq['question'])?></button>
+                </h2>
+                <div id="<?=h($collapseId)?>" class="accordion-collapse collapse<?=$isFirst ? ' show' : ''?>" aria-labelledby="<?=h($headingId)?>" data-bs-parent="#faqAccordion">
+                  <div class="accordion-body"><?=nl2br(h($faq['answer']))?></div>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="faqTwo">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqTwoCollapse" aria-expanded="false" aria-controls="faqTwoCollapse">Misafirler hangi formatlarda dosya yükleyebilir?</button>
-            </h2>
-            <div id="faqTwoCollapse" class="accordion-collapse collapse" aria-labelledby="faqTwo" data-bs-parent="#faqAccordion">
-              <div class="accordion-body">BİKARE yüksek çözünürlüklü fotoğraf ve videoları destekler. Büyük dosyalar için otomatik sıkıştırma ve format uyumluluğu sunar.</div>
-            </div>
-          </div>
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="faqThree">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqThreeCollapse" aria-expanded="false" aria-controls="faqThreeCollapse">Etkinlik sonrası misafir galerisini kullanmaya devam edebilir miyiz?</button>
-            </h2>
-            <div id="faqThreeCollapse" class="accordion-collapse collapse" aria-labelledby="faqThree" data-bs-parent="#faqAccordion">
-              <div class="accordion-body">Evet. Galeriniz etkinlikten sonra da açık kalır. Yorumları, beğenileri ve sohbet geçmişini dilediğiniz zaman görüntüleyebilirsiniz.</div>
-            </div>
-          </div>
-          <div class="accordion-item">
-            <h2 class="accordion-header" id="faqFour">
-              <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqFourCollapse" aria-expanded="false" aria-controls="faqFourCollapse">Bayi olmadan da BİKARE'yi kullanabilir miyiz?</button>
-            </h2>
-            <div id="faqFourCollapse" class="accordion-collapse collapse" aria-labelledby="faqFour" data-bs-parent="#faqAccordion">
-              <div class="accordion-body">Elbette. Web sitemiz üzerinden dilediğiniz paketi seçip saniyeler içinde satın alabilir, kendi etkinliğiniz için BİKARE panelini kurabilirsiniz.</div>
-            </div>
-          </div>
-        </div>
+        <?php else: ?>
+          <div class="alert alert-info">Henüz sıkça sorulan soru eklenmedi.</div>
+        <?php endif; ?>
       </div>
     </div>
   </section>
@@ -352,28 +359,50 @@ unset($_SESSION['lead_success']);
   <section id="iletisim" class="mb-5">
     <div class="row g-4 align-items-stretch">
       <div class="col-lg-6">
-        <div class="feature-card h-100">
-          <h3 class="fw-bold mb-3">Bizimle iletişime geçin</h3>
-          <p class="muted">Projenizle ilgili sorularınızı, özel taleplerinizi veya demo isteğinizi paylaşın. Ekibimiz en kısa sürede dönüş yapacaktır.</p>
-          <ul class="list-unstyled d-flex flex-column gap-3">
-            <li><strong>Telefon:</strong> <a href="tel:+908502225566">+90 850 222 55 66</a></li>
-            <li><strong>E-posta:</strong> <a href="mailto:info@zerosoft.com.tr">info@zerosoft.com.tr</a></li>
-            <li><strong>Adres:</strong> Zerosoft Teknoloji, İzmir Teknopark</li>
-            <li><strong>Web:</strong> <a href="https://zerosoft.com.tr" target="_blank" rel="noopener">zerosoft.com.tr</a></li>
+        <div class="contact-card h-100">
+          <h3 class="fw-bold mb-3"><?=h($content['contact_title'])?></h3>
+          <?php if (!empty($content['contact_text'])): ?>
+            <p class="muted mb-4"><?=h($content['contact_text'])?></p>
+          <?php endif; ?>
+          <ul>
+            <?php if (!empty($content['contact_phone'])): ?>
+              <li><strong>Telefon:</strong> <?php if ($contactPhoneHref): ?><a href="<?=h($contactPhoneHref)?>"><?=h($content['contact_phone'])?></a><?php else: ?><?=h($content['contact_phone'])?><?php endif; ?></li>
+            <?php endif; ?>
+            <?php if (!empty($content['contact_email'])): ?>
+              <li><strong>E-posta:</strong> <a href="mailto:<?=h($content['contact_email'])?>"><?=h($content['contact_email'])?></a></li>
+            <?php endif; ?>
+            <?php if (!empty($content['contact_address'])): ?>
+              <li><strong>Adres:</strong> <?=h($content['contact_address'])?></li>
+            <?php endif; ?>
+            <?php if ($contactWebsiteUrl): ?>
+              <li><strong>Web:</strong> <a href="<?=h($contactWebsiteUrl)?>" target="_blank" rel="noopener"><?=h($contactWebsiteLabel ?: $contactWebsiteUrl)?></a></li>
+            <?php endif; ?>
           </ul>
-          <div class="d-flex flex-wrap gap-3">
-            <a class="btn btn-outline-secondary rounded-pill" href="mailto:info@zerosoft.com.tr">E-posta Gönder</a>
-            <a class="btn btn-brand" href="tel:+908502225566">Hemen Ara</a>
+          <div class="d-flex flex-wrap gap-3 pt-3">
+            <?php if ($contactPrimaryUrl && !empty($content['contact_primary_label'])): ?>
+              <a class="btn btn-outline-secondary rounded-pill" href="<?=h($contactPrimaryUrl)?>"><?=h($content['contact_primary_label'])?></a>
+            <?php endif; ?>
+            <?php if ($contactSecondaryUrl && !empty($content['contact_secondary_label'])): ?>
+              <a class="btn btn-brand" href="<?=h($contactSecondaryUrl)?>"><?=h($content['contact_secondary_label'])?></a>
+            <?php endif; ?>
           </div>
         </div>
       </div>
       <div class="col-lg-6">
         <div class="hero position-relative text-white h-100" style="min-height:320px;">
           <div class="position-relative" style="z-index:2;">
-            <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Zerosoft ile tanışın</span>
-            <h3 class="fw-bold mt-3">Birlikte unutulmaz deneyimler tasarlayalım</h3>
-            <p>Etkinlik konseptiniz, katılımcı sayınız veya ihtiyaç duyduğunuz entegrasyonları konuşmak için randevu planlayalım. BİKARE ekibi tüm süreci sizin için yönetir.</p>
-            <a class="btn btn-light text-dark fw-semibold" href="#lead-form">Demo Talep Et</a>
+            <?php if (!empty($content['contact_cta_badge'])): ?>
+              <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold"><?=h($content['contact_cta_badge'])?></span>
+            <?php endif; ?>
+            <?php if (!empty($content['contact_cta_title'])): ?>
+              <h3 class="fw-bold mt-3"><?=h($content['contact_cta_title'])?></h3>
+            <?php endif; ?>
+            <?php if (!empty($content['contact_cta_text'])): ?>
+              <p><?=nl2br(h($content['contact_cta_text']))?></p>
+            <?php endif; ?>
+            <?php if ($contactCtaButtonUrl && !empty($content['contact_cta_button_label'])): ?>
+              <a class="btn btn-light text-dark fw-semibold" href="<?=h($contactCtaButtonUrl)?>"><?=h($content['contact_cta_button_label'])?></a>
+            <?php endif; ?>
           </div>
         </div>
       </div>
@@ -461,34 +490,44 @@ unset($_SESSION['lead_success']);
 
 <footer>
   <div class="container">
-    <div class="row gy-4">
-      <div class="col-md-4">
+    <div class="row gy-4 align-items-start">
+      <div class="col-lg-4">
         <h5 class="fw-bold">BİKARE</h5>
-        <p class="small">Misafir deneyimini dijitalleştirir, etkinliğinizin her anını tek karede toplarız. Zerosoft güvencesiyle geliştirilen BİKARE, modern etkinliklerin vazgeçilmezi.</p>
+        <p class="small mb-3"><?=nl2br(h($content['footer_about']))?></p>
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" class="footer-payment-logo" loading="lazy">
+          <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" class="footer-payment-logo" loading="lazy">
+          <img src="https://www.paytr.com/img/paytr-logo.svg" alt="PayTR" class="footer-payment-logo" loading="lazy">
+        </div>
       </div>
-      <div class="col-md-4">
-        <h6 class="fw-semibold">Zerosoft</h6>
-        <ul class="list-unstyled small">
-          <li>Telefon: <a href="tel:+908502225566">+90 850 222 55 66</a></li>
-          <li>E-posta: <a href="mailto:info@zerosoft.com.tr">info@zerosoft.com.tr</a></li>
-          <li>Web: <a href="https://zerosoft.com.tr" target="_blank" rel="noopener">zerosoft.com.tr</a></li>
+      <div class="col-lg-4">
+        <h6 class="fw-semibold mb-2"><?=h($content['footer_company'])?></h6>
+        <ul class="list-unstyled small mb-0">
+          <?php if (!empty($content['contact_phone'])): ?>
+            <li>Telefon: <?php if ($contactPhoneHref): ?><a href="<?=h($contactPhoneHref)?>"><?=h($content['contact_phone'])?></a><?php else: ?><?=h($content['contact_phone'])?><?php endif; ?></li>
+          <?php endif; ?>
+          <?php if (!empty($content['contact_email'])): ?>
+            <li>E-posta: <a href="mailto:<?=h($content['contact_email'])?>"><?=h($content['contact_email'])?></a></li>
+          <?php endif; ?>
+          <?php if ($contactWebsiteUrl): ?>
+            <li>Web: <a href="<?=h($contactWebsiteUrl)?>" target="_blank" rel="noopener"><?=h($contactWebsiteLabel ?: $contactWebsiteUrl)?></a></li>
+          <?php endif; ?>
         </ul>
       </div>
-      <div class="col-md-4">
-        <h6 class="fw-semibold">Navigasyon</h6>
-        <ul class="list-unstyled small">
-          <li><a href="#hakkimizda">Hakkımızda</a></li>
-          <li><a href="#nasil">Nasıl Çalışıyoruz</a></li>
-          <li><a href="#paketler">Paketler</a></li>
-          <li><a href="#sss">SSS</a></li>
-          <li><a href="#iletisim">İletişim</a></li>
-        </ul>
+      <div class="col-lg-4">
+        <h6 class="fw-semibold mb-2">Navigasyon</h6>
+        <div class="footer-nav">
+          <?php foreach ($footerNav as $nav): ?>
+            <a href="<?=h($nav['url'])?>"><?=h($nav['label'])?></a>
+          <?php endforeach; ?>
+        </div>
       </div>
     </div>
-    <div class="border-top border-secondary mt-4 pt-3 d-flex flex-column flex-md-row justify-content-between small text-secondary">
-      <span>© <?=date('Y')?> Zerosoft Teknoloji</span>
-      <span>Developed by Zerosoft — BİKARE Dijital Etkinlik Platformu</span>
+    <div class="border-top border-light mt-4 pt-3 d-flex flex-column flex-md-row justify-content-between gap-2 small">
+      <span><?=h($content['footer_disclaimer_left'])?></span>
+      <span><?=h($content['footer_disclaimer_right'])?></span>
     </div>
   </div>
 </footer>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body></html>

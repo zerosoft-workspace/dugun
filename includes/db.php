@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240506_01');
+  define('APP_SCHEMA_VERSION', '20240509_01');
 }
 
 function pdo(): PDO {
@@ -41,6 +41,12 @@ function install_schema(){
     meta_key VARCHAR(64) PRIMARY KEY,
     meta_value TEXT NULL,
     updated_at DATETIME NOT NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  $pdo->exec("CREATE TABLE IF NOT EXISTS site_settings(
+    setting_key VARCHAR(100) PRIMARY KEY,
+    setting_value MEDIUMTEXT NULL,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   $currentVersion = null;

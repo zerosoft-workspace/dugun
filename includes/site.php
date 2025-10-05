@@ -73,6 +73,164 @@ function site_public_packages(): array {
   return dealer_packages_public();
 }
 
+function site_content_defaults(): array {
+  $year = date('Y');
+  return [
+    'contact_title' => 'Bizimle iletişime geçin',
+    'contact_text' => 'Projenizle ilgili sorularınızı, özel taleplerinizi veya demo isteğinizi paylaşın. Ekibimiz en kısa sürede dönüş yapacaktır.',
+    'contact_phone' => '+90 850 222 55 66',
+    'contact_email' => 'info@zerosoft.com.tr',
+    'contact_address' => 'Zerosoft Teknoloji, İzmir Teknopark',
+    'contact_website' => 'https://zerosoft.com.tr',
+    'contact_website_label' => 'zerosoft.com.tr',
+    'contact_primary_label' => 'E-posta Gönder',
+    'contact_primary_url' => 'mailto:info@zerosoft.com.tr',
+    'contact_secondary_label' => 'Hemen Ara',
+    'contact_secondary_url' => 'tel:+908502225566',
+    'contact_cta_badge' => 'Zerosoft ile tanışın',
+    'contact_cta_title' => 'Birlikte unutulmaz deneyimler tasarlayalım',
+    'contact_cta_text' => 'Etkinlik konseptiniz, katılımcı sayınız veya ihtiyaç duyduğunuz entegrasyonları konuşmak için randevu planlayalım. BİKARE ekibi tüm süreci sizin için yönetir.',
+    'contact_cta_button_label' => 'Demo Talep Et',
+    'contact_cta_button_url' => '#lead-form',
+    'footer_about' => 'Misafir deneyimini dijitalleştirir, etkinliğinizin her anını tek karede toplarız. Zerosoft güvencesiyle geliştirilen BİKARE, modern etkinliklerin vazgeçilmezi.',
+    'footer_company' => 'Zerosoft Teknoloji',
+    'footer_disclaimer_left' => '© '.$year.' Zerosoft Teknoloji',
+    'footer_disclaimer_right' => 'Developed by Zerosoft — BİKARE Dijital Etkinlik Platformu',
+    'footer_nav_links' => [
+      ['label' => 'Hakkımızda', 'url' => '#hakkimizda'],
+      ['label' => 'Nasıl Çalışıyoruz', 'url' => '#nasil'],
+      ['label' => 'Paketler', 'url' => '#paketler'],
+      ['label' => 'SSS', 'url' => '#sss'],
+      ['label' => 'İletişim', 'url' => '#iletisim'],
+    ],
+    'faq_items' => [
+      ['question' => 'Ödeme sonrasında panel ne kadar sürede hazır olur?', 'answer' => 'PayTR üzerinden ödemeniz tamamlandığında sistemimiz etkinliğinizi birkaç dakika içinde kurar. QR kodlar ve giriş bilgileri otomatik olarak e-posta ile gönderilir.'],
+      ['question' => 'Misafirler hangi formatlarda dosya yükleyebilir?', 'answer' => 'BİKARE yüksek çözünürlüklü fotoğraf ve videoları destekler. Büyük dosyalar için otomatik sıkıştırma ve format uyumluluğu sunar.'],
+      ['question' => 'Etkinlik sonrası misafir galerisini kullanmaya devam edebilir miyiz?', 'answer' => 'Evet. Galeriniz etkinlikten sonra da açık kalır. Yorumları, beğenileri ve sohbet geçmişini dilediğiniz zaman görüntüleyebilirsiniz.'],
+      ['question' => "Bayi olmadan da BİKARE'yi kullanabilir miyiz?", 'answer' => 'Elbette. Web sitemiz üzerinden dilediğiniz paketi seçip saniyeler içinde satın alabilir, kendi etkinliğiniz için BİKARE panelini kurabilirsiniz.'],
+    ],
+  ];
+}
+
+function site_settings_all(): array {
+  $defaults = site_content_defaults();
+  $values = $defaults;
+  try {
+    if (!table_exists('site_settings')) {
+      return $values;
+    }
+    $st = pdo()->query("SELECT setting_key, setting_value FROM site_settings");
+  } catch (Throwable $e) {
+    return $values;
+  }
+
+  while ($row = $st->fetch()) {
+    $key = $row['setting_key'];
+    $val = $row['setting_value'];
+    if (!array_key_exists($key, $defaults)) {
+      $values[$key] = $val;
+      continue;
+    }
+    if (is_array($defaults[$key])) {
+      $decoded = safe_json_decode((string)$val, true);
+      if (is_array($decoded)) {
+        $values[$key] = $decoded;
+      }
+    } else {
+      $values[$key] = (string)$val;
+    }
+  }
+  return $values;
+}
+
+function site_settings_update(array $data): void {
+  if (!$data) {
+    return;
+  }
+  try {
+    if (!table_exists('site_settings')) {
+      return;
+    }
+    $st = pdo()->prepare("REPLACE INTO site_settings (setting_key, setting_value, updated_at) VALUES (?,?,NOW())");
+  } catch (Throwable $e) {
+    return;
+  }
+
+  foreach ($data as $key => $value) {
+    if (is_array($value)) {
+      $value = safe_json_encode($value);
+    }
+    $st->execute([$key, $value]);
+  }
+}
+
+function site_public_content(): array {
+  $content = site_settings_all();
+
+  if (empty($content['contact_website_label']) && !empty($content['contact_website'])) {
+    $content['contact_website_label'] = preg_replace('~^https?://~i', '', $content['contact_website']);
+  }
+
+  if (!isset($content['faq_items']) || !is_array($content['faq_items'])) {
+    $content['faq_items'] = [];
+  }
+  $content['faq_items'] = array_values(array_filter($content['faq_items'], function ($item) {
+    if (!is_array($item)) {
+      return false;
+    }
+    $q = trim($item['question'] ?? '');
+    $a = trim($item['answer'] ?? '');
+    return $q !== '' && $a !== '';
+  }));
+
+  if (!isset($content['footer_nav_links']) || !is_array($content['footer_nav_links'])) {
+    $content['footer_nav_links'] = [];
+  }
+  $content['footer_nav_links'] = array_values(array_filter($content['footer_nav_links'], function ($item) {
+    if (!is_array($item)) {
+      return false;
+    }
+    $label = trim($item['label'] ?? '');
+    $url = trim($item['url'] ?? '');
+    return $label !== '' && $url !== '';
+  }));
+
+  return $content;
+}
+
+function site_phone_href(?string $phone): ?string {
+  if (!$phone) {
+    return null;
+  }
+  $digits = preg_replace('/[^0-9+]/', '', $phone);
+  if ($digits === '') {
+    return null;
+  }
+  return 'tel:'.$digits;
+}
+
+function site_normalize_url(?string $url): ?string {
+  $url = trim((string)$url);
+  if ($url === '') {
+    return null;
+  }
+  if (!preg_match('~^https?://~i', $url)) {
+    $url = 'https://'.$url;
+  }
+  return $url;
+}
+
+function site_resolve_button_url(?string $url): ?string {
+  $url = trim((string)$url);
+  if ($url === '') {
+    return null;
+  }
+  if (preg_match('~^(mailto:|tel:|#)~i', $url)) {
+    return $url;
+  }
+  return site_normalize_url($url);
+}
+
 function site_default_sales_venue_id(): int {
   $slug = 'genel-satis';
   $st = pdo()->prepare("SELECT id FROM venues WHERE slug=? LIMIT 1");

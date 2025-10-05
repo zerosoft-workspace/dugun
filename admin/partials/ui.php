@@ -58,6 +58,7 @@ CSS;
       'dealers'    => ['href' => BASE_URL.'/admin/dealers.php',    'label' => 'Bayiler'],
     ];
     if (is_superadmin()) {
+      $links['site'] = ['href' => BASE_URL.'/admin/site_content.php', 'label' => 'Site İçerikleri'];
       $links['packages'] = ['href' => BASE_URL.'/admin/dealer_packages.php', 'label' => 'Paketler'];
       $links['team'] = ['href' => BASE_URL.'/admin/team.php', 'label' => 'Yönetim'];
     }
