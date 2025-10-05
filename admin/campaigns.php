@@ -9,17 +9,10 @@ require_once __DIR__.'/partials/ui.php';
 require_admin();
 install_schema();
 
-if (function_exists('require_current_venue_or_redirect')) {
-  $venue = require_current_venue_or_redirect();
-  $VID   = (int)$venue['id'];
-  $VNAME = $venue['name'];
-  $VSLUG = $venue['slug'];
-} else {
-    if (empty($_SESSION['venue_id'])) { redirect(BASE_URL.'/admin/venues.php'); }
-    $VID   = (int)$_SESSION['venue_id'];
-    $VNAME = $_SESSION['venue_name'] ?? 'Salon';
-    $VSLUG = $_SESSION['venue_slug'] ?? '';
-}
+$venue = require_current_venue_or_redirect();
+$VID   = (int)$venue['id'];
+$VNAME = $venue['name'];
+$VSLUG = $venue['slug'];
 
 try {
   pdo()->query("SELECT 1 FROM campaigns LIMIT 1");

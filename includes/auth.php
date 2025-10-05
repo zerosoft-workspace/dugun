@@ -73,6 +73,44 @@ function require_superadmin(string $redirect = '/admin/dashboard.php'): void {
   }
 }
 
+if (!function_exists('require_current_venue_or_redirect')) {
+  /**
+   * Aktif salon seçimini garanti eder.
+   * Oturumda salon yoksa ilk aktif salonu otomatik seçer, hiç yoksa salon listesine yönlendirir.
+   */
+  function require_current_venue_or_redirect(string $redirect = '/admin/venues.php'): array {
+    if (!empty($_SESSION['venue_id'])) {
+      return [
+        'id'   => (int)$_SESSION['venue_id'],
+        'name' => $_SESSION['venue_name'] ?? 'Salon',
+        'slug' => $_SESSION['venue_slug'] ?? '',
+      ];
+    }
+
+    try {
+      $st = pdo()->query("SELECT id, name, slug FROM venues WHERE is_active = 1 ORDER BY id ASC LIMIT 1");
+      $row = $st ? $st->fetch() : null;
+    } catch (Throwable $e) {
+      $row = null;
+    }
+
+    if ($row) {
+      $_SESSION['venue_id']   = (int)$row['id'];
+      $_SESSION['venue_name'] = $row['name'];
+      $_SESSION['venue_slug'] = $row['slug'];
+
+      return [
+        'id'   => (int)$row['id'],
+        'name' => $row['name'],
+        'slug' => $row['slug'],
+      ];
+    }
+
+    flash('err', 'Aktif salon bulunamadı. Lütfen bir salon ekleyin.');
+    redirect($redirect);
+  }
+}
+
 /**
  * Koruma: Giriş yoksa login sayfasına yollar.
  * Login URL'sini istersen değiştir.

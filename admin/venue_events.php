@@ -9,13 +9,10 @@ require_once __DIR__.'/partials/ui.php';
 require_admin();
 install_schema();
 
-if (empty($_SESSION['venue_id'])) {
-  flash('err', 'Önce bir salon seçin.');
-  redirect('venues.php');
-}
-$VID   = (int)$_SESSION['venue_id'];
-$VNAME = $_SESSION['venue_name'] ?? 'Salon';
-$VSLUG = $_SESSION['venue_slug'] ?? '';
+$venue = require_current_venue_or_redirect();
+$VID   = (int)$venue['id'];
+$VNAME = $venue['name'];
+$VSLUG = $venue['slug'];
 
 // Yardımcı
 if (!function_exists('fmt_bytes_ve')) {
