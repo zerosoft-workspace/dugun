@@ -43,6 +43,106 @@ function dealer_generate_identifier_candidate(): string {
   return 'B'.str_pad((string)random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 }
 
+function dealer_validate_billing_inputs(array $input): array {
+  $billingTitle   = trim($input['billing_title'] ?? '');
+  $billingAddress = trim($input['billing_address'] ?? '');
+  $taxOffice      = trim($input['tax_office'] ?? '');
+  $taxNumber      = trim($input['tax_number'] ?? '');
+  $invoiceEmail   = trim($input['invoice_email'] ?? '');
+
+  if ($billingTitle === '' || $billingAddress === '' || $taxOffice === '' || $taxNumber === '') {
+    throw new InvalidArgumentException('Fatura bilgileri eksiksiz doldurulmalıdır.');
+  }
+
+  if ($invoiceEmail !== '' && !filter_var($invoiceEmail, FILTER_VALIDATE_EMAIL)) {
+    throw new InvalidArgumentException('Fatura e-posta adresi geçerli olmalıdır.');
+  }
+
+  return [
+    'billing_title'   => $billingTitle,
+    'billing_address' => $billingAddress,
+    'tax_office'      => $taxOffice,
+    'tax_number'      => $taxNumber,
+    'invoice_email'   => $invoiceEmail ?: null,
+  ];
+}
+
+function dealer_process_tax_document(?array $file, bool $required = false): ?string {
+  if (!$file || !isset($file['error']) || $file['error'] === UPLOAD_ERR_NO_FILE) {
+    if ($required) {
+      throw new InvalidArgumentException('Vergi levhası dosyası yüklenmelidir.');
+    }
+    return null;
+  }
+
+  if ($file['error'] !== UPLOAD_ERR_OK) {
+    throw new RuntimeException('Vergi levhası yüklenirken bir hata oluştu.');
+  }
+
+  if (!empty($file['size']) && $file['size'] > 10 * 1024 * 1024) {
+    throw new InvalidArgumentException('Vergi levhası dosyası en fazla 10 MB olabilir.');
+  }
+
+  $tmpPath = $file['tmp_name'];
+  $detectedMime = '';
+  if (class_exists('finfo')) {
+    $finfo = new finfo(FILEINFO_MIME_TYPE);
+    if ($finfo) {
+      $detectedMime = (string)$finfo->file($tmpPath);
+      unset($finfo);
+    }
+  }
+  if (!$detectedMime && function_exists('mime_content_type')) {
+    $detectedMime = (string)mime_content_type($tmpPath);
+  }
+  $detectedMime = strtolower($detectedMime ?: ($file['type'] ?? ''));
+
+  $allowed = [
+    'application/pdf' => 'pdf',
+    'image/jpeg'      => 'jpg',
+    'image/jpg'       => 'jpg',
+    'image/png'       => 'png',
+  ];
+
+  if (!isset($allowed[$detectedMime])) {
+    throw new InvalidArgumentException('Vergi levhası PDF, JPG veya PNG formatında olmalıdır.');
+  }
+
+  $dir = __DIR__.'/../uploads/dealer_docs';
+  if (!is_dir($dir)) {
+    mkdir($dir, 0775, true);
+  }
+
+  $filename = 'tax_'.date('Ymd_His').'_' . bin2hex(random_bytes(5)).'.'.$allowed[$detectedMime];
+  $dest = $dir.'/'.$filename;
+  if (!move_uploaded_file($tmpPath, $dest)) {
+    throw new RuntimeException('Vergi levhası dosyası kaydedilemedi.');
+  }
+
+  return 'uploads/dealer_docs/'.$filename;
+}
+
+function dealer_delete_tax_document(?string $path): void {
+  if (!$path) {
+    return;
+  }
+  $cleanPath = str_replace(['\\'], '/', $path);
+  if (str_contains($cleanPath, '..')) {
+    return;
+  }
+  $full = dirname(__DIR__).'/'.$cleanPath;
+  if (is_file($full)) {
+    @unlink($full);
+  }
+}
+
+function dealer_tax_document_url(?string $path): ?string {
+  if (!$path) {
+    return null;
+  }
+  return rtrim(BASE_URL, '/').'/'.ltrim($path, '/');
+}
+
 function dealer_email_template(string $headline, string $contentHtml): string {
   if (function_exists('site_email_template')) {
     return site_email_template($headline, $contentHtml);
@@ -443,8 +543,26 @@ function dealer_notify_new_application(array $dealer): void {
   if (!empty($dealer['company'])) {
     $html .= '<p><strong>Firma:</strong> '.h($dealer['company']).'</p>';
   }
+  if (!empty($dealer['billing_title'])) {
+    $html .= '<p><strong>Fatura Ünvanı:</strong> '.h($dealer['billing_title']).'</p>';
+  }
+  if (!empty($dealer['tax_office']) || !empty($dealer['tax_number'])) {
+    $html .= '<p><strong>Vergi Dairesi / No:</strong> '.h(trim(($dealer['tax_office'] ?? '').' / '.($dealer['tax_number'] ?? ''), ' /')).'</p>';
+  }
+  if (!empty($dealer['billing_address'])) {
+    $html .= '<p><strong>Fatura Adresi:</strong><br>'.nl2br(h($dealer['billing_address'])).'</p>';
+  }
+  if (!empty($dealer['invoice_email'])) {
+    $html .= '<p><strong>Fatura E-postası:</strong> '.h($dealer['invoice_email']).'</p>';
+  }
   if (!empty($dealer['notes'])) {
     $html .= '<p><strong>Not:</strong><br>'.nl2br(h($dealer['notes'])).'</p>';
+  }
+  if (!empty($dealer['tax_document_path'])) {
+    $docUrl = dealer_tax_document_url($dealer['tax_document_path']);
+    if ($docUrl) {
+      $html .= '<p><strong>Vergi Levhası:</strong> <a href="'.h($docUrl).'" target="_blank">Belgeyi görüntüle</a></p>';
+    }
   }
   send_mail_simple($to, $subject, $html);
 }

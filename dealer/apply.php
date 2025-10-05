@@ -15,6 +15,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $company = trim($_POST['company'] ?? '');
   $notes = trim($_POST['notes'] ?? '');
 
+  try {
+    $billing = dealer_validate_billing_inputs($_POST);
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+    redirect($_SERVER['PHP_SELF']);
+  }
+
+  try {
+    $taxDocumentPath = dealer_process_tax_document($_FILES['tax_document'] ?? null, true);
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+    redirect($_SERVER['PHP_SELF']);
+  }
+
   if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     flash('err', 'Lütfen adınızı ve geçerli bir e-posta adresini girin.');
     redirect($_SERVER['PHP_SELF']);
@@ -25,8 +39,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect($_SERVER['PHP_SELF']);
   }
 
-  $st = pdo()->prepare("INSERT INTO dealers (name,email,phone,company,notes,status,created_at) VALUES (?,?,?,?,?,'pending',?)");
-  $st->execute([$name,$email,$phone,$company,$notes, now()]);
+  $st = pdo()->prepare("INSERT INTO dealers (name,email,phone,company,billing_title,billing_address,tax_office,tax_number,invoice_email,tax_document_path,notes,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)");
+  $st->execute([
+    $name,
+    $email,
+    $phone,
+    $company,
+    $billing['billing_title'],
+    $billing['billing_address'],
+    $billing['tax_office'],
+    $billing['tax_number'],
+    $billing['invoice_email'],
+    $taxDocumentPath,
+    $notes,
+    now(),
+    now(),
+  ]);
   $dealerId = (int)pdo()->lastInsertId();
   dealer_ensure_codes($dealerId);
 
@@ -127,7 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
       <?php else: ?>
         <?php flash_box(); ?>
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
           <div>
             <label>Ad Soyad</label>
@@ -145,13 +173,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <label>Telefon</label>
             <input name="phone" placeholder="05xx xxx xx xx">
           </div>
+          <div>
+            <label>Fatura Ünvanı</label>
+            <input name="billing_title" required placeholder="Vergi levhasındaki ünvan">
+          </div>
+          <div>
+            <label>Vergi Dairesi</label>
+            <input name="tax_office" required placeholder="Örn. Kadıköy">
+          </div>
+          <div>
+            <label>Vergi Numarası</label>
+            <input name="tax_number" required placeholder="Örn. 1234567890">
+          </div>
+          <div>
+            <label>Fatura E-postası</label>
+            <input type="email" name="invoice_email" placeholder="finans@firma.com">
+          </div>
           <div class="full">
             <label>Notlarınız</label>
             <textarea name="notes" placeholder="Salon sayısı, bulunduğunuz şehir ve işbirliği beklentileriniz"></textarea>
           </div>
+          <div class="full">
+            <label>Fatura Adresi</label>
+            <textarea name="billing_address" required placeholder="Vergi levhasında yer alan resmi adres"></textarea>
+          </div>
+          <div class="full">
+            <label>Vergi Levhası (PDF, JPG veya PNG)</label>
+            <input type="file" name="tax_document" accept=".pdf,.jpg,.jpeg,.png" required>
+          </div>
           <button class="btn-brand" type="submit">Başvuruyu Gönder</button>
         </form>
-        <div class="contact-hint">Başvurunuz ile birlikte sözleşme sürecini hızlandırmak için vergi levhanızı ve salon görsellerinizi hazır bulundurabilirsiniz.</div>
+        <div class="contact-hint">Başvurunuzu göndermek için vergi levhanızı yüklemeniz zorunludur. Belgeleriniz yalnızca sözleşme ve faturalandırma süreçlerinde kullanılacaktır.</div>
       <?php endif; ?>
     </section>
   </div>

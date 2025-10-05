@@ -46,6 +46,20 @@ if ($action === 'create') {
   $license = parse_license_input($licenseInput);
   $code = dealer_generate_unique_identifier();
 
+  try {
+    $billing = dealer_validate_billing_inputs($_POST);
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+    redirect($_SERVER['PHP_SELF']);
+  }
+
+  try {
+    $taxDocumentPath = dealer_process_tax_document($_FILES['tax_document'] ?? null, true);
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+    redirect($_SERVER['PHP_SELF']);
+  }
+
   if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     flash('err', 'Ad ve geçerli e-posta gerekli.');
     redirect($_SERVER['PHP_SELF']);
@@ -56,8 +70,8 @@ if ($action === 'create') {
   }
 
   $pdo = pdo();
-  $pdo->prepare("INSERT INTO dealers (code,name,email,phone,company,notes,status,license_expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
-      ->execute([$code,$name,$email,$phone,$company,$notes,$status,$license, now(), now()]);
+  $pdo->prepare("INSERT INTO dealers (code,name,email,phone,company,billing_title,billing_address,tax_office,tax_number,invoice_email,tax_document_path,notes,status,license_expires_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
+      ->execute([$code,$name,$email,$phone,$company,$billing['billing_title'],$billing['billing_address'],$billing['tax_office'],$billing['tax_number'],$billing['invoice_email'],$taxDocumentPath,$notes,$status,$license, now(), now()]);
   $dealerId = (int)$pdo->lastInsertId();
   dealer_ensure_codes($dealerId);
 
@@ -88,6 +102,26 @@ if ($action === 'update') {
   $licenseInput = $_POST['license_expires_at'] ?? '';
   $license = parse_license_input($licenseInput);
 
+  try {
+    $billing = dealer_validate_billing_inputs($_POST);
+  } catch (Throwable $e) {
+    flash('err','Fatura bilgileri: '.$e->getMessage());
+    redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
+  }
+
+  try {
+    $newTaxDocumentPath = dealer_process_tax_document($_FILES['tax_document'] ?? null, false);
+  } catch (Throwable $e) {
+    flash('err', $e->getMessage());
+    redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
+  }
+
+  $taxDocumentPath = $dealer['tax_document_path'] ?? null;
+  if ($newTaxDocumentPath) {
+    dealer_delete_tax_document($taxDocumentPath);
+    $taxDocumentPath = $newTaxDocumentPath;
+  }
+
   if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
     flash('err','Ad ve geçerli e-posta gerekli.');
     redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
@@ -99,8 +133,8 @@ if ($action === 'update') {
     redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
   }
 
-  pdo()->prepare("UPDATE dealers SET name=?, email=?, phone=?, company=?, notes=?, status=?, license_expires_at=?, updated_at=? WHERE id=?")
-      ->execute([$name,$email,$phone,$company,$notes,$status,$license, now(), $dealerId]);
+  pdo()->prepare("UPDATE dealers SET name=?, email=?, phone=?, company=?, billing_title=?, billing_address=?, tax_office=?, tax_number=?, invoice_email=?, tax_document_path=?, notes=?, status=?, license_expires_at=?, updated_at=? WHERE id=?")
+      ->execute([$name,$email,$phone,$company,$billing['billing_title'],$billing['billing_address'],$billing['tax_office'],$billing['tax_number'],$billing['invoice_email'],$taxDocumentPath,$notes,$status,$license, now(), $dealerId]);
 
   if ($status === DEALER_STATUS_ACTIVE && empty($dealer['password_hash'])) {
     $plain = dealer_random_password();
@@ -493,7 +527,7 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
       <div class="card-lite p-4 mb-4">
         <h5 class="mb-1">Yeni Bayi Oluştur</h5>
         <p class="small text-muted mb-3">Bayi kaydı açıldığında benzersiz bayi kodu otomatik oluşturulur ve aktifleştirildiğinde giriş bilgileri e-posta ile iletilir.</p>
-        <form method="post" class="row g-2">
+        <form method="post" class="row g-2" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
           <input type="hidden" name="do" value="create">
           <div class="col-12">
@@ -513,8 +547,32 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
             <input class="form-control" name="company">
           </div>
           <div class="col-12">
+            <label class="form-label">Fatura Ünvanı</label>
+            <input class="form-control" name="billing_title" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Vergi Dairesi</label>
+            <input class="form-control" name="tax_office" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Vergi Numarası</label>
+            <input class="form-control" name="tax_number" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Fatura E-postası</label>
+            <input type="email" class="form-control" name="invoice_email" placeholder="finans@firma.com">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Fatura Adresi</label>
+            <textarea class="form-control" name="billing_address" rows="2" required></textarea>
+          </div>
+          <div class="col-12">
             <label class="form-label">Not</label>
             <textarea class="form-control" name="notes" rows="2"></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Vergi Levhası (PDF/JPG/PNG)</label>
+            <input class="form-control" type="file" name="tax_document" accept=".pdf,.jpg,.jpeg,.png" required>
           </div>
           <div class="col-6">
             <label class="form-label">Durum</label>
@@ -698,7 +756,34 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
             </div>
             <?php endif; ?>
           </div>
-          <form method="post" class="row g-2">
+          <?php $dealerDocUrl = dealer_tax_document_url($selectedDealer['tax_document_path'] ?? null); ?>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="text-uppercase text-muted small fw-semibold">Fatura Ünvanı</div>
+              <div class="dealer-meta mb-0"><?=h($selectedDealer['billing_title'] ?? '-')?></div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-uppercase text-muted small fw-semibold">Vergi Dairesi / No</div>
+              <div class="dealer-meta mb-0"><?=h(trim(($selectedDealer['tax_office'] ?? '').' / '.($selectedDealer['tax_number'] ?? ''), ' /'))?></div>
+            </div>
+            <div class="col-12">
+              <div class="text-uppercase text-muted small fw-semibold">Fatura Adresi</div>
+              <div class="dealer-meta mb-0"><?= $selectedDealer['billing_address'] ? nl2br(h($selectedDealer['billing_address'])) : '<span class="text-muted">Belirtilmedi</span>' ?></div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-uppercase text-muted small fw-semibold">Fatura E-postası</div>
+              <div class="dealer-meta mb-0"><?= $selectedDealer['invoice_email'] ? h($selectedDealer['invoice_email']) : '<span class="text-muted">Belirtilmedi</span>' ?></div>
+            </div>
+            <div class="col-md-6">
+              <div class="text-uppercase text-muted small fw-semibold">Vergi Levhası</div>
+              <?php if ($dealerDocUrl): ?>
+                <a class="dealer-meta fw-semibold" href="<?=h($dealerDocUrl)?>" target="_blank">Belgeyi görüntüle</a>
+              <?php else: ?>
+                <span class="dealer-meta text-muted">Yüklenmedi</span>
+              <?php endif; ?>
+            </div>
+          </div>
+          <form method="post" class="row g-2" enctype="multipart/form-data">
             <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
             <input type="hidden" name="do" value="update">
             <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
@@ -710,15 +795,15 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
               <label class="form-label">E-posta</label>
               <input type="email" class="form-control" name="email" value="<?=h($selectedDealer['email'])?>" required>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label">Telefon</label>
               <input class="form-control" name="phone" value="<?=h($selectedDealer['phone'])?>">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label">Firma</label>
               <input class="form-control" name="company" value="<?=h($selectedDealer['company'])?>">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-6">
               <label class="form-label">Durum</label>
               <select class="form-select" name="status">
                 <option value="pending" <?= $selectedDealer['status']==='pending'?'selected':'' ?>>Onay Bekliyor</option>
@@ -729,6 +814,36 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
             <div class="col-md-6">
               <label class="form-label">Lisans Bitiş</label>
               <input type="datetime-local" class="form-control" name="license_expires_at" value="<?=h($licenseValue)?>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Fatura Ünvanı</label>
+              <input class="form-control" name="billing_title" value="<?=h($selectedDealer['billing_title'])?>" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Fatura E-postası</label>
+              <input type="email" class="form-control" name="invoice_email" value="<?=h($selectedDealer['invoice_email'])?>" placeholder="finans@firma.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Vergi Dairesi</label>
+              <input class="form-control" name="tax_office" value="<?=h($selectedDealer['tax_office'])?>" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Vergi Numarası</label>
+              <input class="form-control" name="tax_number" value="<?=h($selectedDealer['tax_number'])?>" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Fatura Adresi</label>
+              <textarea class="form-control" name="billing_address" rows="2" required><?=h($selectedDealer['billing_address'])?></textarea>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label d-flex justify-content-between align-items-center">
+                <span>Vergi Levhası (PDF/JPG/PNG)</span>
+                <?php if ($dealerDocUrl): ?>
+                  <a class="small fw-semibold text-decoration-none" href="<?=h($dealerDocUrl)?>" target="_blank">Görüntüle</a>
+                <?php endif; ?>
+              </label>
+              <input class="form-control" type="file" name="tax_document" accept=".pdf,.jpg,.jpeg,.png">
+              <div class="form-text">Yeni dosya yüklerseniz mevcut belge güncellenir.</div>
             </div>
             <div class="col-12">
               <label class="form-label">Not</label>

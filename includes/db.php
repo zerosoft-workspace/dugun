@@ -112,6 +112,12 @@ function install_schema(){
     email VARCHAR(190) NOT NULL UNIQUE,
     phone VARCHAR(64) NULL,
     company VARCHAR(190) NULL,
+    billing_title VARCHAR(190) NULL,
+    billing_address TEXT NULL,
+    tax_office VARCHAR(190) NULL,
+    tax_number VARCHAR(64) NULL,
+    invoice_email VARCHAR(190) NULL,
+    tax_document_path VARCHAR(255) NULL,
     notes TEXT NULL,
     status VARCHAR(16) NOT NULL DEFAULT 'pending',
     license_expires_at DATETIME NULL,
@@ -125,6 +131,24 @@ function install_schema(){
 
   if (!column_exists('dealers', 'code')) {
     pdo()->exec("ALTER TABLE dealers ADD code VARCHAR(16) NULL AFTER id");
+  }
+  if (!column_exists('dealers', 'billing_title')) {
+    pdo()->exec("ALTER TABLE dealers ADD billing_title VARCHAR(190) NULL AFTER company");
+  }
+  if (!column_exists('dealers', 'billing_address')) {
+    pdo()->exec("ALTER TABLE dealers ADD billing_address TEXT NULL AFTER billing_title");
+  }
+  if (!column_exists('dealers', 'tax_office')) {
+    pdo()->exec("ALTER TABLE dealers ADD tax_office VARCHAR(190) NULL AFTER billing_address");
+  }
+  if (!column_exists('dealers', 'tax_number')) {
+    pdo()->exec("ALTER TABLE dealers ADD tax_number VARCHAR(64) NULL AFTER tax_office");
+  }
+  if (!column_exists('dealers', 'invoice_email')) {
+    pdo()->exec("ALTER TABLE dealers ADD invoice_email VARCHAR(190) NULL AFTER tax_number");
+  }
+  if (!column_exists('dealers', 'tax_document_path')) {
+    pdo()->exec("ALTER TABLE dealers ADD tax_document_path VARCHAR(255) NULL AFTER invoice_email");
   }
   try {
     pdo()->exec("ALTER TABLE dealers ADD UNIQUE KEY uniq_dealer_code (code)");
