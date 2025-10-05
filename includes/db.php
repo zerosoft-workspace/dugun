@@ -28,6 +28,16 @@ function table_exists(string $t): bool {
 }
 function supports_json(): bool { try{pdo()->query("SELECT JSON_VALID('[]')");return true;}catch(Throwable){return false;} }
 
+function ensure_schema_patches(PDO $pdo): void {
+  try {
+    if (table_exists('dealer_representative_commissions') && !column_exists('dealer_representative_commissions', 'approved_at')) {
+      $pdo->exec("ALTER TABLE dealer_representative_commissions ADD approved_at DATETIME NULL AFTER paid_at");
+    }
+  } catch (Throwable $e) {
+    // ignore migration errors, column will exist on fresh installs
+  }
+}
+
 function install_schema(){
   static $ran = false;
   if ($ran) {
@@ -80,6 +90,8 @@ function install_schema(){
       }
     }
   }
+
+  ensure_schema_patches($pdo);
 
   if (!$needsInstall) {
     return;
