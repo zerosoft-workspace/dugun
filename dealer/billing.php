@@ -4,6 +4,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealers.php';
 require_once __DIR__.'/../includes/dealer_auth.php';
+require_once __DIR__.'/partials/ui.php';
 
 install_schema();
 
@@ -17,7 +18,6 @@ if (!$dealer) {
 
 dealer_refresh_session((int)$dealer['id']);
 $dealerId = (int)$dealer['id'];
-$activeNav = 'billing';
 
 $action = $_POST['do'] ?? '';
 if ($action) {
@@ -72,269 +72,243 @@ foreach ($cashbackPending as $row) {
   $cashbackPendingAmount += max(0, (int)$row['cashback_amount']);
 }
 
-?>
-<!doctype html>
-<html lang="tr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?=h(APP_NAME)?> — Bakiye & Paketler</title>
-<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+$venuesNav = dealer_fetch_venues($dealerId);
+$refCode = $dealer['code'] ?: dealer_ensure_identifier($dealerId);
+$licenseLabel = dealer_license_label($dealer);
+
+$pageStyles = <<<'CSS'
 <style>
-  :root{
-    --brand:#0ea5b5;
-    --brand-dark:#0b8b98;
-    --ink:#0f172a;
-    --muted:#64748b;
-    --soft:#f1f7fb;
-  }
-  body{background:var(--soft);color:var(--ink);font-family:'Inter','Segoe UI',system-ui,sans-serif;min-height:100vh;}
-  a{color:var(--brand);} a:hover{color:var(--brand-dark);}
-  .dealer-topnav{background:#fff;border-bottom:1px solid rgba(148,163,184,.22);box-shadow:0 12px 30px rgba(15,23,42,.05);}
-  .dealer-topnav .navbar-brand{font-weight:700;color:var(--ink);}
-  .dealer-topnav .nav-link{color:var(--muted);font-weight:600;border-radius:12px;padding:.45rem .95rem;}
-  .dealer-topnav .nav-link:hover{color:var(--brand-dark);background:rgba(14,165,181,.1);}
-  .dealer-topnav .nav-link.active{color:var(--brand);background:rgba(14,165,181,.18);}
-  .dealer-topnav .badge-soft{background:rgba(14,165,181,.12);color:var(--brand-dark);border-radius:999px;padding:.3rem .85rem;font-weight:600;font-size:.85rem;}
-  .billing-hero{padding:2.4rem 0 1.8rem;}
-  .card-lite{border-radius:20px;background:#fff;border:1px solid rgba(148,163,184,.16);box-shadow:0 22px 45px -28px rgba(15,23,42,.45);}
+  .card-lite{border-radius:22px;background:#fff;border:1px solid rgba(148,163,184,.16);box-shadow:0 24px 50px -34px rgba(15,23,42,.45);} 
   .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:1.1rem;}
-  .stat-card{padding:1.35rem;border-radius:16px;background:linear-gradient(150deg,#fff,rgba(14,165,181,.1));}
-  .stat-card h6{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem;}
+  .stat-card{padding:1.4rem;border-radius:18px;background:linear-gradient(150deg,#fff,rgba(14,165,181,.12));}
+  .stat-card h6{font-size:.8rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.35rem;}
   .stat-card strong{font-size:1.6rem;display:block;}
-  .stat-card span{color:var(--muted);font-size:.82rem;}
+  .stat-card span{color:#64748b;font-size:.82rem;}
+  .btn-brand{background:#0ea5b5;border:none;color:#fff;border-radius:14px;padding:.6rem 1.3rem;font-weight:600;}
+  .btn-brand:hover{background:#0b8b98;color:#fff;}
+  .btn-outline-brand{background:#fff;border:1px solid rgba(14,165,181,.55);color:#0ea5b5;border-radius:14px;padding:.6rem 1.3rem;font-weight:600;}
+  .btn-outline-brand:hover{background:rgba(14,165,181,.08);color:#0b8b98;}
   .package-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:1.2rem;}
   .package-card{border:1px solid rgba(148,163,184,.25);border-radius:18px;padding:1.4rem;background:#fff;display:flex;flex-direction:column;gap:1rem;box-shadow:0 16px 35px -28px rgba(15,23,42,.45);}
   .package-card h6{font-weight:700;}
   .package-card .price{font-size:1.8rem;font-weight:700;}
-  .package-card ul{margin:0;padding-left:1.1rem;color:var(--muted);font-size:.9rem;}
-  .btn-brand{background:var(--brand);border:none;color:#fff;border-radius:14px;padding:.6rem 1.3rem;font-weight:600;}
-  .btn-brand:hover{background:var(--brand-dark);color:#fff;}
-  .btn-outline-brand{background:#fff;border:1px solid rgba(14,165,181,.55);color:var(--brand);border-radius:14px;padding:.6rem 1.3rem;font-weight:600;}
-  .btn-outline-brand:hover{background:rgba(14,165,181,.08);color:var(--brand-dark);}
-  .table thead th{color:var(--muted);font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;}
+  .package-card ul{margin:0;padding-left:1.1rem;color:#64748b;font-size:.9rem;}
   .section-title{font-weight:700;}
-  .muted{color:var(--muted);}
+  .muted{color:#64748b;}
+  .status-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .8rem;border-radius:999px;background:rgba(14,165,181,.12);color:#0ea5b5;font-weight:600;font-size:.82rem;}
 </style>
-</head>
-<body>
-<header class="dealer-header">
-  <nav class="dealer-topnav navbar navbar-expand-lg py-3">
-    <div class="container">
-      <a class="navbar-brand" href="dashboard.php"><?=h(APP_NAME)?> — Bayi Paneli</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#dealerNav" aria-controls="dealerNav" aria-expanded="false" aria-label="Menü">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="dealerNav">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item"><a class="nav-link<?= $activeNav === 'dashboard' ? ' active' : '' ?>" href="dashboard.php">Genel Bakış</a></li>
-          <li class="nav-item"><a class="nav-link<?= $activeNav === 'venues' ? ' active' : '' ?>" href="dashboard.php#venues">Salonlar</a></li>
-          <li class="nav-item"><a class="nav-link<?= $activeNav === 'billing' ? ' active' : '' ?>" href="billing.php">Bakiye & Paketler</a></li>
-        </ul>
-        <div class="d-flex align-items-center gap-3 mb-2 mb-lg-0">
-          <span class="badge-soft"><?=h($dealer['name'])?></span>
-          <a class="text-decoration-none fw-semibold" href="login.php?logout=1">Çıkış</a>
-        </div>
+CSS;
+
+dealer_layout_start('billing', [
+  'page_title'   => APP_NAME.' — Bakiye & Paketler',
+  'title'        => 'Bakiye & Paket Yönetimi',
+  'subtitle'     => 'Bakiyenizi yönetin, paket satın alın ve cari hareketlerinizi tek yerden takip edin.',
+  'dealer'       => $dealer,
+  'venues'       => $venuesNav,
+  'balance_text' => format_currency($balance),
+  'license_text' => $licenseLabel,
+  'ref_code'     => $refCode,
+  'extra_head'   => $pageStyles,
+]);
+?>
+<section class="mb-4">
+  <div class="card-lite p-4 p-lg-5">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <h6>Bakiye</h6>
+        <strong><?=h(format_currency($balance))?></strong>
+        <span>Bakiye hareketleri ve yüklemeleriniz</span>
+      </div>
+      <div class="stat-card">
+        <h6>Aktif Paket</h6>
+        <strong><?=h(count($summary['active']))?></strong>
+        <span><?= $summary['has_credit'] ? 'Etkinlik oluşturmaya hazırsınız' : 'Paket satın almanız gerekiyor' ?></span>
+      </div>
+      <div class="stat-card">
+        <h6>Kalan Etkinlik</h6>
+        <strong><?=h($summary['has_unlimited'] ? 'Sınırsız' : (string)$summary['remaining_events'])?></strong>
+        <span><?= $summary['has_unlimited'] ? 'Süre bitişi: '.($summary['unlimited_until'] ? date('d.m.Y', strtotime($summary['unlimited_until'])) : 'Süresiz') : 'Kullanılabilir haklarınız' ?></span>
+      </div>
+      <div class="stat-card">
+        <h6>Cashback Bekleyen</h6>
+        <strong><?=h($cashbackPendingCount)?></strong>
+        <span><?= $cashbackPendingCount ? h(format_currency($cashbackPendingAmount).' onay bekliyor') : 'Şu anda bekleyen ödeme yok' ?></span>
       </div>
     </div>
-  </nav>
-</header>
-<main class="billing-main">
-  <div class="container py-4">
-    <?php flash_box(); ?>
-    <section class="billing-hero mb-4">
-      <div class="card-lite p-4 p-lg-5">
-        <div class="stat-grid">
-          <div class="stat-card">
-            <h6>Bakiye</h6>
-            <strong><?=h(format_currency($balance))?></strong>
-            <span>Bakiye hareketleri ve yüklemeleriniz</span>
-          </div>
-          <div class="stat-card">
-            <h6>Aktif Paket</h6>
-            <strong><?=h(count($summary['active']))?></strong>
-            <span><?= $summary['has_credit'] ? 'Etkinlik oluşturmaya hazırsınız' : 'Paket satın almanız gerekiyor' ?></span>
-          </div>
-          <div class="stat-card">
-            <h6>Kalan Etkinlik</h6>
-            <strong><?=h($summary['has_unlimited'] ? 'Sınırsız' : (string)$summary['remaining_events'])?></strong>
-            <span><?= $summary['has_unlimited'] ? 'Süre bitişi: '.($summary['unlimited_until'] ? date('d.m.Y', strtotime($summary['unlimited_until'])) : 'Süresiz') : 'Kullanılabilir haklarınız' ?></span>
-          </div>
-          <div class="stat-card">
-            <h6>Cashback Bekleyen</h6>
-            <strong><?=h($cashbackPendingCount)?></strong>
-            <span><?= $cashbackPendingCount ? h(format_currency($cashbackPendingAmount).' onay bekliyor') : 'Şu anda bekleyen ödeme yok' ?></span>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <?php if ($cashbackPendingCount): ?>
-      <div class="alert alert-info mb-4">
-        Web referans siparişlerinizden gelen <strong><?=h(format_currency($cashbackPendingAmount))?></strong> tutarında cashback onay bekliyor. Finans ekibi onayladığında tutar otomatik olarak bakiyenize yansıtılır.
-      </div>
-    <?php endif; ?>
-
-    <section id="topup" class="card-lite p-4 p-lg-5 mb-4">
-      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
-        <div>
-          <h5 class="section-title mb-1">Bakiye Yükle</h5>
-          <p class="muted mb-0">Kart ödemeleri PayTR üzerinden alınır, ardından finans ekibimiz onayladıktan sonra bakiyenize yansır.</p>
-        </div>
-        <form class="d-flex flex-column flex-sm-row gap-2" method="post">
-          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-          <input type="hidden" name="do" value="request_topup">
-          <input type="text" class="form-control" name="amount" placeholder="Örn. 3.000" required>
-          <button class="btn btn-brand" type="submit">Ödemeyi Başlat</button>
-        </form>
-      </div>
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
-          <thead><tr><th>Tarih</th><th>Tutar</th><th>Durum</th><th></th></tr></thead>
-          <tbody>
-            <?php if (!$topups): ?>
-              <tr><td colspan="4" class="text-center text-muted">Henüz bakiye yükleme talebiniz bulunmuyor.</td></tr>
-            <?php else: ?>
-              <?php foreach ($topups as $topup): ?>
-                <tr>
-                  <td><?=h(date('d.m.Y H:i', strtotime($topup['created_at'] ?? 'now')))?></td>
-                  <td><?=h(format_currency($topup['amount_cents']))?></td>
-                  <td><?=h(dealer_topup_status_label($topup['status']))?></td>
-                  <td class="text-end">
-                    <?php if ($topup['status'] === DEALER_TOPUP_STATUS_PENDING): ?>
-                      <div class="d-flex flex-column flex-lg-row gap-2 justify-content-end">
-                        <a class="btn btn-sm btn-brand" href="topup_paytr.php?topup_id=<?= (int)$topup['id'] ?>">Ödeme Sayfası</a>
-                        <form method="post" class="d-inline-flex">
-                          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                          <input type="hidden" name="do" value="cancel_topup">
-                          <input type="hidden" name="topup_id" value="<?= (int)$topup['id'] ?>">
-                          <button class="btn btn-sm btn-outline-brand" type="submit">İptal Et</button>
-                        </form>
-                      </div>
-                    <?php elseif ($topup['status'] === DEALER_TOPUP_STATUS_AWAITING_REVIEW): ?>
-                      <span class="badge bg-warning-subtle text-warning fw-semibold">Ödeme alındı, onay bekliyor</span>
-                    <?php else: ?>
-                      <span class="text-muted small">—</span>
-                    <?php endif; ?>
-                  </td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card-lite p-4 p-lg-5 mb-4">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="section-title mb-0">Paket Seçenekleri</h5>
-        <span class="muted">Bakiyeniz: <?=h(format_currency($balance))?></span>
-      </div>
-      <p class="text-muted small mb-4">Paket satın alımları cashback oluşturmaz. Web sitesinden gelen müşteri yönlendirmelerinizde bayi kodunuzla <strong>%20 cashback</strong> kazanırsınız; tutarlar finans onayından sonra bakiyenize eklenir.</p>
-      <?php if (!$packages): ?>
-        <p class="text-muted mb-0">Henüz tanımlanmış paket yok. Lütfen yönetici ile iletişime geçin.</p>
-      <?php else: ?>
-        <div class="package-grid">
-          <?php foreach ($packages as $package): ?>
-            <?php
-              $canBuy = $balance >= $package['price_cents'];
-              $quotaText = $package['event_quota'] === null ? 'Sınırsız etkinlik' : ($package['event_quota'].' etkinlik hakkı');
-              $durationText = $package['duration_days'] ? ($package['duration_days'].' gün geçerli') : 'Süre sınırı yok';
-              $cashbackText = $package['cashback_rate'] > 0 ? ('Web referans kodunuzla %'.number_format($package['cashback_rate'] * 100, 0).' cashback') : null;
-            ?>
-            <div class="package-card">
-              <div>
-                <h6><?=h($package['name'])?></h6>
-                <div class="price"><?=h(format_currency($package['price_cents']))?></div>
-              </div>
-              <?php if (!empty($package['description'])): ?>
-                <p class="muted mb-0"><?=h($package['description'])?></p>
-              <?php endif; ?>
-              <ul class="mb-0">
-                <li><?=h($quotaText)?></li>
-                <li><?=h($durationText)?></li>
-                <?php if ($cashbackText): ?><li><?=h($cashbackText)?></li><?php endif; ?>
-              </ul>
-              <div class="mt-auto">
-                <?php if ($canBuy): ?>
-                  <form method="post">
-                    <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                    <input type="hidden" name="do" value="buy_package">
-                    <input type="hidden" name="package_id" value="<?= (int)$package['id'] ?>">
-                    <button class="btn btn-brand w-100" type="submit">Satın Al</button>
-                  </form>
-                <?php else: ?>
-                  <button class="btn btn-outline-brand w-100" type="button" disabled>Bakiyeniz yetersiz</button>
-                <?php endif; ?>
-              </div>
-            </div>
-          <?php endforeach; ?>
-        </div>
-      <?php endif; ?>
-    </section>
-
-    <section class="card-lite p-4 p-lg-5 mb-4">
-      <h5 class="section-title mb-3">Paket Satın Alma Geçmişi</h5>
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
-          <thead><tr><th>Paket</th><th>Durum</th><th>Tutar</th><th>Satın Alma</th><th>Cashback</th></tr></thead>
-          <tbody>
-            <?php if (!$purchaseHistory): ?>
-              <tr><td colspan="5" class="text-center text-muted">Henüz paket satın almadınız.</td></tr>
-            <?php else: ?>
-              <?php foreach (array_slice($purchaseHistory, 0, 12) as $purchase): ?>
-                <?php
-                  $statusLabel = dealer_purchase_status_label($purchase['status']);
-                  $cashbackLabel = dealer_cashback_status_label($purchase['cashback_status']);
-                  $cashbackAmount = $purchase['cashback_amount'] > 0 ? format_currency($purchase['cashback_amount']) : '—';
-                ?>
-                <tr>
-                  <td>
-                    <div class="fw-semibold"><?=h($purchase['package_name'])?></div>
-                    <?php if (!empty($purchase['package_description'])): ?><div class="small text-muted"><?=h($purchase['package_description'])?></div><?php endif; ?>
-                    <?php if (($purchase['source'] ?? null) === DEALER_PURCHASE_SOURCE_LEAD): ?>
-                      <span class="badge bg-info-subtle text-info-emphasis mt-1">Web satış</span>
-                    <?php endif; ?>
-                  </td>
-                  <td><?=h($statusLabel)?></td>
-                  <td><?=h(format_currency($purchase['price_cents']))?></td>
-                  <td><?=h(date('d.m.Y H:i', strtotime($purchase['created_at'] ?? 'now')))?></td>
-                  <td><?=h($cashbackLabel)?><?php if ($purchase['cashback_status'] === DEALER_CASHBACK_PENDING): ?> • <?=h($cashbackAmount)?><?php endif; ?></td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section id="wallet" class="card-lite p-4 p-lg-5">
-      <h5 class="section-title mb-3">Cari Hareketleri</h5>
-      <div class="table-responsive">
-        <table class="table align-middle mb-0">
-          <thead><tr><th>Tarih</th><th>İşlem</th><th>Tutar</th><th>Son Bakiye</th></tr></thead>
-          <tbody>
-            <?php if (!$walletTransactions): ?>
-              <tr><td colspan="4" class="text-center text-muted">Henüz hareket kaydı bulunmuyor.</td></tr>
-            <?php else: ?>
-              <?php foreach ($walletTransactions as $movement): ?>
-                <tr>
-                  <td><?=h(date('d.m.Y H:i', strtotime($movement['created_at'] ?? 'now')))?></td>
-                  <td>
-                    <div class="fw-semibold"><?=h(dealer_wallet_type_label($movement['type']))?></div>
-                    <?php if (!empty($movement['description'])): ?><div class="small text-muted"><?=h($movement['description'])?></div><?php endif; ?>
-                  </td>
-                  <td><?=h(format_currency($movement['amount_cents']))?></td>
-                  <td><?=h(format_currency($movement['balance_after']))?></td>
-                </tr>
-              <?php endforeach; ?>
-            <?php endif; ?>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
   </div>
-</main>
-</body>
-</html>
+</section>
+
+<?php if ($cashbackPendingCount): ?>
+  <div class="alert alert-info mb-4">
+    Web referans siparişlerinizden gelen <strong><?=h(format_currency($cashbackPendingAmount))?></strong> tutarında cashback onay bekliyor. Finans ekibi onayladığında tutar otomatik olarak bakiyenize yansıtılır.
+  </div>
+<?php endif; ?>
+
+<section id="topup" class="card-lite p-4 p-lg-5 mb-4">
+  <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <div>
+      <h5 class="section-title mb-1">Bakiye Yükle</h5>
+      <p class="muted mb-0">Kart ödemeleri PayTR üzerinden alınır, ardından finans ekibimiz onayladıktan sonra bakiyenize yansır.</p>
+    </div>
+    <form class="d-flex flex-column flex-sm-row gap-2" method="post">
+      <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+      <input type="hidden" name="do" value="request_topup">
+      <input type="text" class="form-control" name="amount" placeholder="Örn. 3.000" required>
+      <button class="btn btn-brand" type="submit">Ödemeyi Başlat</button>
+    </form>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>Tarih</th><th>Tutar</th><th>Durum</th><th></th></tr></thead>
+      <tbody>
+        <?php if (!$topups): ?>
+          <tr><td colspan="4" class="text-center text-muted">Henüz bakiye yükleme talebiniz bulunmuyor.</td></tr>
+        <?php else: ?>
+          <?php foreach ($topups as $topup): ?>
+            <tr>
+              <td><?=h(date('d.m.Y H:i', strtotime($topup['created_at'] ?? 'now')))?></td>
+              <td><?=h(format_currency($topup['amount_cents']))?></td>
+              <td><?=h(dealer_topup_status_label($topup['status']))?></td>
+              <td class="text-end">
+                <?php if ($topup['status'] === DEALER_TOPUP_STATUS_PENDING): ?>
+                  <div class="d-flex flex-column flex-lg-row gap-2 justify-content-end">
+                    <a class="btn btn-sm btn-brand" href="topup_paytr.php?topup_id=<?= (int)$topup['id'] ?>">Ödeme Sayfası</a>
+                    <form method="post" class="d-inline-flex">
+                      <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                      <input type="hidden" name="do" value="cancel_topup">
+                      <input type="hidden" name="topup_id" value="<?= (int)$topup['id'] ?>">
+                      <button class="btn btn-sm btn-outline-brand" type="submit">İptal Et</button>
+                    </form>
+                  </div>
+                <?php elseif ($topup['status'] === DEALER_TOPUP_STATUS_AWAITING_REVIEW): ?>
+                  <span class="badge bg-warning-subtle text-warning fw-semibold">Ödeme alındı, onay bekliyor</span>
+                <?php else: ?>
+                  <span class="text-muted small">—</span>
+                <?php endif; ?>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card-lite p-4 p-lg-5 mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <h5 class="section-title mb-0">Paket Seçenekleri</h5>
+    <span class="muted">Bakiyeniz: <?=h(format_currency($balance))?></span>
+  </div>
+  <p class="text-muted small mb-4">Paket satın alımları cashback oluşturmaz. Web sitesinden gelen müşteri yönlendirmelerinizde bayi kodunuzla <strong>%20 cashback</strong> kazanırsınız; tutarlar finans onayından sonra bakiyenize eklenir.</p>
+  <?php if (!$packages): ?>
+    <p class="text-muted mb-0">Henüz tanımlanmış paket yok. Lütfen yönetici ile iletişime geçin.</p>
+  <?php else: ?>
+    <div class="package-grid">
+      <?php foreach ($packages as $package): ?>
+        <?php
+          $canBuy = $balance >= $package['price_cents'];
+          $quotaText = $package['event_quota'] === null ? 'Sınırsız etkinlik' : ($package['event_quota'].' etkinlik hakkı');
+          $durationText = $package['duration_days'] ? ($package['duration_days'].' gün geçerli') : 'Süre sınırı yok';
+          $cashbackText = $package['cashback_rate'] > 0 ? ('Web referans kodunuzla %'.number_format($package['cashback_rate'] * 100, 0).' cashback') : null;
+        ?>
+        <div class="package-card">
+          <div>
+            <h6><?=h($package['name'])?></h6>
+            <div class="price"><?=h(format_currency($package['price_cents']))?></div>
+          </div>
+          <?php if (!empty($package['description'])): ?>
+            <p class="muted mb-0"><?=h($package['description'])?></p>
+          <?php endif; ?>
+          <ul class="mb-0">
+            <li><?=h($quotaText)?></li>
+            <li><?=h($durationText)?></li>
+            <?php if ($cashbackText): ?><li><?=h($cashbackText)?></li><?php endif; ?>
+          </ul>
+          <div class="mt-auto">
+            <?php if ($canBuy): ?>
+              <form method="post">
+                <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                <input type="hidden" name="do" value="buy_package">
+                <input type="hidden" name="package_id" value="<?= (int)$package['id'] ?>">
+                <button class="btn btn-brand w-100" type="submit">Satın Al</button>
+              </form>
+            <?php else: ?>
+              <button class="btn btn-outline-brand w-100" type="button" disabled>Bakiyeniz yetersiz</button>
+            <?php endif; ?>
+          </div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+  <?php endif; ?>
+</section>
+
+<section class="card-lite p-4 p-lg-5 mb-4">
+  <h5 class="section-title mb-3">Paket Satın Alma Geçmişi</h5>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>Paket</th><th>Durum</th><th>Tutar</th><th>Satın Alma</th><th>Cashback</th></tr></thead>
+      <tbody>
+        <?php if (!$purchaseHistory): ?>
+          <tr><td colspan="5" class="text-center text-muted">Henüz paket satın almadınız.</td></tr>
+        <?php else: ?>
+          <?php foreach (array_slice($purchaseHistory, 0, 12) as $purchase): ?>
+            <?php
+              $statusLabel = dealer_purchase_status_label($purchase['status']);
+              $cashbackLabel = dealer_cashback_status_label($purchase['cashback_status']);
+              $cashbackAmount = $purchase['cashback_amount'] > 0 ? format_currency($purchase['cashback_amount']) : '—';
+            ?>
+            <tr>
+              <td>
+                <div class="fw-semibold"><?=h($purchase['package_name'])?></div>
+                <?php if (!empty($purchase['package_description'])): ?><div class="small text-muted"><?=h($purchase['package_description'])?></div><?php endif; ?>
+                <?php if (($purchase['source'] ?? null) === DEALER_PURCHASE_SOURCE_LEAD): ?>
+                  <span class="badge bg-info-subtle text-info-emphasis mt-1">Web satış</span>
+                <?php endif; ?>
+              </td>
+              <td><?=h($statusLabel)?></td>
+              <td><?=h(format_currency($purchase['price_cents']))?></td>
+              <td><?=h(date('d.m.Y H:i', strtotime($purchase['created_at'] ?? 'now')))?></td>
+              <td><?=h($cashbackLabel)?><?php if ($purchase['cashback_status'] === DEALER_CASHBACK_PENDING): ?> • <?=h($cashbackAmount)?><?php endif; ?></td>
+            </tr>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section id="wallet" class="card-lite p-4 p-lg-5">
+  <h5 class="section-title mb-3">Cari Hareketleri</h5>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>Tarih</th><th>İşlem</th><th>Tutar</th><th>Son Bakiye</th></tr></thead>
+      <tbody>
+        <?php if (!$walletTransactions): ?>
+          <tr><td colspan="4" class="text-center text-muted">Henüz hareket kaydı bulunmuyor.</td></tr>
+        <?php else: ?>
+          <?php foreach ($walletTransactions as $movement): ?>
+            <?php
+              $amount = (int)$movement['amount_cents'];
+              $direction = $amount >= 0 ? 'Giriş' : 'Çıkış';
+              $amountLabel = format_currency($amount);
+              $description = dealer_wallet_description($movement);
+            ?>
+            <tr>
+              <td><?=h(date('d.m.Y H:i', strtotime($movement['created_at'] ?? 'now')))?></td>
+              <td><?=h($description)?></td>
+              <td>
+                <span class="status-chip">
+                  <i class="bi <?= $amount >= 0 ? 'bi-arrow-down-left' : 'bi-arrow-up-right'?>"></i>
+                  <?=$direction?> • <?=$amountLabel?>
+                </span>
+              </td>
+              <td><?=h(format_currency($movement['balance_after_cents']))?></td>
+            </tr>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<?php dealer_layout_end();
