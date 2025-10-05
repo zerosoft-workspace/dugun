@@ -20,14 +20,44 @@ function representative_normalize_row(array $row): array {
   return $row;
 }
 
-function representative_get(int $id): ?array {
+function representative_hydrate_assignments(array $rep): array {
+  if (($rep['id'] ?? 0) <= 0) {
+    return $rep;
+  }
+  $dealers = representative_assigned_dealers((int)$rep['id']);
+  $rep['dealers'] = $dealers;
+  $rep['dealer_ids'] = array_map(fn($dealer) => (int)$dealer['id'], $dealers);
+  if (!empty($dealers)) {
+    $primary = $dealers[0];
+    $rep['dealer_id'] = (int)$primary['id'];
+    $rep['assigned_at'] = $primary['assigned_at'] ?? ($rep['assigned_at'] ?? null);
+    $rep['dealer_name'] = $primary['name'] ?? null;
+    $rep['dealer_company'] = $primary['company'] ?? null;
+    $rep['dealer_status'] = $primary['status'] ?? null;
+    $rep['dealer_code'] = $primary['code'] ?? null;
+  } else {
+    $rep['dealer_ids'] = [];
+    $rep['dealer_id'] = 0;
+  }
+  return $rep;
+}
+
+function representative_fetch_raw(int $id): ?array {
   if ($id <= 0) {
     return null;
   }
-  $st = pdo()->prepare("SELECT * FROM dealer_representatives WHERE id=? LIMIT 1");
+  $st = pdo()->prepare('SELECT * FROM dealer_representatives WHERE id=? LIMIT 1');
   $st->execute([$id]);
   $row = $st->fetch();
   return $row ? representative_normalize_row($row) : null;
+}
+
+function representative_get(int $id): ?array {
+  $row = representative_fetch_raw($id);
+  if (!$row) {
+    return null;
+  }
+  return representative_hydrate_assignments($row);
 }
 
 function representative_find_by_email(string $email): ?array {
@@ -35,41 +65,51 @@ function representative_find_by_email(string $email): ?array {
   if ($email === '') {
     return null;
   }
-  $st = pdo()->prepare("SELECT * FROM dealer_representatives WHERE email=? LIMIT 1");
+  $st = pdo()->prepare('SELECT * FROM dealer_representatives WHERE email=? LIMIT 1');
   $st->execute([$email]);
-  $row = $st->fetch();
-  return $row ? representative_normalize_row($row) : null;
-}
-
-function representative_for_dealer(int $dealer_id): ?array {
-  if ($dealer_id <= 0) {
-    return null;
-  }
-  $st = pdo()->prepare("SELECT * FROM dealer_representatives WHERE dealer_id=? LIMIT 1");
-  $st->execute([$dealer_id]);
-  $row = $st->fetch();
-  return $row ? representative_normalize_row($row) : null;
-}
-
-function representative_detail(int $representative_id): ?array {
-  if ($representative_id <= 0) {
-    return null;
-  }
-  $sql = "SELECT r.*, d.name AS dealer_name, d.company AS dealer_company, d.status AS dealer_status, d.code AS dealer_code
-          FROM dealer_representatives r
-          LEFT JOIN dealers d ON d.id = r.dealer_id
-          WHERE r.id=? LIMIT 1";
-  $st = pdo()->prepare($sql);
-  $st->execute([$representative_id]);
   $row = $st->fetch();
   if (!$row) {
     return null;
   }
-  $rep = representative_normalize_row($row);
-  $rep['dealer_name'] = $row['dealer_name'] ?? null;
-  $rep['dealer_company'] = $row['dealer_company'] ?? null;
-  $rep['dealer_status'] = $row['dealer_status'] ?? null;
-  $rep['dealer_code'] = $row['dealer_code'] ?? null;
+  return representative_hydrate_assignments(representative_normalize_row($row));
+}
+
+function representative_assigned_dealer_ids(int $representative_id): array {
+  $st = pdo()->prepare('SELECT dealer_id FROM dealer_representative_assignments WHERE representative_id=? ORDER BY assigned_at ASC, dealer_id ASC');
+  $st->execute([$representative_id]);
+  return array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+}
+
+function representative_assigned_dealers(int $representative_id): array {
+  if ($representative_id <= 0) {
+    return [];
+  }
+  $sql = "SELECT d.id, d.name, d.company, d.status, d.code, a.assigned_at
+          FROM dealer_representative_assignments a
+          INNER JOIN dealers d ON d.id = a.dealer_id
+          WHERE a.representative_id=?
+          ORDER BY a.assigned_at ASC, d.name ASC";
+  $st = pdo()->prepare($sql);
+  $st->execute([$representative_id]);
+  $rows = [];
+  foreach ($st as $row) {
+    $rows[] = [
+      'id' => (int)$row['id'],
+      'name' => $row['name'] ?? '',
+      'company' => $row['company'] ?? null,
+      'status' => $row['status'] ?? null,
+      'code' => $row['code'] ?? null,
+      'assigned_at' => $row['assigned_at'] ?? null,
+    ];
+  }
+  return $rows;
+}
+
+function representative_detail(int $representative_id): ?array {
+  $rep = representative_get($representative_id);
+  if (!$rep) {
+    return null;
+  }
   return $rep;
 }
 
@@ -86,12 +126,12 @@ function representative_list(array $filters = []): array {
     $params[] = $statusFilter;
   }
   if ($assignedFilter === 'assigned') {
-    $conditions[] = 'r.dealer_id IS NOT NULL';
+    $conditions[] = 'EXISTS (SELECT 1 FROM dealer_representative_assignments a WHERE a.representative_id = r.id)';
   } elseif ($assignedFilter === 'unassigned') {
-    $conditions[] = 'r.dealer_id IS NULL';
+    $conditions[] = 'NOT EXISTS (SELECT 1 FROM dealer_representative_assignments a WHERE a.representative_id = r.id)';
   }
   if ($dealerFilter > 0) {
-    $conditions[] = 'r.dealer_id=?';
+    $conditions[] = 'EXISTS (SELECT 1 FROM dealer_representative_assignments a WHERE a.representative_id = r.id AND a.dealer_id=?)';
     $params[] = $dealerFilter;
   }
   if ($search !== '') {
@@ -100,9 +140,7 @@ function representative_list(array $filters = []): array {
     array_push($params, $like, $like, $like);
   }
 
-  $sql = "SELECT r.*, d.name AS dealer_name, d.company AS dealer_company, d.status AS dealer_status, d.code AS dealer_code
-          FROM dealer_representatives r
-          LEFT JOIN dealers d ON d.id = r.dealer_id";
+  $sql = 'SELECT r.* FROM dealer_representatives r';
   if ($conditions) {
     $sql .= ' WHERE '.implode(' AND ', $conditions);
   }
@@ -113,11 +151,7 @@ function representative_list(array $filters = []): array {
   $rows = [];
   foreach ($st as $row) {
     $rep = representative_normalize_row($row);
-    $rep['dealer_name'] = $row['dealer_name'] ?? null;
-    $rep['dealer_company'] = $row['dealer_company'] ?? null;
-    $rep['dealer_status'] = $row['dealer_status'] ?? null;
-    $rep['dealer_code'] = $row['dealer_code'] ?? null;
-    $rows[] = $rep;
+    $rows[] = representative_hydrate_assignments($rep);
   }
   return $rows;
 }
@@ -136,10 +170,113 @@ function representative_status_counts(): array {
     $summary[$status] = (int)($row['c'] ?? 0);
     $summary['total'] += (int)($row['c'] ?? 0);
   }
-  $assigned = (int)pdo()->query("SELECT COUNT(*) FROM dealer_representatives WHERE dealer_id IS NOT NULL")->fetchColumn();
+  $assigned = (int)pdo()->query('SELECT COUNT(DISTINCT representative_id) FROM dealer_representative_assignments')->fetchColumn();
   $summary['assigned'] = $assigned;
   $summary['unassigned'] = max(0, $summary['total'] - $assigned);
   return $summary;
+}
+
+function representative_for_dealer(int $dealer_id): ?array {
+  if ($dealer_id <= 0) {
+    return null;
+  }
+  $sql = "SELECT r.*, a.assigned_at AS assignment_date
+          FROM dealer_representative_assignments a
+          INNER JOIN dealer_representatives r ON r.id = a.representative_id
+          WHERE a.dealer_id=? LIMIT 1";
+  $st = pdo()->prepare($sql);
+  $st->execute([$dealer_id]);
+  $row = $st->fetch();
+  if (!$row) {
+    return null;
+  }
+  $rep = representative_hydrate_assignments(representative_normalize_row($row));
+  foreach ($rep['dealers'] as $dealer) {
+    if ((int)$dealer['id'] === $dealer_id) {
+      $rep['dealer_id'] = (int)$dealer['id'];
+      $rep['dealer_name'] = $dealer['name'] ?? null;
+      $rep['dealer_company'] = $dealer['company'] ?? null;
+      $rep['dealer_status'] = $dealer['status'] ?? null;
+      $rep['dealer_code'] = $dealer['code'] ?? null;
+      $rep['assigned_at'] = $dealer['assigned_at'] ?? ($row['assignment_date'] ?? null);
+      break;
+    }
+  }
+  return $rep;
+}
+
+function representative_update_assignments(int $representative_id, array $dealer_ids): void {
+  $rep = representative_fetch_raw($representative_id);
+  if (!$rep) {
+    throw new InvalidArgumentException('Temsilci kaydı bulunamadı.');
+  }
+  $dealer_ids = array_values(array_unique(array_filter(array_map('intval', $dealer_ids), fn($id) => $id > 0)));
+  $pdo = pdo();
+  $pdo->beginTransaction();
+  try {
+    if ($dealer_ids) {
+      $placeholders = implode(',', array_fill(0, count($dealer_ids), '?'));
+      $check = $pdo->prepare("SELECT id FROM dealers WHERE id IN ($placeholders)");
+      $check->execute($dealer_ids);
+      $found = array_map('intval', $check->fetchAll(PDO::FETCH_COLUMN));
+      sort($found);
+      $sortedInput = $dealer_ids;
+      sort($sortedInput);
+      if ($found !== $sortedInput) {
+        throw new InvalidArgumentException('Seçilen bayilerden bazıları bulunamadı.');
+      }
+
+      $conflictSql = "SELECT dealer_id FROM dealer_representative_assignments WHERE dealer_id IN ($placeholders) AND representative_id <> ?";
+      $conflictStmt = $pdo->prepare($conflictSql);
+      $conflictParams = $dealer_ids;
+      $conflictParams[] = $representative_id;
+      $conflictStmt->execute($conflictParams);
+      $conflicts = $conflictStmt->fetchAll(PDO::FETCH_COLUMN);
+      if ($conflicts) {
+        throw new InvalidArgumentException('Seçilen bayilerden bazıları başka bir temsilciye atanmış.');
+      }
+    }
+
+    $currentIds = representative_assigned_dealer_ids($representative_id);
+    $toRemove = array_diff($currentIds, $dealer_ids);
+    $toAdd = array_diff($dealer_ids, $currentIds);
+
+    if ($toRemove) {
+      $placeholders = implode(',', array_fill(0, count($toRemove), '?'));
+      $delete = $pdo->prepare("DELETE FROM dealer_representative_assignments WHERE representative_id=? AND dealer_id IN ($placeholders)");
+      $delete->execute(array_merge([$representative_id], array_values($toRemove)));
+    }
+
+    foreach ($toAdd as $dealer_id) {
+      $pdo->prepare('INSERT INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at) VALUES (?,?,?)')
+          ->execute([$representative_id, $dealer_id, now()]);
+    }
+
+    representative_refresh_primary_assignment($representative_id, $pdo);
+
+    $pdo->commit();
+  } catch (Throwable $e) {
+    $pdo->rollBack();
+    throw $e;
+  }
+}
+
+function representative_refresh_primary_assignment(int $representative_id, ?PDO $pdo = null): void {
+  $pdo = $pdo ?: pdo();
+  $st = $pdo->prepare('SELECT dealer_id, assigned_at FROM dealer_representative_assignments WHERE representative_id=? ORDER BY assigned_at ASC, dealer_id ASC LIMIT 1');
+  $st->execute([$representative_id]);
+  $row = $st->fetch();
+  $primaryDealerId = $row ? (int)$row['dealer_id'] : null;
+  $assignedAt = $row['assigned_at'] ?? null;
+  try {
+    $pdo->prepare('UPDATE dealer_representatives SET dealer_id=?, assigned_at=?, updated_at=? WHERE id=?')
+        ->execute([$primaryDealerId, $assignedAt, now(), $representative_id]);
+  } catch (Throwable $e) {
+    try {
+      $pdo->prepare('UPDATE dealer_representatives SET dealer_id=?, updated_at=? WHERE id=?')
+          ->execute([$primaryDealerId, now(), $representative_id]);
+    } catch (Throwable $ignored) {}
+  }
 }
 
 function representative_create(array $data): int {
@@ -165,7 +302,7 @@ function representative_create(array $data): int {
 
   $commissionRate = max(0.0, min(100.0, $commissionRate));
 
-  $duplicateCheck = pdo()->prepare("SELECT id FROM dealer_representatives WHERE email=? LIMIT 1");
+  $duplicateCheck = pdo()->prepare('SELECT id FROM dealer_representatives WHERE email=? LIMIT 1');
   $duplicateCheck->execute([$email]);
   if ($duplicateCheck->fetchColumn()) {
     throw new InvalidArgumentException('Bu e-posta adresi başka bir temsilcide kayıtlı.');
@@ -174,7 +311,8 @@ function representative_create(array $data): int {
   $hash = password_hash($password, PASSWORD_DEFAULT);
 
   $pdo = pdo();
-  $pdo->prepare("INSERT INTO dealer_representatives (dealer_id, assigned_at, name, email, phone, password_hash, commission_rate, status, created_at, updated_at) VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)")
+  $pdo->prepare('INSERT INTO dealer_representatives (dealer_id, assigned_at, name, email, phone, password_hash, commission_rate, status, created_at, updated_at)
+                 VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)')
       ->execute([
         $name,
         $email,
@@ -187,15 +325,22 @@ function representative_create(array $data): int {
       ]);
 
   $repId = (int)$pdo->lastInsertId();
-  $dealerId = isset($data['dealer_id']) ? (int)$data['dealer_id'] : 0;
-  if ($dealerId > 0) {
-    representative_assign_to_dealer($repId, $dealerId);
+  $dealerIds = [];
+  if (!empty($data['dealer_ids']) && is_array($data['dealer_ids'])) {
+    $dealerIds = array_map('intval', $data['dealer_ids']);
+  }
+  if (!empty($data['dealer_id'])) {
+    $dealerIds[] = (int)$data['dealer_id'];
+  }
+  $dealerIds = array_values(array_unique(array_filter($dealerIds, fn($id) => $id > 0)));
+  if ($dealerIds) {
+    representative_update_assignments($repId, $dealerIds);
   }
   return $repId;
 }
 
 function representative_update(int $representative_id, array $data): void {
-  $rep = representative_get($representative_id);
+  $rep = representative_fetch_raw($representative_id);
   if (!$rep) {
     throw new InvalidArgumentException('Temsilci kaydı bulunamadı.');
   }
@@ -216,13 +361,13 @@ function representative_update(int $representative_id, array $data): void {
   }
   $commissionRate = max(0.0, min(100.0, $commissionRate));
 
-  $duplicateCheck = pdo()->prepare("SELECT id FROM dealer_representatives WHERE email=? AND id<>? LIMIT 1");
+  $duplicateCheck = pdo()->prepare('SELECT id FROM dealer_representatives WHERE email=? AND id<>? LIMIT 1');
   $duplicateCheck->execute([$email, $representative_id]);
   if ($duplicateCheck->fetchColumn()) {
     throw new InvalidArgumentException('Bu e-posta adresi başka bir temsilcide kayıtlı.');
   }
 
-  pdo()->prepare("UPDATE dealer_representatives SET name=?, email=?, phone=?, commission_rate=?, status=?, updated_at=? WHERE id=?")
+  pdo()->prepare('UPDATE dealer_representatives SET name=?, email=?, phone=?, commission_rate=?, status=?, updated_at=? WHERE id=?')
       ->execute([
         $name,
         $email,
@@ -239,45 +384,25 @@ function representative_update(int $representative_id, array $data): void {
 }
 
 function representative_assign_to_dealer(int $representative_id, ?int $dealer_id): void {
-  $rep = representative_get($representative_id);
-  if (!$rep) {
-    throw new InvalidArgumentException('Temsilci kaydı bulunamadı.');
-  }
+  $dealerIds = ($dealer_id && $dealer_id > 0) ? [$dealer_id] : [];
+  representative_update_assignments($representative_id, $dealerIds);
+}
 
+function representative_unassign_dealer(int $dealer_id): void {
+  if ($dealer_id <= 0) {
+    return;
+  }
   $pdo = pdo();
   $pdo->beginTransaction();
   try {
-    $newDealerId = $dealer_id && $dealer_id > 0 ? $dealer_id : null;
-    if ($newDealerId) {
-      $check = $pdo->prepare("SELECT id FROM dealers WHERE id=? LIMIT 1");
-      $check->execute([$newDealerId]);
-      if (!$check->fetch()) {
-        throw new InvalidArgumentException('Seçilen bayi bulunamadı.');
-      }
-
-      $currentForDealer = representative_for_dealer($newDealerId);
-      if ($currentForDealer && (int)$currentForDealer['id'] !== $representative_id) {
-        $pdo->prepare("UPDATE dealer_representatives SET dealer_id=NULL, assigned_at=NULL, updated_at=? WHERE id=?")
-            ->execute([now(), (int)$currentForDealer['id']]);
-      }
+    $st = $pdo->prepare('SELECT representative_id FROM dealer_representative_assignments WHERE dealer_id=?');
+    $st->execute([$dealer_id]);
+    $repIds = array_map('intval', $st->fetchAll(PDO::FETCH_COLUMN));
+    $pdo->prepare('DELETE FROM dealer_representative_assignments WHERE dealer_id=?')
+        ->execute([$dealer_id]);
+    foreach ($repIds as $repId) {
+      representative_refresh_primary_assignment($repId, $pdo);
     }
-
-    if (!empty($rep['dealer_id']) && $rep['dealer_id'] !== $newDealerId) {
-      $pdo->prepare("UPDATE dealer_representatives SET dealer_id=NULL, assigned_at=NULL, updated_at=? WHERE id=?")
-          ->execute([now(), $representative_id]);
-      $rep['dealer_id'] = 0;
-    }
-
-    if ($newDealerId) {
-      $pdo->prepare("UPDATE dealer_representatives SET dealer_id=?, assigned_at=?, updated_at=? WHERE id=?")
-          ->execute([$newDealerId, now(), now(), $representative_id]);
-    }
-
-    if (!$newDealerId) {
-      $pdo->prepare("UPDATE dealer_representatives SET dealer_id=NULL, assigned_at=NULL, updated_at=? WHERE id=?")
-          ->execute([now(), $representative_id]);
-    }
-
     $pdo->commit();
   } catch (Throwable $e) {
     $pdo->rollBack();
@@ -285,25 +410,17 @@ function representative_assign_to_dealer(int $representative_id, ?int $dealer_id
   }
 }
 
-function representative_unassign_dealer(int $dealer_id): void {
-  if ($dealer_id <= 0) {
-    return;
-  }
-  pdo()->prepare("UPDATE dealer_representatives SET dealer_id=NULL, assigned_at=NULL, updated_at=? WHERE dealer_id=?")
-      ->execute([now(), $dealer_id]);
-}
-
 function representative_update_password(int $representative_id, string $plainPassword): void {
   if ($plainPassword === '') {
     throw new InvalidArgumentException('Şifre boş olamaz.');
   }
   $hash = password_hash($plainPassword, PASSWORD_DEFAULT);
-  pdo()->prepare("UPDATE dealer_representatives SET password_hash=?, updated_at=? WHERE id=?")
+  pdo()->prepare('UPDATE dealer_representatives SET password_hash=?, updated_at=? WHERE id=?')
       ->execute([$hash, now(), (int)$representative_id]);
 }
 
 function representative_record_login(int $representative_id): void {
-  pdo()->prepare("UPDATE dealer_representatives SET last_login_at=?, updated_at=? WHERE id=?")
+  pdo()->prepare('UPDATE dealer_representatives SET last_login_at=?, updated_at=? WHERE id=?')
       ->execute([now(), now(), (int)$representative_id]);
 }
 
@@ -319,7 +436,7 @@ function representative_create_commission_for_topup(int $topup_id, int $dealer_i
     return;
   }
   $pdo = pdo();
-  $check = $pdo->prepare("SELECT id FROM dealer_representative_commissions WHERE dealer_topup_id=? LIMIT 1");
+  $check = $pdo->prepare('SELECT id FROM dealer_representative_commissions WHERE dealer_topup_id=? LIMIT 1');
   $check->execute([$topup_id]);
   if ($check->fetch()) {
     return;
@@ -328,7 +445,7 @@ function representative_create_commission_for_topup(int $topup_id, int $dealer_i
   if ($commission <= 0) {
     return;
   }
-  $pdo->prepare("INSERT INTO dealer_representative_commissions (representative_id, dealer_topup_id, amount_cents, commission_cents, status, created_at) VALUES (?,?,?,?,?,?)")
+  $pdo->prepare('INSERT INTO dealer_representative_commissions (representative_id, dealer_topup_id, amount_cents, commission_cents, status, created_at) VALUES (?,?,?,?,?,?)')
       ->execute([
         (int)$rep['id'],
         $topup_id,
@@ -347,7 +464,7 @@ function representative_commission_totals(int $representative_id): array {
     'paid_count' => 0,
     'total_amount' => 0,
   ];
-  $st = pdo()->prepare("SELECT status, COUNT(*) AS c, COALESCE(SUM(commission_cents),0) AS total FROM dealer_representative_commissions WHERE representative_id=? GROUP BY status");
+  $st = pdo()->prepare('SELECT status, COUNT(*) AS c, COALESCE(SUM(commission_cents),0) AS total FROM dealer_representative_commissions WHERE representative_id=? GROUP BY status');
   $st->execute([$representative_id]);
   foreach ($st as $row) {
     $status = $row['status'] ?? '';
@@ -398,10 +515,10 @@ function representative_recent_commissions(int $representative_id, int $limit = 
 function representative_completed_topups(int $representative_id, int $limit = 20): array {
   $limit = max(1, $limit);
   $sql = "SELECT t.id, t.amount_cents, t.status, t.completed_at, t.created_at, c.commission_cents, c.status AS commission_status
-          FROM dealer_representatives r
-          INNER JOIN dealer_topups t ON t.dealer_id = r.dealer_id
-          LEFT JOIN dealer_representative_commissions c ON c.dealer_topup_id = t.id
-          WHERE r.id=? AND t.status=?
+          FROM dealer_representative_assignments a
+          INNER JOIN dealer_topups t ON t.dealer_id = a.dealer_id
+          LEFT JOIN dealer_representative_commissions c ON c.dealer_topup_id = t.id AND c.representative_id = a.representative_id
+          WHERE a.representative_id=? AND t.status=?
           ORDER BY COALESCE(t.completed_at, t.created_at) DESC
           LIMIT ?";
   $st = pdo()->prepare($sql);
@@ -425,7 +542,7 @@ function representative_completed_topups(int $representative_id, int $limit = 20
 }
 
 function representative_has_commission(int $representative_id, int $topup_id): bool {
-  $st = pdo()->prepare("SELECT 1 FROM dealer_representative_commissions WHERE representative_id=? AND dealer_topup_id=? LIMIT 1");
+  $st = pdo()->prepare('SELECT 1 FROM dealer_representative_commissions WHERE representative_id=? AND dealer_topup_id=? LIMIT 1');
   $st->execute([$representative_id, $topup_id]);
   return (bool)$st->fetchColumn();
 }

@@ -305,6 +305,7 @@ if (!function_exists('representative_base_styles')) {
     $headerSubtitle = $options['header_subtitle'] ?? 'Bayi yüklemelerini, komisyon özetlerini ve CRM akışını buradan yönetin.';
     $representative = $options['representative'] ?? null;
     $dealer = $options['dealer'] ?? null;
+    $dealerSelector = $options['dealer_selector'] ?? null;
     $extraHead = $options['extra_head'] ?? '';
     $logoutUrl = $options['logout_url'] ?? 'login.php?logout=1';
 
@@ -337,7 +338,9 @@ if (!function_exists('representative_base_styles')) {
     echo '</div>';
     echo '<h1>'.h($headerTitle).'</h1>';
     echo '<p>'.h($headerSubtitle).'</p>';
-    if ($dealerName) {
+    if ($dealerSelector) {
+      echo $dealerSelector;
+    } elseif ($dealerName) {
       echo '<div class="rep-dealer-pill"><i class="bi bi-building"></i><span>'.h($dealerName).'</span>';
       if ($dealerCompany) {
         echo '<span>'.h($dealerCompany).'</span>';

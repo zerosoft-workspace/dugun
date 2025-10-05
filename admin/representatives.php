@@ -16,7 +16,7 @@ if ($action) {
   $contextDealerId = isset($_POST['context_dealer_id']) ? (int)$_POST['context_dealer_id'] : 0;
   try {
     if ($action === 'create') {
-      $dealerId = (int)($_POST['assign_dealer_id'] ?? 0);
+      $dealerIds = array_map('intval', $_POST['assign_dealer_ids'] ?? []);
       $repId = representative_create([
         'name' => $_POST['name'] ?? '',
         'email' => $_POST['email'] ?? '',
@@ -24,10 +24,10 @@ if ($action) {
         'status' => $_POST['status'] ?? REPRESENTATIVE_STATUS_ACTIVE,
         'commission_rate' => $_POST['commission_rate'] ?? 10,
         'password' => $_POST['password'] ?? '',
-        'dealer_id' => $dealerId > 0 ? $dealerId : null,
+        'dealer_ids' => $dealerIds,
       ]);
-      if ($dealerId > 0) {
-        $contextDealerId = $dealerId;
+      if (!empty($dealerIds)) {
+        $contextDealerId = $dealerIds[0];
       }
       flash('ok', 'Temsilci oluşturuldu.');
       $params = ['id' => $repId];
@@ -59,10 +59,10 @@ if ($action) {
     }
     if ($action === 'assign') {
       $repId = (int)($_POST['representative_id'] ?? 0);
-      $dealerId = (int)($_POST['dealer_id'] ?? 0);
-      representative_assign_to_dealer($repId, $dealerId > 0 ? $dealerId : null);
-      flash('ok', $dealerId > 0 ? 'Temsilci seçilen bayiye atandı.' : 'Temsilci bayiden kaldırıldı.');
-      $contextDealerId = $dealerId > 0 ? $dealerId : 0;
+      $dealerIds = array_map('intval', $_POST['dealer_ids'] ?? []);
+      representative_update_assignments($repId, $dealerIds);
+      flash('ok', $dealerIds ? 'Temsilci için bayi atamaları güncellendi.' : 'Temsilci tüm bayilerden kaldırıldı.');
+      $contextDealerId = $dealerIds[0] ?? 0;
       $params = ['id' => $repId];
       if ($contextDealerId > 0) {
         $params['dealer_id'] = $contextDealerId;
@@ -160,6 +160,21 @@ function representative_filters(array $base = []): string {
   .rep-stat .muted {
     font-size: .85rem;
     color: var(--admin-muted);
+  }
+  .rep-assignment-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+  }
+  .rep-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: .3rem .65rem;
+    border-radius: 999px;
+    background: rgba(14,165,181,.14);
+    color: var(--admin-ink);
+    font-size: .78rem;
+    font-weight: 600;
   }
   .card-lite form .form-label {
     font-weight: 600;
@@ -262,13 +277,13 @@ function representative_filters(array $base = []): string {
             <input type="password" class="form-control" name="password" required>
           </div>
           <div class="col-12">
-            <label class="form-label">Bayi Ataması (Opsiyonel)</label>
-            <select class="form-select" name="assign_dealer_id">
-              <option value="0">Şimdilik atama yapma</option>
+            <label class="form-label">Bayi Atamaları (Opsiyonel)</label>
+            <select class="form-select" name="assign_dealer_ids[]" multiple size="6">
               <?php foreach ($dealers as $dealer): ?>
                 <option value="<?= (int)$dealer['id'] ?>" <?=$dealerContextId === (int)$dealer['id'] ? 'selected' : ''?>><?=h($dealer['name'])?></option>
               <?php endforeach; ?>
             </select>
+            <small class="text-muted">CTRL/CMD tuşu ile birden fazla bayi seçebilirsiniz.</small>
           </div>
           <div class="col-12 d-grid">
             <button class="btn btn-brand" type="submit">Temsilci Oluştur</button>
@@ -325,7 +340,18 @@ function representative_filters(array $base = []): string {
                     <td class="fw-semibold"><?=h($rep['name'])?></td>
                     <td><?=h($rep['email'])?></td>
                     <td><span class="badge <?=($rep['status'] ?? '') === REPRESENTATIVE_STATUS_ACTIVE ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary'?>"><?=($rep['status'] ?? '') === REPRESENTATIVE_STATUS_ACTIVE ? 'Aktif' : 'Pasif'?></span></td>
-                    <td><?= $rep['dealer_name'] ? h($rep['dealer_name']) : '<span class="text-muted">Atanmamış</span>' ?></td>
+                    <td>
+                      <?php if (empty($rep['dealers'])): ?>
+                        <span class="text-muted">Atanmamış</span>
+                      <?php else: ?>
+                        <span class="d-inline-flex align-items-center gap-1">
+                          <?=h($rep['dealers'][0]['name'])?>
+                          <?php if (count($rep['dealers']) > 1): ?>
+                            <small class="text-muted">+<?=count($rep['dealers']) - 1?></small>
+                          <?php endif; ?>
+                        </span>
+                      <?php endif; ?>
+                    </td>
                     <td class="text-end"><a class="btn btn-sm btn-outline-brand" href="<?=h($_SERVER['PHP_SELF']).'?id='.(int)$rep['id']?>">Görüntüle</a></td>
                   </tr>
                 <?php endforeach; ?>
@@ -364,9 +390,16 @@ function representative_filters(array $base = []): string {
             </div>
             <div class="col-md-4">
               <div class="rep-stat">
-                <div class="label">Atandığı Bayi</div>
-                <div class="muted mb-1"><?= $selectedRep['dealer_name'] ? h($selectedRep['dealer_name']) : 'Atanmamış' ?></div>
-                <?php if ($selectedRep['dealer_code']): ?><div class="muted">Kod: <?=h($selectedRep['dealer_code'])?></div><?php endif; ?>
+                <div class="label">Atandığı Bayiler</div>
+                <?php if (empty($selectedRep['dealers'])): ?>
+                  <div class="muted">Atama yapılmamış</div>
+                <?php else: ?>
+                  <div class="rep-assignment-list">
+                    <?php foreach ($selectedRep['dealers'] as $dealer): ?>
+                      <span class="rep-chip"><?=h($dealer['name'])?></span>
+                    <?php endforeach; ?>
+                  </div>
+                <?php endif; ?>
               </div>
             </div>
           </div>
@@ -421,18 +454,68 @@ function representative_filters(array $base = []): string {
               <input type="hidden" name="context_dealer_id" value="<?=$dealerContextId?>">
             <?php endif; ?>
             <div class="col-md-8">
-              <label class="form-label">Bayi Ataması</label>
-              <select class="form-select" name="dealer_id">
-                <option value="0">Atama yapma</option>
+              <label class="form-label">Bayi Atamaları</label>
+              <select class="form-select" name="dealer_ids[]" multiple size="8">
+                <?php $selectedDealerIds = $selectedRep['dealer_ids'] ?? []; ?>
                 <?php foreach ($dealers as $dealer): ?>
-                  <option value="<?= (int)$dealer['id'] ?>" <?=$selectedRep['dealer_id'] == $dealer['id'] ? 'selected' : ''?>><?=h($dealer['name'])?></option>
+                  <?php $isSelected = in_array((int)$dealer['id'], $selectedDealerIds, true); ?>
+                  <option value="<?= (int)$dealer['id'] ?>" <?=$isSelected ? 'selected' : ''?>><?=h($dealer['name'])?></option>
                 <?php endforeach; ?>
               </select>
+              <small class="text-muted d-block mt-1">Birden fazla bayi seçebilirsiniz. Seçimi temizlemek için CTRL/CMD ile tıklayın.</small>
             </div>
             <div class="col-md-4 d-grid align-items-end">
               <button class="btn btn-outline-brand" type="submit">Atamayı Güncelle</button>
             </div>
           </form>
+          <?php if (!empty($selectedRep['dealers'])): ?>
+            <div class="table-responsive mt-4">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr><th>Bayi</th><th>Durum</th><th>Atama Tarihi</th></tr>
+                </thead>
+                <tbody>
+                  <?php foreach ($selectedRep['dealers'] as $dealer): ?>
+                    <?php
+                      $status = $dealer['status'] ?? 'pending';
+                      switch ($status) {
+                        case 'active':
+                        case 'approved':
+                          $badgeClass = 'bg-success-subtle text-success';
+                          $statusLabel = 'Aktif';
+                          break;
+                        case 'pending':
+                          $badgeClass = 'bg-warning-subtle text-warning';
+                          $statusLabel = 'Beklemede';
+                          break;
+                        case 'inactive':
+                          $badgeClass = 'bg-secondary-subtle text-secondary';
+                          $statusLabel = 'Pasif';
+                          break;
+                        case 'suspended':
+                          $badgeClass = 'bg-danger-subtle text-danger';
+                          $statusLabel = 'Askıda';
+                          break;
+                        case 'blocked':
+                          $badgeClass = 'bg-danger-subtle text-danger';
+                          $statusLabel = 'Engelli';
+                          break;
+                        default:
+                          $badgeClass = 'bg-warning-subtle text-warning';
+                          $statusLabel = ucfirst($status);
+                          break;
+                      }
+                    ?>
+                    <tr>
+                      <td><?=h($dealer['name'])?></td>
+                      <td><span class="badge <?=$badgeClass?>"><?=h($statusLabel)?></span></td>
+                      <td><?= $dealer['assigned_at'] ? h(date('d.m.Y H:i', strtotime($dealer['assigned_at']))) : '—' ?></td>
+                    </tr>
+                  <?php endforeach; ?>
+                </tbody>
+              </table>
+            </div>
+          <?php endif; ?>
         <?php endif; ?>
       </div>
     </div>

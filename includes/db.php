@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240509_03');
+  define('APP_SCHEMA_VERSION', '20240527_01');
 }
 
 function pdo(): PDO {
@@ -347,6 +347,31 @@ function install_schema(){
     INDEX idx_representative_status (status),
     FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representative_assignments(
+    representative_id INT NOT NULL,
+    dealer_id INT NOT NULL,
+    assigned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (representative_id, dealer_id),
+    UNIQUE KEY uniq_assignment_dealer (dealer_id),
+    INDEX idx_assignment_rep (representative_id),
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  try {
+    $migrateAssignments = $pdo->query("SELECT id, dealer_id, assigned_at, created_at FROM dealer_representatives WHERE dealer_id IS NOT NULL");
+    $insertAssignment = $pdo->prepare("INSERT IGNORE INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at) VALUES (?,?,?)");
+    foreach ($migrateAssignments as $row) {
+      $repId = (int)$row['id'];
+      $dealerId = (int)$row['dealer_id'];
+      if ($repId <= 0 || $dealerId <= 0) {
+        continue;
+      }
+      $assignedAt = $row['assigned_at'] ?? ($row['created_at'] ?? now());
+      $insertAssignment->execute([$repId, $dealerId, $assignedAt]);
+    }
+  } catch (Throwable $e) {}
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representative_commissions(
     id INT AUTO_INCREMENT PRIMARY KEY,

@@ -18,14 +18,44 @@ if (!$representative) {
   redirect('login.php');
 }
 
-$dealerId = (int)($representative['dealer_id'] ?? 0);
-$dealer = $dealerId ? dealer_get($dealerId) : null;
-if ($dealerId && !$dealer) {
-  try {
-    representative_assign_to_dealer((int)$representative['id'], null);
-  } catch (Throwable $e) {}
+$assignedDealers = $representative['dealers'] ?? [];
+$assignedDealerIds = array_map(fn($dealer) => (int)$dealer['id'], $assignedDealers);
+$dealerLookup = [];
+foreach ($assignedDealers as $item) {
+  $dealerLookup[(int)$item['id']] = $item;
+}
+
+$dealerId = isset($_POST['context_dealer_id']) ? (int)$_POST['context_dealer_id'] : 0;
+if ($dealerId <= 0) {
+  $dealerId = isset($_GET['dealer_id']) ? (int)$_GET['dealer_id'] : 0;
+}
+if ($dealerId > 0 && !isset($dealerLookup[$dealerId])) {
   $dealerId = 0;
 }
+if ($dealerId === 0 && $assignedDealerIds) {
+  $dealerId = $assignedDealerIds[0];
+}
+
+$dealer = $dealerId ? dealer_get($dealerId) : null;
+if ($dealerId && !$dealer) {
+  $remaining = array_values(array_filter($assignedDealerIds, fn($id) => $id !== $dealerId));
+  if (count($remaining) !== count($assignedDealerIds)) {
+    try {
+      representative_update_assignments((int)$representative['id'], $remaining);
+    } catch (Throwable $e) {}
+    $representative = representative_get((int)$user['id']);
+    $assignedDealers = $representative['dealers'] ?? [];
+    $assignedDealerIds = array_map(fn($dealer) => (int)$dealer['id'], $assignedDealers);
+    $dealerLookup = [];
+    foreach ($assignedDealers as $item) {
+      $dealerLookup[(int)$item['id']] = $item;
+    }
+    $dealerId = $assignedDealerIds[0] ?? 0;
+    $dealer = $dealerId ? dealer_get($dealerId) : null;
+  }
+}
+
+$dealerQuery = $dealerId ? '?dealer_id='.$dealerId : '';
 
 $commissionTotals = representative_commission_totals((int)$representative['id']);
 $topups = representative_completed_topups((int)$representative['id'], 20);
@@ -56,8 +86,8 @@ $action = $_POST['do'] ?? '';
 if ($action) {
   csrf_or_die();
   try {
-    if (!$dealer) {
-      throw new RuntimeException('Önce bir bayi atanması gerekiyor.');
+    if (!$dealer || !$dealerId) {
+      throw new RuntimeException('Önce bir bayi seçmeniz gerekiyor.');
     }
     if ($action === 'create_lead') {
       $payload = [
@@ -72,7 +102,7 @@ if ($action) {
       ];
       $leadId = dealer_lead_create((int)$dealer['id'], $payload, (int)$representative['id']);
       flash('ok', 'Potansiyel müşteri kaydedildi.');
-      redirect('dashboard.php#lead-'.$leadId);
+      redirect('dashboard.php'.$dealerQuery.'#lead-'.$leadId);
     }
     if ($action === 'update_lead') {
       $leadId = (int)($_POST['lead_id'] ?? 0);
@@ -85,7 +115,7 @@ if ($action) {
         'notes' => $_POST['notes'] ?? null,
       ], (int)$representative['id']);
       flash('ok', 'Potansiyel müşteri bilgileri güncellendi.');
-      redirect('dashboard.php#lead-'.$leadId);
+      redirect('dashboard.php'.$dealerQuery.'#lead-'.$leadId);
     }
     if ($action === 'add_note') {
       $leadId = (int)($_POST['lead_id'] ?? 0);
@@ -104,11 +134,11 @@ if ($action) {
         (int)$representative['id']
       );
       flash('ok', 'Görüşme notu kaydedildi.');
-      redirect('dashboard.php#lead-'.$leadId);
+      redirect('dashboard.php'.$dealerQuery.'#lead-'.$leadId);
     }
   } catch (Throwable $e) {
     flash('err', $e->getMessage());
-    redirect('dashboard.php');
+    redirect('dashboard.php'.$dealerQuery);
   }
 }
 
@@ -132,11 +162,20 @@ $pageStyles = <<<'CSS'
   .section-heading{display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:1rem;flex-wrap:wrap;}
   .section-heading h5{font-weight:700;margin:0;}
   .section-heading small{color:#64748b;}
+  .dealer-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.35rem .75rem;border-radius:999px;background:rgba(14,165,181,.16);color:#0b8b98;font-size:.78rem;font-weight:600;}
+  .dealer-badge i{font-size:1rem;}
   .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.1rem;}
   .summary-item{border-radius:20px;padding:1.15rem 1.25rem;background:linear-gradient(150deg,#fff,rgba(14,165,181,.08));border:1px solid rgba(148,163,184,.22);box-shadow:0 24px 54px -40px rgba(15,23,42,.45);}
   .summary-item span{display:block;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.35rem;font-weight:600;}
   .summary-item strong{font-size:1.45rem;color:#0f172a;display:block;}
   .summary-item small{display:block;font-size:.78rem;color:#475569;margin-top:.25rem;}
+  .dealer-switcher{margin-top:1.6rem;display:flex;flex-direction:column;gap:.5rem;max-width:320px;}
+  .dealer-switcher__label{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:rgba(255,255,255,.75);font-weight:600;}
+  .dealer-switcher__field{display:flex;align-items:center;gap:.55rem;background:rgba(255,255,255,.14);border-radius:14px;padding:.45rem .75rem;}
+  .dealer-switcher__field i{color:#fff;font-size:1.1rem;}
+  .dealer-switcher__field select{flex:1;border:none;background:transparent;color:#fff;font-weight:600;font-size:.95rem;appearance:none;}
+  .dealer-switcher__field select:focus{outline:none;box-shadow:none;}
+  .dealer-switcher__field select option{color:#0f172a;}
   .crm-status-row{display:flex;flex-wrap:wrap;gap:.6rem;margin-top:.5rem;}
   .status-chip{display:flex;align-items:center;gap:.45rem;padding:.35rem .85rem;border-radius:999px;font-size:.78rem;font-weight:600;background:rgba(148,163,184,.16);color:#475569;}
   .status-chip .count{font-size:.9rem;color:#0f172a;}
@@ -207,9 +246,32 @@ $pageStyles = <<<'CSS'
 </style>
 CSS;
 
-$headerSubtitle = $dealer
-  ? 'Bayinizin yüklemelerini takip edin, CRM akışını güncelleyin ve komisyon durumunu inceleyin.'
-  : 'Henüz bir bayi ataması yapılmadı. Yönetici ekibinizden atama talep edebilirsiniz.';
+$dealerSelectorHtml = '';
+if (!empty($assignedDealers)) {
+  ob_start();
+  ?>
+  <form method="get" class="dealer-switcher">
+    <label for="dealer-switcher" class="dealer-switcher__label">Bayi seçimi</label>
+    <div class="dealer-switcher__field">
+      <i class="bi bi-building"></i>
+      <select id="dealer-switcher" name="dealer_id" onchange="this.form.submit()">
+        <?php foreach ($assignedDealers as $item): ?>
+          <option value="<?= (int)$item['id'] ?>" <?=$dealerId === (int)$item['id'] ? 'selected' : ''?>><?=h($item['name'])?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+  </form>
+  <?php
+  $dealerSelectorHtml = ob_get_clean();
+}
+
+if ($dealer) {
+  $headerSubtitle = $dealer['name'].' bayisinin yüklemelerini, CRM akışını ve komisyonlarını buradan yönetin.';
+} elseif (!empty($assignedDealers)) {
+  $headerSubtitle = 'Atandığınız bayileri görüntülemek için üstteki seçimden bir bayi seçin.';
+} else {
+  $headerSubtitle = 'Henüz bir bayi ataması yapılmadı. Yönetici ekibinizden atama talep edebilirsiniz.';
+}
 
 representative_layout_start([
   'page_title' => APP_NAME.' — Temsilci Paneli',
@@ -217,6 +279,7 @@ representative_layout_start([
   'header_subtitle' => $headerSubtitle,
   'representative' => $representative,
   'dealer' => $dealer,
+  'dealer_selector' => $dealerSelectorHtml,
   'extra_head' => $pageStyles,
   'logout_url' => 'login.php?logout=1',
 ]);
@@ -232,7 +295,12 @@ if (!$dealer): ?>
   <div class="card-lite mb-4">
     <div class="section-heading">
       <h5 class="mb-0">Komisyon özeti</h5>
-      <small>Bayinizin gerçekleştirdiği yüklemeler üzerinden kazanımlarınızı takip edin.</small>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <small>Bayinizin gerçekleştirdiği yüklemeler üzerinden kazanımlarınızı takip edin.</small>
+        <?php if ($dealer): ?>
+          <span class="dealer-badge"><i class="bi bi-building"></i><?=h($dealer['name'])?></span>
+        <?php endif; ?>
+      </div>
     </div>
     <div class="summary-grid">
       <div class="summary-item">
@@ -253,7 +321,7 @@ if (!$dealer): ?>
       <div class="summary-item">
         <span>Komisyon Oranı</span>
         <strong>%<?=h(number_format($representative['commission_rate'], 1))?></strong>
-        <small>Temsilci oranınız</small>
+        <small><?=h(count($assignedDealers))?> bayi ataması</small>
       </div>
     </div>
   </div>
@@ -322,6 +390,7 @@ if (!$dealer): ?>
     <form method="post" class="create-lead-form">
       <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
       <input type="hidden" name="do" value="create_lead">
+      <input type="hidden" name="context_dealer_id" value="<?=$dealerId?>">
       <div>
         <label class="form-label">Ad Soyad</label>
         <input type="text" name="lead_name" class="form-control" required>
@@ -412,6 +481,7 @@ if (!$dealer): ?>
                     <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
                     <input type="hidden" name="do" value="update_lead">
                     <input type="hidden" name="lead_id" value="<?=$leadId?>">
+                    <input type="hidden" name="context_dealer_id" value="<?=$dealerId?>">
                     <div>
                       <label class="form-label">Durum</label>
                       <select class="form-select" name="status">
@@ -456,6 +526,7 @@ if (!$dealer): ?>
                     <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
                     <input type="hidden" name="do" value="add_note">
                     <input type="hidden" name="lead_id" value="<?=$leadId?>">
+                    <input type="hidden" name="context_dealer_id" value="<?=$dealerId?>">
                     <div class="mb-2">
                       <label class="form-label">Yeni Görüşme Notu</label>
                       <textarea class="form-control" name="note" required placeholder="Görüşmenin detaylarını yazın."></textarea>
