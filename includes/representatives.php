@@ -9,6 +9,18 @@ require_once __DIR__.'/functions.php';
 const REPRESENTATIVE_STATUS_ACTIVE = 'active';
 const REPRESENTATIVE_STATUS_INACTIVE = 'inactive';
 
+function representative_assignments_support_commission_rate(): bool {
+  static $hasColumn = null;
+  if ($hasColumn === null) {
+    try {
+      $hasColumn = column_exists('dealer_representative_assignments', 'commission_rate');
+    } catch (Throwable $e) {
+      $hasColumn = false;
+    }
+  }
+  return (bool)$hasColumn;
+}
+
 function representative_normalize_row(array $row): array {
   $row['id'] = (int)($row['id'] ?? 0);
   $row['dealer_id'] = isset($row['dealer_id']) ? (int)$row['dealer_id'] : 0;
@@ -109,7 +121,10 @@ function representative_assigned_dealers(int $representative_id): array {
   if ($representative_id <= 0) {
     return [];
   }
-  $sql = "SELECT d.id, d.name, d.company, d.status, d.code, a.assigned_at, a.commission_rate
+  $commissionSelect = representative_assignments_support_commission_rate()
+    ? 'a.commission_rate AS commission_rate'
+    : 'NULL AS commission_rate';
+  $sql = "SELECT d.id, d.name, d.company, d.status, d.code, a.assigned_at, {$commissionSelect}
           FROM dealer_representative_assignments a
           INNER JOIN dealers d ON d.id = a.dealer_id
           WHERE a.representative_id=?
@@ -254,6 +269,7 @@ function representative_update_assignments(int $representative_id, array $dealer
   $pdo = pdo();
   $pdo->beginTransaction();
   try {
+    $hasAssignmentRate = representative_assignments_support_commission_rate();
     if ($dealer_ids) {
       $placeholders = implode(',', array_fill(0, count($dealer_ids), '?'));
       $check = $pdo->prepare("SELECT id FROM dealers WHERE id IN ($placeholders)");
@@ -287,13 +303,20 @@ function representative_update_assignments(int $representative_id, array $dealer
       $delete->execute(array_merge([$representative_id], array_values($toRemove)));
     }
 
+    $insertSql = $hasAssignmentRate
+      ? 'INSERT INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at, commission_rate) VALUES (?,?,?,?)'
+      : 'INSERT INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at) VALUES (?,?,?)';
+    $insertStmt = $pdo->prepare($insertSql);
     foreach ($toAdd as $dealer_id) {
       $rate = $rateMap[$dealer_id] ?? ($rep['commission_rate'] ?? 0.0);
-      $pdo->prepare('INSERT INTO dealer_representative_assignments (representative_id, dealer_id, assigned_at, commission_rate) VALUES (?,?,?,?)')
-          ->execute([$representative_id, $dealer_id, now(), number_format($rate, 2, '.', '')]);
+      $params = [$representative_id, $dealer_id, now()];
+      if ($hasAssignmentRate) {
+        $params[] = number_format($rate, 2, '.', '');
+      }
+      $insertStmt->execute($params);
     }
 
-    if ($rateMap) {
+    if ($hasAssignmentRate && $rateMap) {
       $update = $pdo->prepare('UPDATE dealer_representative_assignments SET commission_rate=? WHERE representative_id=? AND dealer_id=?');
       foreach ($dealer_ids as $dealer_id) {
         if (!array_key_exists($dealer_id, $rateMap)) {
@@ -302,6 +325,13 @@ function representative_update_assignments(int $representative_id, array $dealer
         $rate = number_format($rateMap[$dealer_id], 2, '.', '');
         $update->execute([$rate, $representative_id, $dealer_id]);
       }
+    } elseif (!$hasAssignmentRate && $rateMap) {
+      $firstRate = reset($rateMap);
+      $normalizedRate = representative_sanitize_commission_rate($firstRate, $rep['commission_rate'] ?? null);
+      try {
+        $pdo->prepare('UPDATE dealer_representatives SET commission_rate=?, updated_at=? WHERE id=?')
+            ->execute([number_format($normalizedRate, 2, '.', ''), now(), $representative_id]);
+      } catch (Throwable $ignored) {}
     }
 
     representative_refresh_primary_assignment($representative_id, $pdo);
@@ -342,6 +372,18 @@ function representative_update_assignment_rates(int $representative_id, array $r
   $pdo = pdo();
   $pdo->beginTransaction();
   try {
+    if (!representative_assignments_support_commission_rate()) {
+      $first = reset($rates);
+      if ($first !== false) {
+        $normalized = representative_sanitize_commission_rate($first, $rep['commission_rate'] ?? null);
+        try {
+          $pdo->prepare('UPDATE dealer_representatives SET commission_rate=?, updated_at=? WHERE id=?')
+              ->execute([number_format($normalized, 2, '.', ''), now(), $representative_id]);
+        } catch (Throwable $ignored) {}
+      }
+      $pdo->commit();
+      return;
+    }
     $check = $pdo->prepare('SELECT 1 FROM dealer_representative_assignments WHERE representative_id=? AND dealer_id=? LIMIT 1');
     $update = $pdo->prepare('UPDATE dealer_representative_assignments SET commission_rate=? WHERE representative_id=? AND dealer_id=?');
     foreach ($rates as $dealerId => $rate) {
@@ -619,7 +661,10 @@ function representative_recent_commissions(int $representative_id, int $limit = 
 
 function representative_completed_topups(int $representative_id, int $limit = 20, ?int $dealer_id = null): array {
   $limit = max(1, $limit);
-  $sql = "SELECT t.id, t.amount_cents, t.status, t.completed_at, t.created_at, t.dealer_id, a.commission_rate,
+  $commissionSelect = representative_assignments_support_commission_rate()
+    ? 'a.commission_rate'
+    : 'NULL AS commission_rate';
+  $sql = "SELECT t.id, t.amount_cents, t.status, t.completed_at, t.created_at, t.dealer_id, {$commissionSelect},
                  c.commission_cents, c.status AS commission_status
           FROM dealer_representative_assignments a
           INNER JOIN dealer_topups t ON t.dealer_id = a.dealer_id
