@@ -5,6 +5,7 @@ require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/representatives.php';
 require_once __DIR__.'/../includes/dealers.php';
 require_once __DIR__.'/../includes/auth.php';
+require_once __DIR__.'/partials/ui.php';
 
 require_admin();
 install_schema();
