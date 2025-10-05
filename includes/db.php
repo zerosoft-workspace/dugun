@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240509_01');
+  define('APP_SCHEMA_VERSION', '20240509_02');
 }
 
 function pdo(): PDO {
@@ -206,6 +206,22 @@ function install_schema(){
     UNIQUE KEY uniq_code (code),
     INDEX (dealer_id, type),
     FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (target_event_id) REFERENCES events(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_qr_codes(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    venue_id INT NOT NULL,
+    code VARCHAR(128) NOT NULL,
+    target_event_id INT NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_qr_code (code),
+    UNIQUE KEY uniq_dealer_venue (dealer_id, venue_id),
+    INDEX idx_qr_target (target_event_id),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE,
     FOREIGN KEY (target_event_id) REFERENCES events(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
