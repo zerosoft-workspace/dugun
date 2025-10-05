@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealers.php';
+require_once __DIR__.'/../includes/representatives.php';
 require_once __DIR__.'/../includes/dealer_auth.php';
 require_once __DIR__.'/partials/ui.php';
 
@@ -17,6 +18,7 @@ if (!$dealer) {
 }
 
 $dealerId = (int)$dealer['id'];
+$representative = representative_for_dealer($dealerId);
 $venueId = (int)($_GET['venue_id'] ?? 0);
 if ($venueId <= 0) {
   flash('err', 'Salon seçilmedi.');
@@ -205,6 +207,7 @@ dealer_layout_start('venues', [
   'title'           => $venue['name'].' • Etkinlik Yönetimi',
   'subtitle'        => 'Atandığınız salon için etkinlik oluşturun, QR kodları yönetin ve davetli akışını kontrol edin.',
   'dealer'          => $dealer,
+  'representative'  => $representative,
   'venues'          => $venuesNav,
   'active_venue_id' => $venueId,
   'balance_text'    => format_currency($balance),

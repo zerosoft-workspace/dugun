@@ -5,6 +5,7 @@
 require_once __DIR__.'/../config.php';
 require_once __DIR__.'/db.php';
 require_once __DIR__.'/functions.php';
+require_once __DIR__.'/representatives.php';
 
 const DEALER_STATUS_PENDING = 'pending';
 const DEALER_STATUS_ACTIVE  = 'active';
@@ -1429,6 +1430,7 @@ function dealer_mark_topup_completed(int $topup_id, ?string $reference = null, a
           now(),
           $topup_id,
         ]);
+    representative_create_commission_for_topup($topup_id, (int)$row['dealer_id'], $amount);
     if ($ownTxn) {
       $pdo->commit();
     }

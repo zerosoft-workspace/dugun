@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealers.php';
+require_once __DIR__.'/../includes/representatives.php';
 require_once __DIR__.'/../includes/dealer_auth.php';
 require_once __DIR__.'/partials/ui.php';
 
@@ -18,6 +19,7 @@ if (!$dealer) {
 
 dealer_refresh_session((int)$dealer['id']);
 $dealerId = (int)$dealer['id'];
+$representative = representative_for_dealer($dealerId);
 
 $action = $_POST['do'] ?? '';
 if ($action) {
@@ -104,6 +106,7 @@ dealer_layout_start('billing', [
   'title'        => 'Bakiye & Paket Yönetimi',
   'subtitle'     => 'Bakiyenizi yönetin, paket satın alın ve cari hareketlerinizi tek yerden takip edin.',
   'dealer'       => $dealer,
+  'representative' => $representative,
   'venues'       => $venuesNav,
   'balance_text' => format_currency($balance),
   'license_text' => $licenseLabel,

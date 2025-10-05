@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240509_02');
+  define('APP_SCHEMA_VERSION', '20240509_03');
 }
 
 function pdo(): PDO {
@@ -319,6 +319,75 @@ function install_schema(){
       pdo()->exec("ALTER TABLE dealer_topups ADD UNIQUE KEY uniq_topup_oid (merchant_oid)");
     } catch (Throwable $e) {}
   }
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representatives(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NOT NULL UNIQUE,
+    phone VARCHAR(64) NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    commission_rate DECIMAL(5,2) NOT NULL DEFAULT 10.00,
+    status VARCHAR(16) NOT NULL DEFAULT 'active',
+    last_login_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_dealer_representative (dealer_id),
+    INDEX idx_representative_status (status),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representative_commissions(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    representative_id INT NOT NULL,
+    dealer_topup_id INT NOT NULL,
+    amount_cents INT NOT NULL,
+    commission_cents INT NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    notes VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL,
+    paid_at DATETIME NULL,
+    UNIQUE KEY uniq_commission_topup (dealer_topup_id),
+    INDEX idx_commission_rep_status (representative_id, status),
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
+    FOREIGN KEY (dealer_topup_id) REFERENCES dealer_topups(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_leads(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    representative_id INT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NULL,
+    phone VARCHAR(64) NULL,
+    company VARCHAR(190) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'new',
+    source VARCHAR(64) NULL,
+    notes TEXT NULL,
+    last_contact_at DATETIME NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_leads_dealer_status (dealer_id, status),
+    INDEX idx_leads_rep (representative_id),
+    INDEX idx_leads_next (next_action_at),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_lead_notes(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    representative_id INT NULL,
+    note TEXT NOT NULL,
+    contact_type VARCHAR(32) NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (lead_id) REFERENCES dealer_leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL,
+    INDEX idx_lead_notes_lead (lead_id),
+    INDEX idx_lead_notes_next (next_action_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* müşteri web siparişleri */
   $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';

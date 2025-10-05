@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealers.php';
+require_once __DIR__.'/../includes/representatives.php';
 require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/partials/ui.php';
 
@@ -266,6 +267,63 @@ if ($action === 'topup_cancel_admin') {
   redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#finance');
 }
 
+if ($action === 'representative_save') {
+  $dealerId = (int)($_POST['dealer_id'] ?? 0);
+  $dealer = dealer_get($dealerId);
+  if (!$dealer) {
+    flash('err', 'Bayi bulunamadı.');
+    redirect($_SERVER['PHP_SELF']);
+  }
+  $existingRep = representative_for_dealer($dealerId);
+  $name = trim($_POST['rep_name'] ?? '');
+  $email = trim($_POST['rep_email'] ?? '');
+  $phone = trim($_POST['rep_phone'] ?? '');
+  $status = $_POST['rep_status'] ?? REPRESENTATIVE_STATUS_ACTIVE;
+  $commissionRate = (float)($_POST['rep_commission_rate'] ?? 10.0);
+  $password = trim($_POST['rep_password'] ?? '');
+  try {
+    $payload = [
+      'name' => $name,
+      'email' => $email,
+      'phone' => $phone,
+      'status' => $status,
+      'commission_rate' => $commissionRate,
+    ];
+    if ($password !== '') {
+      $payload['password_hash'] = password_hash($password, PASSWORD_DEFAULT);
+    }
+    representative_save_for_dealer($dealerId, $payload, $existingRep['id'] ?? null);
+    if ($existingRep) {
+      $msg = 'Temsilci bilgileri güncellendi.';
+      if ($password !== '') {
+        $msg = 'Temsilci bilgileri ve şifresi güncellendi.';
+      }
+    } else {
+      $msg = 'Yeni temsilci hesabı oluşturuldu.';
+    }
+    flash('ok', $msg);
+  } catch (Throwable $e) {
+    flash('err', 'Temsilci kaydedilemedi: '.$e->getMessage());
+  }
+  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#representative');
+}
+
+if ($action === 'representative_remove') {
+  $dealerId = (int)($_POST['dealer_id'] ?? 0);
+  $dealer = dealer_get($dealerId);
+  if (!$dealer) {
+    flash('err', 'Bayi bulunamadı.');
+    redirect($_SERVER['PHP_SELF']);
+  }
+  try {
+    representative_delete_for_dealer($dealerId);
+    flash('ok', 'Temsilci kaydı kaldırıldı.');
+  } catch (Throwable $e) {
+    flash('err', 'Temsilci silinemedi: '.$e->getMessage());
+  }
+  redirect($_SERVER['PHP_SELF'].'?id='.$dealerId.'#representative');
+}
+
 $statusFilter = $_GET['status'] ?? 'all';
 $validStatusFilters = ['all', 'active', 'pending', 'inactive'];
 if (!in_array($statusFilter, $validStatusFilters, true)) {
@@ -363,6 +421,8 @@ if ($selectedDealer) {
   }
 
   dealer_refresh_purchase_states($selectedId);
+  $representative = representative_for_dealer($selectedId);
+  $representativeTotals = $representative ? representative_commission_totals((int)$representative['id']) : ['pending_amount' => 0, 'paid_amount' => 0, 'pending_count' => 0, 'paid_count' => 0, 'total_amount' => 0];
   $walletBalance = dealer_get_balance($selectedId);
   $walletTransactions = dealer_wallet_transactions($selectedId, 10);
   $walletFlowTotals = dealer_wallet_flow_totals($selectedId);
@@ -385,6 +445,8 @@ if ($selectedDealer) {
   $cashbackPendingCount = 0;
   $cashbackPendingAmount = 0;
   $topupRequests = [];
+  $representative = null;
+  $representativeTotals = ['pending_amount' => 0, 'paid_amount' => 0, 'pending_count' => 0, 'paid_count' => 0, 'total_amount' => 0];
 }
 $venueAssignments = dealer_fetch_venue_assignments();
 $unassignedVenueCount = 0;
@@ -500,6 +562,10 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
   .balance-stat .value{font-size:1.35rem;font-weight:700;color:#0f172a;}
   .balance-stat.income .value{color:#15803d;}
   .balance-stat.expense .value{color:#b91c1c;}
+  .rep-stat{border:1px solid rgba(148,163,184,.25);border-radius:16px;padding:1rem 1.2rem;background:linear-gradient(140deg,#f8fafc,#fff);height:100%;box-shadow:0 18px 40px -30px rgba(15,23,42,.35);}
+  .rep-stat .label{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.3rem;font-weight:600;}
+  .rep-stat .value{font-size:1.15rem;font-weight:700;color:var(--admin-ink);}
+  .rep-stat .muted{font-size:.82rem;color:var(--muted);}
   .badge-soft-lg{display:inline-flex;align-items:center;gap:.4rem;padding:.4rem .8rem;border-radius:999px;font-size:.85rem;font-weight:600;background:rgba(14,165,181,.12);color:#0f172a;}
   .wallet-direction{font-size:.75rem;font-weight:600;padding:.2rem .55rem;border-radius:999px;}
   .wallet-direction.in{background:rgba(34,197,94,.16);color:#166534;}
@@ -862,8 +928,95 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
               <label class="form-label">Not</label>
               <textarea class="form-control" name="notes" rows="2"><?=h($selectedDealer['notes'])?></textarea>
             </div>
-            <div class="col-12 d-grid">
-              <button class="btn btn-brand" type="submit">Bilgileri Güncelle</button>
+          <div class="col-12 d-grid">
+            <button class="btn btn-brand" type="submit">Bilgileri Güncelle</button>
+          </div>
+        </form>
+      </div>
+
+        <div class="card-lite p-4 mb-4" id="representative">
+          <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-3">
+            <div>
+              <h5 class="mb-1">Bayi Temsilcisi</h5>
+              <p class="text-muted small mb-0">Temsilciler tamamlanan bayi yüklemelerinden otomatik olarak komisyon kazanır.</p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <?php if ($representative): ?>
+                <span class="badge bg-success-subtle text-success-emphasis fw-semibold">Aktif</span>
+                <form method="post" class="m-0" onsubmit="return confirm('Temsilci kaydını kaldırmak istediğinize emin misiniz?');">
+                  <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                  <input type="hidden" name="do" value="representative_remove">
+                  <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Temsilciyi Kaldır</button>
+                </form>
+              <?php else: ?>
+                <span class="badge bg-secondary-subtle text-secondary-emphasis fw-semibold">Atanmadı</span>
+              <?php endif; ?>
+            </div>
+          </div>
+          <?php if ($representative): ?>
+            <div class="row g-3 mb-4">
+              <div class="col-md-4">
+                <div class="rep-stat">
+                  <div class="label">Temsilci</div>
+                  <div class="value"><?=h($representative['name'])?></div>
+                  <div class="muted"><?=h($representative['email'])?></div>
+                  <?php if (!empty($representative['phone'])): ?><div class="muted"><?=h($representative['phone'])?></div><?php endif; ?>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="rep-stat">
+                  <div class="label">Son Giriş</div>
+                  <div class="value"><?= $representative['last_login_at'] ? h(date('d.m.Y H:i', strtotime($representative['last_login_at']))) : '<span class="text-muted">Henüz giriş yapmadı</span>' ?></div>
+                  <div class="muted">Komisyon Oranı: %<?=h(number_format($representative['commission_rate'], 1))?></div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="rep-stat">
+                  <div class="label">Toplam Komisyon</div>
+                  <div class="value"><?=h(format_currency($representativeTotals['total_amount'] ?? 0))?></div>
+                  <div class="muted">Bekleyen: <?=h(format_currency($representativeTotals['pending_amount'] ?? 0))?></div>
+                </div>
+              </div>
+            </div>
+          <?php endif; ?>
+          <form method="post" class="row g-3">
+            <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+            <input type="hidden" name="do" value="representative_save">
+            <input type="hidden" name="dealer_id" value="<?= (int)$selectedDealer['id'] ?>">
+            <div class="col-md-4">
+              <label class="form-label">Ad Soyad</label>
+              <input type="text" class="form-control" name="rep_name" value="<?=h($representative['name'] ?? '')?>" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">E-posta</label>
+              <input type="email" class="form-control" name="rep_email" value="<?=h($representative['email'] ?? '')?>" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Telefon</label>
+              <input type="text" class="form-control" name="rep_phone" value="<?=h($representative['phone'] ?? '')?>">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Durum</label>
+              <select class="form-select" name="rep_status">
+                <option value="active" <?= ($representative['status'] ?? '') === 'active' ? 'selected' : '' ?>>Aktif</option>
+                <option value="inactive" <?= ($representative['status'] ?? '') === 'inactive' ? 'selected' : '' ?>>Pasif</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Komisyon (%)</label>
+              <div class="input-group">
+                <input type="number" step="0.1" min="0" max="100" class="form-control" name="rep_commission_rate" value="<?=h(number_format($representative['commission_rate'] ?? 10.0, 1, '.', ''))?>" required>
+                <span class="input-group-text">%</span>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Şifre</label>
+              <input type="password" class="form-control" name="rep_password" placeholder="<?= $representative ? 'Boş bırakırsanız mevcut şifre korunur' : 'Yeni şifre oluşturun' ?>" <?= $representative ? '' : 'required' ?>>
+              <div class="form-text">Temsilci paneli adresi: <?=h(rtrim(BASE_URL, '/'))?>/representative</div>
+            </div>
+            <div class="col-12 d-flex justify-content-end">
+              <button class="btn btn-brand" type="submit">Temsilci Bilgilerini Kaydet</button>
             </div>
           </form>
         </div>

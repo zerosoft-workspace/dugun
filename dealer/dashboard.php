@@ -3,6 +3,8 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealers.php';
+require_once __DIR__.'/../includes/representatives.php';
+require_once __DIR__.'/../includes/dealer_crm.php';
 require_once __DIR__.'/../includes/dealer_auth.php';
 require_once __DIR__.'/partials/ui.php';
 
@@ -26,6 +28,12 @@ $creationStatus = dealer_event_creation_status($dealer);
 $canCreate = $creationStatus['allowed'];
 $quotaSummary = $creationStatus['summary'];
 $balance = dealer_get_balance((int)$dealer['id']);
+$representative = representative_for_dealer((int)$dealer['id']);
+$leadStats = dealer_lead_status_counts((int)$dealer['id']);
+$leadTotal = array_sum($leadStats);
+$leadStatusLabels = dealer_lead_status_options();
+$upcomingActions = dealer_lead_upcoming_actions((int)$dealer['id'], 5);
+$recentLeadNotes = dealer_lead_recent_notes((int)$dealer['id'], 5);
 $totalCashback = dealer_total_cashback((int)$dealer['id']);
 $cashbackPending = dealer_cashback_candidates((int)$dealer['id'], DEALER_CASHBACK_PENDING);
 $pendingCashbackCount = count($cashbackPending);
@@ -93,6 +101,28 @@ $pageStyles = <<<'CSS'
   .info-card h6{font-weight:700;margin-bottom:.35rem;}
   .info-card p{color:#64748b;font-size:.86rem;}
   .badge-soft{background:rgba(14,165,181,.12);color:#0ea5b5;border-radius:999px;padding:.35rem .75rem;font-weight:600;font-size:.82rem;display:inline-flex;align-items:center;}
+  .rep-contact{display:flex;align-items:center;gap:1rem;margin-bottom:1.25rem;}
+  .rep-contact .avatar{width:58px;height:58px;border-radius:18px;background:linear-gradient(150deg,rgba(14,165,181,.25),rgba(14,165,181,.55));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:1.35rem;color:#0b8b98;}
+  .rep-contact .info{display:flex;flex-direction:column;gap:.2rem;}
+  .rep-contact .info span{font-size:.85rem;color:#64748b;}
+  .crm-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1rem;}
+  .crm-stat{border:1px solid rgba(148,163,184,.2);border-radius:18px;padding:1rem;background:linear-gradient(150deg,#fff,rgba(14,165,181,.08));box-shadow:0 18px 40px -32px rgba(15,23,42,.35);}
+  .crm-stat .label{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.35rem;font-weight:600;}
+  .crm-stat strong{font-size:1.4rem;color:#0f172a;display:block;}
+  .crm-stat.highlight{background:linear-gradient(160deg,#0ea5b5,#6366f1);color:#fff;border:none;box-shadow:0 24px 58px -30px rgba(14,165,181,.7);}
+  .crm-stat.highlight .label{color:rgba(255,255,255,.85);}
+  .crm-stat.highlight strong{color:#fff;}
+  .crm-timeline{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:1rem;}
+  .crm-timeline li{display:flex;gap:.9rem;}
+  .crm-timeline .dot{width:38px;height:38px;border-radius:12px;background:rgba(14,165,181,.12);color:#0b8b98;display:flex;align-items:center;justify-content:center;font-size:1.1rem;}
+  .crm-timeline .content strong{display:block;font-weight:600;color:#0f172a;}
+  .crm-timeline .content span{display:block;font-size:.85rem;color:#64748b;}
+  .crm-timeline .content .badge{margin-top:.4rem;font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;}
+  .crm-notes{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:1rem;}
+  .crm-notes li{border:1px solid rgba(148,163,184,.22);border-radius:16px;padding:1rem;background:#f8fafc;}
+  .crm-notes .title{font-weight:600;color:#0f172a;margin-bottom:.35rem;}
+  .crm-notes p{margin:0 0 .45rem 0;color:#475569;font-size:.9rem;}
+  .crm-notes .meta{display:flex;flex-wrap:wrap;gap:.6rem;font-size:.75rem;color:#64748b;text-transform:uppercase;letter-spacing:.05em;}
   @media (max-width: 991px){
     .status-table,.timeline-card{padding:1.4rem;}
   }
@@ -104,6 +134,7 @@ dealer_layout_start('dashboard', [
   'title'        => 'Merhaba '.$dealer['name'].' 👋',
   'subtitle'     => 'Atanmış salonlarınızı yönetin, etkinlikleri takip edin ve BİKARE avantajlarını keşfedin.',
   'dealer'       => $dealer,
+  'representative' => $representative,
   'venues'       => $venues,
   'balance_text' => format_currency($balance),
   'license_text' => $licenseLabel,
@@ -152,6 +183,97 @@ dealer_layout_start('dashboard', [
           <h6>Etkinlik Hakkı</h6>
           <strong><?=h($quotaLabel)?></strong>
           <span><?=h($quotaHint)?></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="mb-4">
+  <div class="row g-4">
+    <div class="col-xl-4">
+      <div class="card-lite p-4 h-100">
+        <h5 class="mb-3">Temsilciniz</h5>
+        <?php if ($representative): ?>
+          <?php $repInitial = mb_strtoupper(mb_substr($representative['name'], 0, 1, 'UTF-8'), 'UTF-8'); ?>
+          <div class="rep-contact">
+            <div class="avatar"><?=h($repInitial)?></div>
+            <div class="info">
+              <strong><?=h($representative['name'])?></strong>
+              <span><?=h($representative['email'])?></span>
+              <?php if (!empty($representative['phone'])): ?><span><?=h($representative['phone'])?></span><?php endif; ?>
+            </div>
+          </div>
+          <p class="text-muted small mb-3">Temsilciniz yüklemelerinizden %<?=h(number_format($representative['commission_rate'], 1))?> komisyon kazanır ve potansiyel müşterilerinizin takibini sağlar.</p>
+          <div class="d-grid gap-2">
+            <a class="btn btn-outline-brand" href="leads.php"><i class="bi bi-people me-1"></i>Potansiyel Müşterileri Yönet</a>
+            <a class="btn btn-outline-brand" href="<?=h(BASE_URL.'/representative/login.php')?>" target="_blank"><i class="bi bi-box-arrow-up-right me-1"></i>Temsilci Paneli</a>
+          </div>
+        <?php else: ?>
+          <p class="text-muted mb-3">Henüz hesabınıza atanmış bir temsilci bulunmuyor. Yönetici ekibimizle iletişime geçerek temsilci talep edebilirsiniz.</p>
+          <a class="btn btn-outline-brand" href="leads.php">Potansiyel Müşteri Listesi</a>
+        <?php endif; ?>
+      </div>
+    </div>
+    <div class="col-xl-8">
+      <div class="card-lite p-4 h-100">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+          <h5 class="mb-0">CRM Özeti</h5>
+          <a class="btn btn-sm btn-outline-brand" href="leads.php">CRM'yi Aç</a>
+        </div>
+        <div class="crm-stats mb-4">
+          <div class="crm-stat highlight">
+            <span class="label">Toplam Potansiyel</span>
+            <strong><?=$leadTotal?></strong>
+          </div>
+          <?php foreach ($leadStats as $statusKey => $count): ?>
+            <?php $label = $leadStatusLabels[$statusKey] ?? ucfirst($statusKey); ?>
+            <div class="crm-stat">
+              <span class="label"><?=h($label)?></span>
+              <strong><?= (int)$count ?></strong>
+            </div>
+          <?php endforeach; ?>
+        </div>
+        <div class="row g-4">
+          <div class="col-md-6">
+            <h6 class="fw-semibold mb-2">Yaklaşan Aksiyonlar</h6>
+            <?php if (!$upcomingActions): ?>
+              <p class="text-muted small mb-0">Planlanmış görüşme bulunmuyor.</p>
+            <?php else: ?>
+              <ul class="crm-timeline">
+                <?php foreach ($upcomingActions as $item): ?>
+                  <li>
+                    <div class="dot"><i class="bi bi-calendar-event"></i></div>
+                    <div class="content">
+                      <strong><?=h($item['name'])?></strong>
+                      <span><?=h(date('d.m.Y H:i', strtotime($item['next_action_at'])))?></span>
+                      <span class="badge bg-light text-dark"><?=h($leadStatusLabels[$item['status']] ?? ucfirst($item['status']))?></span>
+                    </div>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+          </div>
+          <div class="col-md-6">
+            <h6 class="fw-semibold mb-2">Son Görüşme Notları</h6>
+            <?php if (!$recentLeadNotes): ?>
+              <p class="text-muted small mb-0">Henüz görüşme notu eklenmedi.</p>
+            <?php else: ?>
+              <ul class="crm-notes">
+                <?php foreach ($recentLeadNotes as $note): ?>
+                  <li>
+                    <div class="title"><?=h($note['lead_name'])?></div>
+                    <p><?=nl2br(h($note['note']))?></p>
+                    <div class="meta">
+                      <span><?=h(date('d.m.Y H:i', strtotime($note['created_at'])))?></span>
+                      <?php if (!empty($note['representative_name'])): ?><span><?=h($note['representative_name'])?></span><?php endif; ?>
+                      <?php if (!empty($note['contact_type'])): ?><span><?=h($note['contact_type'])?></span><?php endif; ?>
+                    </div>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+          </div>
         </div>
       </div>
     </div>

@@ -357,6 +357,7 @@ CSS;
     $heroTitle   = $options['title'] ?? '';
     $heroSubtitle= $options['subtitle'] ?? '';
     $dealer      = $options['dealer'] ?? null;
+    $representative = $options['representative'] ?? null;
     $venues      = $options['venues'] ?? [];
     $activeVenue = $options['active_venue_id'] ?? null;
     $balanceText = $options['balance_text'] ?? null;
@@ -401,12 +402,25 @@ CSS;
       if ($balanceText !== null) {
         echo '<div class="balance"><i class="bi bi-wallet2"></i><span>'.h($balanceText).'</span></div>';
       }
+      if ($representative) {
+        echo '<div class="mt-3 small" style="color:rgba(255,255,255,.75);">';
+        echo '<div class="fw-semibold" style="color:rgba(255,255,255,.85);">Temsilciniz</div>';
+        echo '<div class="fw-semibold text-white">'.h($representative['name'] ?? '').'</div>';
+        if (!empty($representative['email'])) {
+          echo '<div>'.h($representative['email']).'</div>';
+        }
+        if (!empty($representative['phone'])) {
+          echo '<div>'.h($representative['phone']).'</div>';
+        }
+        echo '</div>';
+      }
       echo '</div>';
     }
 
     $links = [
       'dashboard' => ['href' => BASE_URL.'/dealer/dashboard.php', 'label' => 'Genel Bakış', 'icon' => 'bi-speedometer2'],
       'billing'   => ['href' => BASE_URL.'/dealer/billing.php', 'label' => 'Bakiye & Paketler', 'icon' => 'bi-wallet2'],
+      'leads'     => ['href' => BASE_URL.'/dealer/leads.php', 'label' => 'Potansiyel Müşteriler', 'icon' => 'bi-people'],
     ];
 
     echo '<nav class="sidebar-nav">';
