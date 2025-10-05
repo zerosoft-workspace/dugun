@@ -88,6 +88,20 @@ $packages = dealer_packages_all(false);
 $editId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $editPackage = $editId ? dealer_package_get($editId) : null;
 
+$packageTotals = [
+  'all'    => count($packages),
+  'active' => 0,
+  'public' => 0,
+];
+foreach ($packages as $pkg) {
+  if (!empty($pkg['is_active'])) {
+    $packageTotals['active']++;
+  }
+  if (!empty($pkg['is_public'])) {
+    $packageTotals['public']++;
+  }
+}
+
 ?>
 <!doctype html>
 <html lang="tr">
@@ -98,20 +112,71 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <?=admin_base_styles()?>
 <style>
-  .card-lite form .form-label{font-weight:600;}
-  .table thead th{vertical-align:middle;}
-  .badge-status{padding:.35rem .75rem;border-radius:999px;font-size:.75rem;font-weight:600;}
-  .status-active{background:rgba(34,197,94,.15);color:#15803d;}
-  .status-passive{background:rgba(248,113,113,.16);color:#b91c1c;}
+  .card-lite form .form-label { font-weight:600; }
+  .stats-row .stat-card {
+    border-radius:18px;
+    background:#fff;
+    border:1px solid rgba(14,165,181,.12);
+    padding:22px 24px;
+    box-shadow:0 28px 52px -38px rgba(14,165,181,.6);
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .stats-row .stat-label { font-size:.78rem; color:var(--admin-muted); letter-spacing:.08em; text-transform:uppercase; }
+  .stats-row .stat-value { font-size:1.9rem; font-weight:700; color:var(--admin-ink); }
+  .stats-row .stat-chip { display:inline-flex; align-items:center; gap:6px; padding:.28rem .9rem; border-radius:999px; background:rgba(14,165,181,.12); color:var(--admin-brand-dark); font-size:.75rem; font-weight:600; }
+
+  .package-table thead th { vertical-align:middle; white-space:nowrap; }
+  .package-table .badge-status { padding:.35rem .85rem; border-radius:999px; font-size:.75rem; font-weight:600; }
+  .package-table .status-active { background:rgba(34,197,94,.18); color:#15803d; }
+  .package-table .status-passive { background:rgba(248,113,113,.18); color:#b91c1c; }
+  .package-table .status-public { background:rgba(14,165,181,.18); color:var(--admin-brand-dark); }
+  .package-table .action-group { display:flex; gap:8px; flex-wrap:wrap; }
+
+  .package-summary { border-radius:16px; background:rgba(14,165,181,.08); padding:18px; }
 </style>
 </head>
 <body class="admin-body">
 <?php admin_layout_start('packages', 'Paket Yönetimi', 'Bayi paketlerini oluşturun, fiyatlarını güncelleyin ve satış durumlarını yönetin.'); ?>
     <?php flash_box(); ?>
+
+    <div class="row g-3 stats-row mb-4">
+      <div class="col-md-4">
+        <div class="stat-card">
+          <span class="stat-label">Toplam Paket</span>
+          <span class="stat-value"><?=$packageTotals['all']?></span>
+          <span class="stat-chip"><i class="bi bi-boxes me-1"></i>Portföy</span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-card">
+          <span class="stat-label">Satışta</span>
+          <span class="stat-value text-success"><?=$packageTotals['active']?></span>
+          <span class="stat-chip"><i class="bi bi-graph-up-arrow me-1"></i>Aktif</span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-card">
+          <span class="stat-label">Web'de Yayında</span>
+          <span class="stat-value text-primary"><?=$packageTotals['public']?></span>
+          <span class="stat-chip"><i class="bi bi-globe2 me-1"></i>Site</span>
+        </div>
+      </div>
+    </div>
+
     <div class="row g-4">
       <div class="col-lg-5">
-        <div class="card-lite p-4">
-          <h5 class="mb-3"><?= $editPackage ? 'Paketi Güncelle' : 'Yeni Paket Oluştur' ?></h5>
+        <div class="card-lite p-4 h-100">
+          <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+              <h5 class="mb-1"><?= $editPackage ? 'Paketi Güncelle' : 'Yeni Paket Oluştur' ?></h5>
+              <p class="small text-muted mb-0">Bayi paketlerinizi fiyat, hak ve cashback kurallarına göre düzenleyin.</p>
+            </div>
+            <?php if ($editPackage): ?>
+              <a href="<?=h($_SERVER['PHP_SELF'])?>" class="btn btn-light border btn-sm"><i class="bi bi-x-lg"></i></a>
+            <?php endif; ?>
+          </div>
           <form method="post" class="row g-3">
             <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
             <input type="hidden" name="do" value="save">
@@ -122,7 +187,7 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
             </div>
             <div class="col-12">
               <label class="form-label">Fiyat (TL)</label>
-              <input class="form-control" name="price" value="<?= $editPackage ? number_format($editPackage['price_cents']/100, 2, ',', '') : ''?>" placeholder="Örn. 3000" required>
+              <input class="form-control" name="price" value="<?= $editPackage ? number_format($editPackage['price_cents']/100,2, ',', '') : ''?>" placeholder="Örn. 3000" required>
             </div>
             <div class="col-md-6">
               <label class="form-label">Etkinlik Hakkı</label>
@@ -155,11 +220,27 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
         </div>
       </div>
       <div class="col-lg-7">
-        <div class="card-lite p-4">
-          <h5 class="mb-3">Paket Listesi</h5>
+        <div class="card-lite p-4 h-100">
+          <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+            <h5 class="mb-0">Paket Listesi</h5>
+            <div class="package-summary small">
+              <strong><?=$packageTotals['active']?> paket</strong> satışta • <?=$packageTotals['public']?> paket web sitesinde yayınlanıyor.
+            </div>
+          </div>
           <div class="table-responsive">
-            <table class="table align-middle mb-0">
-              <thead><tr><th>Ad</th><th>Fiyat</th><th>Etkinlik</th><th>Süre</th><th>Cashback</th><th>Web</th><th>Durum</th><th></th></tr></thead>
+            <table class="table align-middle mb-0 package-table">
+              <thead>
+                <tr>
+                  <th>Paket</th>
+                  <th>Fiyat</th>
+                  <th>Etkinlik</th>
+                  <th>Süre</th>
+                  <th>Cashback</th>
+                  <th>Web</th>
+                  <th>Durum</th>
+                  <th style="width:200px">İşlemler</th>
+                </tr>
+              </thead>
               <tbody>
                 <?php if (!$packages): ?>
                   <tr><td colspan="8" class="text-center text-muted">Tanımlı paket bulunmuyor.</td></tr>
@@ -171,27 +252,30 @@ $editPackage = $editId ? dealer_package_get($editId) : null;
                       $quotaLabel = $pkg['event_quota'] === null ? 'Sınırsız' : $pkg['event_quota'];
                       $durationLabel = $pkg['duration_days'] === null ? 'Süre yok' : $pkg['duration_days'].' gün';
                       $cashbackLabel = $pkg['cashback_rate'] > 0 ? number_format($pkg['cashback_rate'] * 100, 1).'%' : '—';
-                      $publicLabel = $pkg['is_public'] ? 'Evet' : 'Hayır';
                     ?>
                     <tr>
                       <td>
-                        <div class="fw-semibold"><?=h($pkg['name'])?></div>
+                        <div class="fw-semibold mb-1"><?=h($pkg['name'])?></div>
                         <?php if (!empty($pkg['description'])): ?><div class="small text-muted"><?=h($pkg['description'])?></div><?php endif; ?>
                       </td>
                       <td><?=h(format_currency($pkg['price_cents']))?></td>
                       <td><?=h($quotaLabel)?></td>
                       <td><?=h($durationLabel)?></td>
                       <td><?=h($cashbackLabel)?></td>
-                      <td><?=h($publicLabel)?></td>
+                      <td>
+                        <span class="badge-status <?= $pkg['is_public'] ? 'status-public' : 'status-passive' ?>"><?= $pkg['is_public'] ? 'Yayında' : 'Gizli' ?></span>
+                      </td>
                       <td><span class="badge-status <?=$statusClass?>"><?=h($statusLabel)?></span></td>
-                      <td class="text-end">
-                        <a class="btn btn-sm btn-outline-primary" href="?id=<?= (int)$pkg['id'] ?>">Düzenle</a>
-                        <form method="post" class="d-inline">
-                          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-                          <input type="hidden" name="do" value="toggle">
-                          <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
-                          <button class="btn btn-sm btn-outline-secondary" type="submit"><?= $pkg['is_active'] ? 'Pasifleştir' : 'Aktifleştir' ?></button>
-                        </form>
+                      <td>
+                        <div class="action-group justify-content-end">
+                          <a class="btn btn-sm btn-brand-outline" href="?id=<?= (int)$pkg['id'] ?>"><i class="bi bi-pencil me-1"></i>Düzenle</a>
+                          <form method="post">
+                            <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+                            <input type="hidden" name="do" value="toggle">
+                            <input type="hidden" name="package_id" value="<?= (int)$pkg['id'] ?>">
+                            <button class="btn btn-sm btn-light border" type="submit"><i class="bi bi-shuffle me-1"></i><?= $pkg['is_active'] ? 'Pasifleştir' : 'Aktifleştir' ?></button>
+                          </form>
+                        </div>
                       </td>
                     </tr>
                   <?php endforeach; ?>

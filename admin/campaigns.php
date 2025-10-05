@@ -74,9 +74,22 @@ if (($_POST['do'] ?? '') === 'camp_toggle') {
   redirect($_SERVER['PHP_SELF']);
 }
 
-$campaigns = pdo()->prepare("SELECT * FROM campaigns WHERE venue_id=? ORDER BY is_active DESC, id DESC");
-$campaigns->execute([$VID]);
-$campaigns=$campaigns->fetchAll();
+$campaignsStmt = pdo()->prepare("SELECT * FROM campaigns WHERE venue_id=? ORDER BY is_active DESC, id DESC");
+$campaignsStmt->execute([$VID]);
+$campaigns = $campaignsStmt->fetchAll();
+
+$totals = [
+  'all'    => count($campaigns),
+  'active' => 0,
+  'passive'=> 0,
+];
+foreach ($campaigns as $c) {
+  if (!empty($c['is_active'])) {
+    $totals['active']++;
+  } else {
+    $totals['passive']++;
+  }
+}
 
 ?>
 <!doctype html>
@@ -88,22 +101,80 @@ $campaigns=$campaigns->fetchAll();
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <?=admin_base_styles()?>
 <style>
-  .grid-compact .form-control, .grid-compact .form-select{ height:46px; }
-  .muted{ color:var(--muted); }
-  .btn-zs{ background:var(--brand); border:none; color:#fff; border-radius:12px; font-weight:600; }
-  .btn-zs:hover{ background:var(--brand-dark); color:#fff; }
-  .btn-zs-outline{ background:#fff; border:1px solid rgba(14,165,181,.55); color:var(--brand); border-radius:12px; font-weight:600; }
-  .btn-zs-outline:hover{ background:rgba(14,165,181,.12); color:var(--brand-dark); }
+  .grid-compact .form-control, .grid-compact .form-select { height:46px; }
+  .muted { color:var(--muted); }
+  .btn-zs { background:var(--brand); border:none; color:#fff; border-radius:12px; font-weight:600; }
+  .btn-zs:hover { background:var(--brand-dark); color:#fff; }
+  .btn-zs-outline { background:#fff; border:1px solid rgba(14,165,181,.55); color:var(--brand); border-radius:12px; font-weight:600; }
+  .btn-zs-outline:hover { background:rgba(14,165,181,.12); color:var(--brand-dark); }
+
+  .stats-row .stat-card {
+    border-radius:18px;
+    background:#fff;
+    border:1px solid rgba(14,165,181,.12);
+    padding:20px 22px;
+    box-shadow:0 24px 45px -34px rgba(14,165,181,.6);
+    display:flex;
+    flex-direction:column;
+    gap:6px;
+  }
+  .stats-row .stat-label { font-size:.8rem; color:var(--admin-muted); text-transform:uppercase; letter-spacing:.08em; }
+  .stats-row .stat-value { font-size:1.8rem; font-weight:700; color:var(--admin-ink); }
+  .stats-row .stat-chip {
+    align-self:flex-start;
+    background:rgba(14,165,181,.12);
+    color:var(--admin-brand-dark);
+    border-radius:999px;
+    padding:.25rem .8rem;
+    font-size:.75rem;
+    font-weight:600;
+  }
+
+  .campaign-table .form-control,
+  .campaign-table textarea { background:rgba(15,23,42,.02); border-color:rgba(148,163,184,.35); }
+  .campaign-table textarea { resize:vertical; }
+  .campaign-table .badge-status { border-radius:999px; padding:.35rem .9rem; font-weight:600; font-size:.75rem; }
+  .campaign-table .badge-active { background:rgba(34,197,94,.18); color:#15803d; }
+  .campaign-table .badge-passive { background:rgba(248,113,113,.18); color:#b91c1c; }
+  .campaign-table .action-group { display:flex; gap:10px; }
+  .campaign-table .action-group .btn { border-radius:12px; font-weight:600; }
 </style>
 </head>
 <body class="admin-body">
 <?php admin_layout_start('campaigns', 'Kampanya Yönetimi', 'Salon: '.$VNAME.' • Kampanyalar tüm etkinlik panellerinde gösterilir.'); ?>
     <?php flash_box(); ?>
 
+    <div class="row g-3 stats-row mb-4">
+      <div class="col-md-4">
+        <div class="stat-card">
+          <span class="stat-label">Toplam Kampanya</span>
+          <span class="stat-value"><?=$totals['all']?></span>
+          <span class="stat-chip"><i class="bi bi-bullseye me-1"></i>Tümü</span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-card">
+          <span class="stat-label">Aktif</span>
+          <span class="stat-value text-success"><?=$totals['active']?></span>
+          <span class="stat-chip"><i class="bi bi-broadcast-pin me-1"></i>Yayında</span>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="stat-card">
+          <span class="stat-label">Pasif</span>
+          <span class="stat-value text-danger"><?=$totals['passive']?></span>
+          <span class="stat-chip"><i class="bi bi-pause-circle me-1"></i>Arşiv</span>
+        </div>
+      </div>
+    </div>
+
     <div class="card-lite mb-4">
-      <div class="d-flex justify-content-between align-items-center mb-2">
-        <h5 class="m-0">Yeni Kampanya</h5>
-        <span class="muted small">Eklediğiniz kampanyalar salonunuzdaki tüm etkinlik panellerine yansır.</span>
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+        <div>
+          <h5 class="m-0">Yeni Kampanya</h5>
+          <span class="muted small">Eklediğiniz kampanyalar salonunuzdaki tüm etkinlik panellerine yansır.</span>
+        </div>
+        <a href="#campaign-list" class="btn btn-zs-outline"><i class="bi bi-layout-text-window me-1"></i>Listeyi Gör</a>
       </div>
       <form method="post" class="row g-3 grid-compact">
         <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
@@ -125,25 +196,28 @@ $campaigns=$campaigns->fetchAll();
           <textarea class="form-control" name="description" rows="3" placeholder="Kampanyanın detaylarını yazın."></textarea>
         </div>
         <div class="col-12 col-md-3">
-          <button class="btn btn-zs w-100">Kampanyayı Kaydet</button>
+          <button class="btn btn-zs w-100"><i class="bi bi-plus-lg me-1"></i>Kampanyayı Kaydet</button>
         </div>
       </form>
     </div>
 
-    <div class="card-lite">
-      <h5 class="mb-3">Aktif Kampanyalar</h5>
+    <div class="card-lite" id="campaign-list">
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+        <h5 class="mb-0">Kampanya Listesi</h5>
+        <span class="muted small">Listeden düzenleyebilir, pasife alabilir veya hızlıca kopya oluşturabilirsiniz.</span>
+      </div>
       <?php if (!$campaigns): ?>
         <div class="muted">Henüz kampanya eklenmedi.</div>
       <?php else: ?>
         <div class="table-responsive">
-          <table class="table align-middle">
+          <table class="table align-middle campaign-table">
             <thead>
               <tr>
-                <th>Ad</th>
-                <th>Tür</th>
-                <th>Fiyat</th>
-                <th>Durum</th>
-                <th style="width:220px">İşlemler</th>
+                <th style="min-width:220px">Ad & Açıklama</th>
+                <th style="width:160px">Tür</th>
+                <th style="width:140px">Fiyat</th>
+                <th style="width:110px">Durum</th>
+                <th style="width:240px">İşlemler</th>
               </tr>
             </thead>
             <tbody>
@@ -166,16 +240,17 @@ $campaigns=$campaigns->fetchAll();
                       <span class="input-group-text">TL</span>
                     </div>
                   </td>
-                  <td>
-                    <div class="form-check form-switch">
+                  <td class="text-nowrap">
+                    <span class="badge-status <?= $c['is_active'] ? 'badge-active' : 'badge-passive' ?>"><?= $c['is_active'] ? 'Aktif' : 'Pasif' ?></span>
+                    <div class="form-check form-switch mt-2">
                       <input form="camp-form-<?=$c['id']?>" class="form-check-input" type="checkbox" value="1" name="is_active" id="camp-active-<?=$c['id']?>" <?= $c['is_active'] ? 'checked' : '' ?>>
-                      <label class="form-check-label" for="camp-active-<?=$c['id']?>">Aktif</label>
+                      <label class="form-check-label" for="camp-active-<?=$c['id']?>">Yayında</label>
                     </div>
                   </td>
                   <td>
-                    <div class="d-flex gap-2">
-                      <button form="camp-form-<?=$c['id']?>" class="btn btn-zs" type="submit" name="do" value="camp_update">Güncelle</button>
-                      <button form="camp-form-<?=$c['id']?>" class="btn btn-zs-outline" type="submit" name="do" value="camp_toggle">Durumu Değiştir</button>
+                    <div class="action-group">
+                      <button form="camp-form-<?=$c['id']?>" class="btn btn-zs" type="submit" name="do" value="camp_update"><i class="bi bi-save me-1"></i>Kaydet</button>
+                      <button form="camp-form-<?=$c['id']?>" class="btn btn-zs-outline" type="submit" name="do" value="camp_toggle"><i class="bi bi-shuffle me-1"></i>Durumu Değiştir</button>
                     </div>
                   </td>
                 </tr>

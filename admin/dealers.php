@@ -239,6 +239,10 @@ if (!in_array($statusFilter, $validStatusFilters, true)) {
 }
 
 $statusCounts = dealer_status_counts();
+$activeCount = (int)($statusCounts['active'] ?? 0);
+$pendingCount = (int)($statusCounts['pending'] ?? 0);
+$inactiveCount = (int)($statusCounts['inactive'] ?? 0);
+$totalDealers = (int)($statusCounts['total'] ?? ($activeCount + $pendingCount + $inactiveCount));
 $dealerListSql = "SELECT * FROM dealers";
 $dealerListParams = [];
 if ($statusFilter !== 'all') {
@@ -294,6 +298,16 @@ $venueAssignments = dealer_fetch_venue_assignments();
 <?=admin_base_styles()?>
 <style>
   .card-lite{ padding:1.5rem; }
+  .stats-row .stat-card{
+    border-radius:18px;
+    background:#fff;
+    border:1px solid rgba(14,165,181,.12);
+    padding:22px 24px;
+    box-shadow:0 32px 60px -42px rgba(14,165,181,.55);
+  }
+  .stats-row .stat-label{font-size:.78rem;color:var(--admin-muted);letter-spacing:.08em;text-transform:uppercase;}
+  .stats-row .stat-value{font-size:1.9rem;font-weight:700;color:var(--admin-ink);}
+  .stats-row .stat-chip{display:inline-flex;align-items:center;gap:6px;padding:.28rem .85rem;border-radius:999px;background:rgba(14,165,181,.12);color:var(--admin-brand-dark);font-size:.75rem;font-weight:600;}
   .badge-status{padding:.35rem .75rem;border-radius:999px;font-size:.75rem;font-weight:600;}
   .status-active{background:rgba(34,197,94,.15);color:#15803d;}
   .status-pending{background:rgba(250,204,21,.18);color:#854d0e;}
@@ -302,8 +316,9 @@ $venueAssignments = dealer_fetch_venue_assignments();
   .dealer-meta{color:var(--muted); font-size:.9rem;}
   .dealer-meta strong{color:var(--ink);}
   .dealer-code{font-family:"JetBrains Mono",monospace;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em;color:var(--ink);}
-  .dealer-list .list-group-item{padding:1rem 1.25rem;}
-  .dealer-list .list-group-item.active{background:rgba(14,165,181,.08);border-color:rgba(14,165,181,.3);}
+  .dealer-list .list-group-item{padding:1rem 1.25rem;border:none;border-bottom:1px solid rgba(148,163,184,.15);transition:all .2s ease;}
+  .dealer-list .list-group-item:hover{background:rgba(14,165,181,.08);}
+  .dealer-list .list-group-item.active{background:rgba(14,165,181,.12);border-color:rgba(14,165,181,.28);box-shadow:0 18px 30px -26px rgba(14,165,181,.6);}
   .assigned-tags{display:flex;flex-wrap:wrap;gap:.4rem;}
   .assigned-tags .dealer-chip{background:rgba(14,165,181,.12);color:#0f172a;border-radius:999px;padding:.25rem .75rem;font-size:.75rem;font-weight:500;}
   .assigned-tags .dealer-chip span{font-weight:600;color:#0f172a;}
@@ -318,9 +333,10 @@ $venueAssignments = dealer_fetch_venue_assignments();
   .venue-chip-empty{color:var(--muted);font-size:.85rem;}
   .section-subtitle{font-size:.85rem;color:var(--muted);}
   .tab-card{border-radius:18px; background:#fff; border:1px solid rgba(148,163,184,.16); box-shadow:0 22px 45px -28px rgba(15,23,42,.45);}
-  .filter-pills .nav-link{padding:.35rem .65rem;font-size:.75rem;border-radius:999px;color:var(--muted);background:rgba(148,163,184,.18);margin-left:.35rem;}
+  .filter-pills .nav-link{padding:.35rem .65rem;font-size:.75rem;border-radius:999px;color:var(--muted);background:rgba(148,163,184,.18);margin-left:.35rem;transition:all .2s ease;}
   .filter-pills .nav-link:first-child{margin-left:0;}
-  .filter-pills .nav-link.active{background:#0ea5e9;color:#fff;}
+  .filter-pills .nav-link:hover{background:rgba(14,165,181,.18);color:var(--admin-brand-dark);}
+  .filter-pills .nav-link.active{background:var(--admin-brand);color:#fff;}
   .balance-stat{border:1px solid rgba(148,163,184,.2);border-radius:14px;padding:1rem 1.25rem;background:#f8fafc;}
   .balance-stat h6{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem;}
   .balance-stat .value{font-size:1.35rem;font-weight:700;color:#0f172a;}
@@ -336,10 +352,36 @@ $venueAssignments = dealer_fetch_venue_assignments();
 <?php admin_layout_start('dealers', 'Bayi Yönetimi', 'Bayileri yönetin, salon atayın ve lisans durumlarını takip edin.'); ?>
 
   <?php flash_box(); ?>
+
+  <div class="row g-3 stats-row mb-4">
+    <div class="col-md-4">
+      <div class="stat-card">
+        <span class="stat-label">Toplam Bayi</span>
+        <span class="stat-value"><?=$totalDealers?></span>
+        <span class="stat-chip"><i class="bi bi-people-fill me-1"></i>Portföy</span>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stat-card">
+        <span class="stat-label">Aktif</span>
+        <span class="stat-value text-success"><?=$activeCount?></span>
+        <span class="stat-chip"><i class="bi bi-lightning-charge me-1"></i>Canlı</span>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="stat-card">
+        <span class="stat-label">Onay Bekliyor</span>
+        <span class="stat-value text-warning"><?=$pendingCount?></span>
+        <span class="stat-chip"><i class="bi bi-hourglass-split me-1"></i>Sırada</span>
+      </div>
+    </div>
+  </div>
+
   <div class="row g-4">
     <div class="col-lg-5">
       <div class="card-lite p-4 mb-4">
-        <h5 class="mb-3">Yeni Bayi Oluştur</h5>
+        <h5 class="mb-1">Yeni Bayi Oluştur</h5>
+        <p class="small text-muted mb-3">Bayi kaydı açıldığında benzersiz bayi kodu otomatik oluşturulur ve aktifleştirildiğinde giriş bilgileri e-posta ile iletilir.</p>
         <form method="post" class="row g-2">
           <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
           <input type="hidden" name="do" value="create">
@@ -383,7 +425,10 @@ $venueAssignments = dealer_fetch_venue_assignments();
       <div class="card-lite p-0">
         <div class="p-3 border-bottom">
           <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <h5 class="m-0">Bayiler</h5>
+            <div>
+              <h5 class="m-0">Bayiler</h5>
+              <span class="small text-muted">Filtreleyerek portföyünüzdeki bayileri yönetin.</span>
+            </div>
             <div class="filter-pills nav nav-pills">
               <?php
                 $statusLabels = [
@@ -403,7 +448,7 @@ $venueAssignments = dealer_fetch_venue_assignments();
             </div>
           </div>
         </div>
-        <div class="list-group list-group-flush" style="max-height:420px;overflow:auto;">
+        <div class="list-group list-group-flush dealer-list" style="max-height:420px;overflow:auto;">
           <?php foreach ($dealersList as $d): ?>
             <?php
               $badge = dealer_status_badge($d['status']);
@@ -419,7 +464,10 @@ $venueAssignments = dealer_fetch_venue_assignments();
             ?>
             <a href="?<?=$linkQuery?>" class="list-group-item list-group-item-action <?= $activeClass ?>">
               <div class="d-flex justify-content-between align-items-center mb-1">
-                <div class="fw-semibold me-2"><?=h($d['name'])?></div>
+                <div>
+                  <div class="fw-semibold me-2"><?=h($d['name'])?></div>
+                  <div class="dealer-meta"><?=h($d['email'])?></div>
+                </div>
                 <span class="badge-status <?=$badgeClass?>"><?=h($badge)?></span>
               </div>
               <div class="d-flex justify-content-between align-items-center">
