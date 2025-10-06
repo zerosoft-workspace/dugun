@@ -85,6 +85,7 @@ function install_schema(){
       'listing_categories',
       'dealer_listings',
       'dealer_listing_packages',
+      'dealer_listing_media',
       'listing_category_requests',
     ];
     foreach ($criticalTables as $table) {

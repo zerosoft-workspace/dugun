@@ -163,6 +163,13 @@ function listing_media_group(array $listingIds, bool $withUrls = false): array {
   if (!$listingIds) {
     return [];
   }
+  try {
+    if (!table_exists('dealer_listing_media')) {
+      return [];
+    }
+  } catch (Throwable $e) {
+    return [];
+  }
   $placeholders = implode(',', array_fill(0, count($listingIds), '?'));
   $st = pdo()->prepare("SELECT * FROM dealer_listing_media WHERE listing_id IN ($placeholders) ORDER BY listing_id, sort_order");
   $st->execute($listingIds);
