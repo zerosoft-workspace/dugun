@@ -242,13 +242,16 @@ function event_quiz_scoreboard(int $eventId, int $limit = 10): array {
           FROM event_quiz_attempts a
           INNER JOIN guest_profiles gp ON gp.id = a.profile_id
           INNER JOIN event_quiz_questions q ON q.id = a.question_id
-          WHERE gp.event_id = ? AND q.event_id = ?
+          WHERE gp.event_id = :event_id AND q.event_id = :event_id
           GROUP BY gp.id
           HAVING total_points > 0
           ORDER BY total_points DESC, correct_count DESC, last_answered ASC
-          LIMIT ?";
-  $st = pdo()->prepare($sql);
-  $st->execute([$eventId, $eventId, $limit]);
+          LIMIT :limit";
+  $pdo = pdo();
+  $st = $pdo->prepare($sql);
+  $st->bindValue(':event_id', $eventId, PDO::PARAM_INT);
+  $st->bindValue(':limit', max(1, $limit), PDO::PARAM_INT);
+  $st->execute();
   $rows = $st->fetchAll();
   $rank = 1;
   $out = [];
