@@ -353,6 +353,8 @@ function install_schema(){
     description MEDIUMTEXT NULL,
     city VARCHAR(100) NOT NULL,
     district VARCHAR(100) NOT NULL,
+    contact_email VARCHAR(190) NULL,
+    contact_phone VARCHAR(60) NULL,
     status VARCHAR(16) NOT NULL DEFAULT 'draft',
     status_note TEXT NULL,
     requested_at DATETIME NULL,
@@ -382,6 +384,18 @@ function install_schema(){
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
     INDEX idx_listing_packages_listing (listing_id),
+    FOREIGN KEY (listing_id) REFERENCES dealer_listings(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_listing_media(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    listing_id INT NOT NULL,
+    file_path VARCHAR(255) NOT NULL,
+    caption VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_listing_media_listing (listing_id, sort_order),
     FOREIGN KEY (listing_id) REFERENCES dealer_listings(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
@@ -417,6 +431,20 @@ function install_schema(){
   } catch (Throwable $e) {}
   try {
     pdo()->exec("UPDATE dealer_representatives SET assigned_at = COALESCE(assigned_at, created_at) WHERE dealer_id IS NOT NULL AND assigned_at IS NULL");
+  } catch (Throwable $e) {}
+
+  if (!column_exists('dealer_listings', 'contact_email')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_listings ADD contact_email VARCHAR(190) NULL AFTER district");
+    } catch (Throwable $e) {}
+  }
+  if (!column_exists('dealer_listings', 'contact_phone')) {
+    try {
+      pdo()->exec("ALTER TABLE dealer_listings ADD contact_phone VARCHAR(60) NULL AFTER contact_email");
+    } catch (Throwable $e) {}
+  }
+  try {
+    pdo()->exec("UPDATE dealer_listings l JOIN dealers d ON d.id=l.dealer_id SET l.contact_email = COALESCE(NULLIF(l.contact_email,''), d.email), l.contact_phone = COALESCE(NULLIF(l.contact_phone,''), d.phone) WHERE l.contact_email IS NULL OR l.contact_email='' OR l.contact_phone IS NULL OR l.contact_phone=''");
   } catch (Throwable $e) {}
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representatives(

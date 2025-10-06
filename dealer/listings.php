@@ -39,7 +39,12 @@ if ($action !== '') {
         'category_id' => isset($_POST['category_id']) ? (int)$_POST['category_id'] : null,
         'city' => $_POST['city'] ?? '',
         'district' => $_POST['district'] ?? '',
-      ], $packages, $listingId ?: null);
+        'contact_email' => $_POST['contact_email'] ?? '',
+        'contact_phone' => $_POST['contact_phone'] ?? '',
+      ], $packages, $listingId ?: null, [
+        'files' => $_FILES['gallery'] ?? null,
+        'remove_ids' => $_POST['remove_media'] ?? [],
+      ]);
       $message = $listingId ? 'İlan taslağınız güncellendi.' : 'Yeni ilan taslağınız oluşturuldu.';
       if (!empty($result['previous_status']) && $result['previous_status'] !== LISTING_STATUS_DRAFT && $result['status'] === LISTING_STATUS_DRAFT) {
         $message .= ' Onaylı veya yayındaki ilanınızı yeniden incelememiz gerekecek. Lütfen tekrar onaya gönderin.';
@@ -88,6 +93,8 @@ $listings = dealer_listings_for_dealer((int)$dealer['id']);
 $counts = dealer_listing_status_counts((int)$dealer['id']);
 $categoryRequests = listing_category_requests_for_dealer((int)$dealer['id']);
 $categories = listing_category_all(true);
+$contactEmailDefault = $currentListing['contact_email'] ?? ($dealer['email'] ?? '');
+$contactPhoneDefault = $currentListing['contact_phone'] ?? ($dealer['phone'] ?? '');
 
 $formPackages = $currentListing ? $currentListing['packages'] : [];
 while (count($formPackages) < LISTING_MIN_PACKAGES) {
@@ -114,6 +121,13 @@ $pageStyles = <<<'CSS'
   .category-request-card { border:1px solid rgba(14,165,181,.18); border-radius:22px; background:linear-gradient(135deg,rgba(14,165,181,.12),#fff); padding:1.5rem; box-shadow:0 28px 58px -44px rgba(14,165,181,.45); }
   .category-request-card h5 { font-weight:700; }
   .status-note { border-radius:14px; background:rgba(248,113,113,.12); padding:.85rem 1rem; color:#b91c1c; font-weight:600; }
+  .gallery-grid { display:grid; gap:1rem; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); margin-bottom:1rem; }
+  .gallery-thumb { position:relative; border-radius:16px; overflow:hidden; cursor:pointer; border:2px solid transparent; transition:border-color .2s ease, box-shadow .2s ease; display:flex; flex-direction:column; justify-content:flex-end; min-height:140px; }
+  .gallery-thumb input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+  .gallery-thumb .thumb-image { position:absolute; inset:0; background-size:cover; background-position:center; filter:brightness(.92); }
+  .gallery-thumb .thumb-label { position:relative; padding:.45rem .7rem; background:rgba(15,23,42,.75); color:#fff; font-weight:600; font-size:.8rem; text-align:center; }
+  .gallery-thumb:hover { border-color:rgba(59,130,246,.35); box-shadow:0 22px 40px -30px rgba(37,99,235,.55); }
+  .gallery-thumb input:checked ~ .thumb-label { background:rgba(220,38,38,.85); }
 </style>
 CSS;
 
@@ -209,7 +223,7 @@ dealer_layout_start('listings', [
                           <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-send"></i> Onaya Gönder</button>
                         </form>
                       <?php elseif ($listing['status'] === LISTING_STATUS_APPROVED): ?>
-                        <a class="btn btn-sm btn-outline-success" target="_blank" href="<?=h(BASE_URL.'/public/partners.php?listing='.urlencode($listing['slug']))?>"><i class="bi bi-box-arrow-up-right"></i> Görüntüle</a>
+                        <a class="btn btn-sm btn-outline-success" target="_blank" href="<?=h(BASE_URL.'/public/partner.php?listing='.urlencode($listing['slug']))?>"><i class="bi bi-box-arrow-up-right"></i> Görüntüle</a>
                       <?php else: ?>
                         <span class="text-muted small">İncelemede</span>
                       <?php endif; ?>
@@ -227,7 +241,7 @@ dealer_layout_start('listings', [
     <div class="listing-card mb-4">
       <h5><?= $currentListing ? 'İlanı Düzenle' : 'Yeni İlan Oluştur' ?></h5>
       <p class="text-muted">İlanınızda en az <?=LISTING_MIN_PACKAGES?>, en fazla <?=LISTING_MAX_PACKAGES?> paket sunabilirsiniz. Paket fiyatlarını TL cinsinden girin.</p>
-      <form method="post" class="mt-3">
+      <form method="post" class="mt-3" enctype="multipart/form-data">
         <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
         <input type="hidden" name="do" value="save_listing">
         <?php if ($currentListing): ?>
@@ -265,6 +279,19 @@ dealer_layout_start('listings', [
           <textarea class="form-control" name="description" rows="4" placeholder="Hizmetlerinizi, avantajlarınızı ve iletişim notlarınızı yazın."><?=h($currentListing['description'] ?? '')?></textarea>
         </div>
 
+        <div class="row g-3 mt-3">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">İletişim E-postası *</label>
+            <input type="email" class="form-control" name="contact_email" value="<?=h($contactEmailDefault)?>" required>
+            <div class="form-text">Ziyaretçiler ilan üzerinden bu adrese ulaşır.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold">İletişim Telefonu *</label>
+            <input type="text" class="form-control" name="contact_phone" value="<?=h($contactPhoneDefault)?>" required>
+            <div class="form-text">Telefon numaranız doğrudan ilan kartında gösterilir.</div>
+          </div>
+        </div>
+
         <div class="mt-4">
           <h6 class="fw-semibold">Paketler</h6>
           <div class="package-grid">
@@ -291,6 +318,29 @@ dealer_layout_start('listings', [
             <?php endforeach; ?>
           </div>
         </div>
+
+        <div class="mt-4">
+          <h6 class="fw-semibold">Görsel Galerisi</h6>
+          <p class="text-muted small mb-3">İlan vitrininizde yer alacak görselleri yükleyin. En az bir görsel güven verir.</p>
+          <?php if (!empty($currentListing['media'])): ?>
+            <div class="gallery-grid">
+              <?php foreach ($currentListing['media'] as $media): ?>
+                <label class="gallery-thumb">
+                  <input type="checkbox" name="remove_media[]" value="<?=h($media['id'])?>">
+                  <span class="thumb-image" style="background-image:url('<?=h($media['url'])?>')"></span>
+                  <span class="thumb-label">Sil</span>
+                </label>
+              <?php endforeach; ?>
+            </div>
+            <div class="form-text mb-3">Kaldırmak istediğiniz görselleri işaretleyin. İşaretlenmeyenler yayında kalır.</div>
+          <?php endif; ?>
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Yeni Görseller Yükle</label>
+            <input type="file" class="form-control" name="gallery[]" accept="image/*" multiple>
+            <div class="form-text">JPG, PNG, WEBP veya GIF formatı; en fazla 10 MB.</div>
+          </div>
+        </div>
+
         <div class="d-flex gap-2 mt-4">
           <button type="submit" class="btn btn-brand fw-semibold flex-grow-1"><i class="bi bi-save me-1"></i> Taslağı Kaydet</button>
           <?php if ($currentListing): ?>

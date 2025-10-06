@@ -33,60 +33,61 @@ $pageStyles = <<<'CSS'
     --muted:#64748b;
     --brand:#0ea5b5;
     --brand-dark:#0b8b98;
+    --surface:#ffffff;
   }
-  body { background:radial-gradient(circle at top,#f0f9ff 0%,#f5f3ff 35%,#f8fafc 100%); font-family:'Inter',sans-serif; color:var(--ink); }
-  .page-shell { max-width:1260px; margin:0 auto; }
-  .hero { border-radius:40px; background:linear-gradient(135deg,rgba(14,165,181,.95),rgba(99,102,241,.9)); color:#fff; padding:82px 72px; position:relative; overflow:hidden; box-shadow:0 60px 140px -80px rgba(15,23,42,.6); }
-  .hero::before { content:""; position:absolute; inset:-140px 40% auto -80px; height:320px; background:radial-gradient(circle at top,#fff,transparent 70%); opacity:.35; }
-  .hero::after { content:""; position:absolute; inset:auto -120px -160px -120px; height:340px; background:rgba(255,255,255,.16); filter:blur(90px); }
-  .hero h1 { font-size:3rem; font-weight:800; margin-bottom:1rem; }
-  .hero p { max-width:680px; font-size:1.05rem; margin-bottom:0; opacity:.9; }
-  .hero .breadcrumb-link { color:#fff; text-decoration:none; font-weight:600; }
+  body { background:#f3f4f6; font-family:'Inter',sans-serif; color:var(--ink); }
+  .page-shell { max-width:1280px; margin:0 auto; }
+  .hero { border-radius:32px; background:linear-gradient(135deg,rgba(14,165,181,.92),rgba(15,23,42,.85)); color:#fff; padding:72px 64px; position:relative; overflow:hidden; box-shadow:0 40px 110px -60px rgba(15,23,42,.55); }
+  .hero::after { content:""; position:absolute; inset:auto -140px -180px -140px; height:320px; background:rgba(255,255,255,.16); filter:blur(90px); }
+  .hero h1 { font-size:2.8rem; font-weight:800; margin-bottom:.75rem; position:relative; z-index:1; }
+  .hero p { max-width:620px; font-size:1.02rem; opacity:.92; position:relative; z-index:1; }
+  .hero .breadcrumb-link { position:relative; z-index:1; color:rgba(255,255,255,.9); text-decoration:none; font-weight:600; }
   .hero .breadcrumb-link:hover { text-decoration:underline; }
-  .hero .badge { font-size:.85rem; border-radius:999px; padding:.55rem 1.2rem; backdrop-filter:blur(10px); background:rgba(255,255,255,.2); color:#fff; font-weight:600; }
-  .filter-card { margin-top:-70px; border-radius:32px; background:rgba(255,255,255,.92); backdrop-filter:blur(14px); box-shadow:0 45px 120px -60px rgba(15,23,42,.45); padding:32px; position:relative; z-index:2; }
+  .hero .badge { position:relative; z-index:1; font-size:.85rem; border-radius:999px; padding:.5rem 1.1rem; background:rgba(255,255,255,.18); backdrop-filter:blur(8px); font-weight:600; }
+  .filter-card { margin-top:-48px; border-radius:22px; background:var(--surface); box-shadow:0 28px 80px -50px rgba(15,23,42,.35); padding:28px; position:relative; z-index:2; }
   .filter-card .form-label { font-weight:600; color:var(--ink); }
-  .filter-card .form-select, .filter-card .form-control { border-radius:14px; padding:.65rem .85rem; }
-  .filter-card button { border-radius:14px; padding:.7rem 1.6rem; font-weight:600; }
+  .filter-card .form-select, .filter-card .form-control { border-radius:12px; padding:.6rem .85rem; }
+  .filter-card button { border-radius:12px; padding:.65rem 1.5rem; font-weight:600; }
   .filter-reset { color:var(--brand); text-decoration:none; font-weight:600; }
   .filter-reset:hover { text-decoration:underline; }
-  .listing-grid { display:grid; gap:32px; }
-  @media (min-width: 992px) { .listing-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
-  @media (min-width: 1400px) { .listing-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
-  .listing-card { border-radius:28px; overflow:hidden; background:linear-gradient(160deg,#fff,rgba(226,232,240,.65)); box-shadow:0 45px 110px -70px rgba(15,23,42,.6); display:flex; flex-direction:column; min-height:100%; position:relative; transition:transform .3s ease, box-shadow .3s ease; }
-  .listing-card::after { content:""; position:absolute; inset:auto -40% -60% -40%; height:220px; background:radial-gradient(circle at top,rgba(14,165,181,.25),transparent 70%); opacity:.6; pointer-events:none; }
-  .listing-card:hover { transform:translateY(-6px); box-shadow:0 65px 150px -70px rgba(15,23,42,.6); }
-  .listing-card.highlight { border:1px solid rgba(14,165,181,.45); box-shadow:0 70px 160px -70px rgba(14,165,181,.65); }
-  .listing-cover { position:relative; height:220px; background-size:cover; background-position:center; background-repeat:no-repeat; display:flex; align-items:flex-end; padding:1.6rem; color:#fff; }
-  .listing-cover::before { content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,.05),rgba(15,23,42,.78)); }
-  .listing-cover .cover-content { position:relative; width:100%; display:flex; justify-content:space-between; align-items:flex-end; gap:1rem; }
-  .listing-cover .category-chip { padding:.55rem 1.1rem; border-radius:999px; font-weight:600; font-size:.85rem; background:rgba(15,23,42,.68); backdrop-filter:blur(10px); }
-  .listing-cover .location-chip { display:inline-flex; align-items:center; gap:.45rem; padding:.5rem 1rem; border-radius:999px; background:rgba(255,255,255,.2); font-weight:600; font-size:.85rem; backdrop-filter:blur(10px); }
-  .listing-cover .location-chip i { color:#e0f2fe; }
-  .listing-cover .cover-initial { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:3.2rem; font-weight:700; color:rgba(255,255,255,.9); text-shadow:0 18px 40px rgba(15,23,42,.55); }
-  .listing-cover.tone-1 { background-image:linear-gradient(135deg,#bae6fd,#0ea5b5); }
-  .listing-cover.tone-2 { background-image:linear-gradient(135deg,#ede9fe,#a855f7); }
-  .listing-cover.tone-3 { background-image:linear-gradient(135deg,#fee2e2,#fb7185); }
-  .listing-cover.tone-4 { background-image:linear-gradient(135deg,#dcfce7,#22c55e); }
-  .listing-cover.tone-5 { background-image:linear-gradient(135deg,#fef3c7,#f97316); }
-  .listing-body { position:relative; z-index:1; padding:1.9rem 2.1rem 2rem; display:flex; flex-direction:column; gap:1.2rem; }
-  .listing-title { font-size:1.45rem; font-weight:700; margin-bottom:.35rem; color:var(--ink); }
-  .listing-summary { font-size:.95rem; color:#475569; margin-bottom:0; }
-  .listing-description { color:#334155; font-size:.95rem; line-height:1.65; max-height:6.5rem; overflow:hidden; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; }
-  .meta-group { display:flex; flex-wrap:wrap; gap:.55rem; }
-  .meta-chip { background:rgba(14,165,181,.12); color:#0f172a; border-radius:999px; padding:.45rem .9rem; font-weight:600; font-size:.8rem; display:inline-flex; align-items:center; gap:.45rem; }
-  .meta-chip i { color:var(--brand); }
-  .package-stack { display:flex; flex-direction:column; gap:.75rem; }
-  .package-item { border-radius:18px; padding:1rem 1.2rem; background:linear-gradient(135deg,rgba(240,253,255,.92),#fff); border:1px solid rgba(14,165,181,.18); box-shadow:0 24px 60px -50px rgba(14,165,181,.4); }
-  .package-item strong { display:block; font-size:1rem; color:var(--ink); }
-  .package-item span { font-weight:700; color:var(--brand); }
-  .package-item p { margin-bottom:0; font-size:.85rem; color:#475569; }
-  .contact-actions { margin-top:auto; display:flex; flex-wrap:wrap; gap:.6rem; align-items:center; }
-  .contact-chip { border-radius:999px; padding:.55rem 1.1rem; font-weight:600; display:inline-flex; align-items:center; gap:.45rem; background:rgba(99,102,241,.12); color:#312e81; text-decoration:none; }
-  .contact-chip:hover { text-decoration:none; background:rgba(99,102,241,.2); }
-  .cta-link { margin-left:auto; border-radius:999px; padding:.6rem 1.3rem; font-weight:600; border:1px solid rgba(14,165,181,.45); color:#0e7490; text-decoration:none; display:inline-flex; align-items:center; gap:.35rem; }
-  .cta-link:hover { text-decoration:none; background:rgba(14,165,181,.08); }
-  .empty-state { border-radius:32px; border:2px dashed rgba(148,163,184,.35); padding:60px; text-align:center; color:var(--muted); background:rgba(255,255,255,.7); backdrop-filter:blur(8px); }
+  .listing-feed { display:flex; flex-direction:column; gap:28px; }
+  .listing-card { background:var(--surface); border:1px solid rgba(148,163,184,.25); border-radius:24px; box-shadow:0 26px 70px -48px rgba(15,23,42,.4); overflow:hidden; display:flex; gap:0; transition:box-shadow .25s ease, transform .25s ease; }
+  .listing-card:hover { transform:translateY(-6px); box-shadow:0 40px 110px -60px rgba(15,23,42,.45); }
+  .listing-card.highlight { border-color:rgba(14,165,181,.45); box-shadow:0 48px 120px -60px rgba(14,165,181,.5); }
+  .listing-media { position:relative; width:280px; min-height:220px; background-size:cover; background-position:center; flex-shrink:0; }
+  .listing-media.no-image { background:linear-gradient(135deg,rgba(14,165,181,.14),rgba(148,163,184,.18)); display:flex; align-items:center; justify-content:center; color:var(--brand-dark); font-weight:700; font-size:1.6rem; }
+  .listing-media::after { content:""; position:absolute; inset:0; background:linear-gradient(180deg,rgba(15,23,42,.1),rgba(15,23,42,.55)); opacity:.55; }
+  .listing-media.no-image::after { display:none; }
+  .listing-media .category-badge { position:absolute; left:18px; top:18px; padding:.45rem 1rem; border-radius:999px; background:rgba(255,255,255,.85); color:var(--ink); font-weight:600; font-size:.85rem; }
+  .thumb-strip { position:absolute; left:18px; bottom:18px; display:flex; gap:8px; z-index:1; }
+  .thumb-strip span { width:54px; height:54px; border-radius:14px; background-size:cover; background-position:center; border:2px solid rgba(255,255,255,.85); box-shadow:0 10px 22px -12px rgba(15,23,42,.45); }
+  .listing-body { flex:1; padding:26px 28px; display:flex; flex-direction:column; gap:18px; }
+  .listing-header { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; flex-wrap:wrap; }
+  .listing-title { font-size:1.4rem; font-weight:700; color:var(--ink); margin:0 0 .35rem; }
+  .listing-location { display:flex; align-items:center; gap:.5rem; font-size:.95rem; color:#475569; font-weight:600; }
+  .listing-summary { margin:0; color:#334155; font-size:.95rem; line-height:1.6; max-width:640px; }
+  .dealer-meta { display:flex; flex-direction:column; gap:.3rem; color:#475569; font-size:.9rem; min-width:180px; }
+  .dealer-meta strong { font-size:1rem; color:var(--ink); }
+  .listing-meta { display:flex; flex-wrap:wrap; gap:12px; font-size:.85rem; color:#64748b; font-weight:600; }
+  .listing-meta span { display:inline-flex; align-items:center; gap:.45rem; }
+  .package-list { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); }
+  .package-item { border:1px solid rgba(14,165,181,.25); border-radius:16px; padding:12px 14px; background:rgba(14,165,181,.07); }
+  .package-item strong { display:block; font-weight:600; color:var(--ink); margin-bottom:2px; }
+  .package-item span { font-weight:700; color:var(--brand-dark); }
+  .listing-footer { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+  .contact-links { display:flex; gap:10px; flex-wrap:wrap; }
+  .contact-chip { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:999px; background:rgba(14,165,181,.14); color:var(--brand-dark); font-weight:600; text-decoration:none; }
+  .contact-chip i { font-size:1rem; }
+  .contact-chip:hover { background:rgba(14,165,181,.24); color:var(--ink); }
+  .detail-link { margin-left:auto; display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:999px; border:1px solid rgba(14,165,181,.45); color:var(--ink); font-weight:600; text-decoration:none; }
+  .detail-link:hover { background:rgba(14,165,181,.08); }
+  .empty-state { border-radius:24px; border:2px dashed rgba(148,163,184,.35); padding:54px; text-align:center; background:rgba(255,255,255,.92); color:var(--muted); }
+  @media (max-width: 992px) {
+    .hero { padding:60px 28px; }
+    .listing-card { flex-direction:column; }
+    .listing-media { width:100%; min-height:220px; }
+    .detail-link { margin-left:0; }
+  }
 </style>
 CSS;
 ?>
@@ -163,81 +164,87 @@ CSS;
           <a class="btn btn-outline-primary rounded-pill px-4" href="mailto:info@zerosoft.com.tr"><i class="bi bi-envelope"></i> Bize yazın</a>
         </div>
       <?php else: ?>
-        <div class="listing-grid">
+        <div class="listing-feed">
           <?php foreach ($listings as $listing): ?>
             <?php
               $isHighlight = $highlightSlug && $highlightSlug === $listing['slug'];
-              $heroImage = '';
-              if (!empty($listing['hero_image'])) {
-                $heroImage = $listing['hero_image'];
-                if ($heroImage && !preg_match('~^https?://~', $heroImage)) {
-                  $heroImage = rtrim(BASE_URL, '/').'/'.ltrim($heroImage, '/');
-                }
+              $heroUrl = $listing['hero_url'] ?? null;
+              $mediaItems = $listing['media'] ?? [];
+              if (!$heroUrl && $mediaItems) {
+                $heroUrl = $mediaItems[0]['url'] ?? null;
               }
-              $tone = (($listing['id'] ?? 0) % 5) + 1;
-              $initialSource = trim((string)($listing['dealer_name'] ?: $listing['title']));
-              if ($initialSource === '') {
-                $initialSource = APP_NAME;
-              }
+              $thumbs = $mediaItems ? array_slice($mediaItems, 1, 3) : [];
+              $initialSource = trim((string)($listing['dealer_name'] ?: $listing['title'] ?: APP_NAME));
               $initial = mb_strtoupper(mb_substr($initialSource, 0, 1, 'UTF-8'), 'UTF-8');
-              $coverClasses = 'listing-cover '.($heroImage ? 'has-image' : 'tone-'.$tone);
-              $coverStyleAttr = '';
-              if ($heroImage) {
-                $coverStyleAttr = sprintf(' style="background-image:url(\'%s\')"', h($heroImage));
-              }
               $packages = $listing['packages'] ?? [];
+              $packagePreview = array_slice($packages, 0, 3);
               $packageCount = count($packages);
+              $publishedAt = !empty($listing['published_at']) ? date('d.m.Y', strtotime($listing['published_at'])) : null;
+              $contactEmail = $listing['contact_email'] ?? '';
+              $contactPhone = $listing['contact_phone'] ?? '';
+              $dialPhone = $contactPhone ? preg_replace('~[^0-9+]~', '', $contactPhone) : '';
+              $detailUrl = BASE_URL.'/public/partner.php?listing='.urlencode($listing['slug']);
             ?>
             <article class="listing-card<?= $isHighlight ? ' highlight' : '' ?>" id="listing-<?=h($listing['id'])?>">
-              <div class="<?=h($coverClasses)?>"<?=$coverStyleAttr?>>
-                <?php if (!$heroImage): ?>
-                  <div class="cover-initial"><?=h($initial)?></div>
+              <div class="listing-media<?= $heroUrl ? '' : ' no-image'?>"<?= $heroUrl ? ' style="background-image:url(\''.h($heroUrl).'\')"' : '' ?>>
+                <span class="category-badge"><?=h($listing['category_name'] ?? 'Kategori')?></span>
+                <?php if ($heroUrl && $thumbs): ?>
+                  <div class="thumb-strip">
+                    <?php foreach ($thumbs as $thumb): ?>
+                      <span style="background-image:url('<?=h($thumb['url'])?>')"></span>
+                    <?php endforeach; ?>
+                  </div>
+                <?php elseif (!$heroUrl): ?>
+                  <?=h($initial)?>
                 <?php endif; ?>
-                <div class="cover-content">
-                  <span class="category-chip"><?=h($listing['category_name'] ?? 'Kategori')?></span>
-                  <span class="location-chip"><i class="bi bi-geo-alt-fill"></i> <?=h($listing['city'])?> / <?=h($listing['district'])?></span>
-                </div>
               </div>
               <div class="listing-body">
-                <div>
-                  <h3 class="listing-title"><?=h($listing['title'])?></h3>
-                  <p class="listing-summary mb-1">Bayi: <?=h($listing['dealer_name'])?><?php if (!empty($listing['dealer_company'])): ?> · <?=h($listing['dealer_company'])?><?php endif; ?></p>
-                  <?php if (!empty($listing['summary'])): ?>
-                    <p class="listing-summary"><?=h($listing['summary'])?></p>
-                  <?php endif; ?>
+                <div class="listing-header">
+                  <div>
+                    <h3 class="listing-title"><?=h($listing['title'])?></h3>
+                    <div class="listing-location"><i class="bi bi-geo-alt-fill text-primary"></i> <?=h($listing['city'])?> / <?=h($listing['district'])?></div>
+                    <?php if (!empty($listing['summary'])): ?>
+                      <p class="listing-summary mt-2 mb-0"><?=h($listing['summary'])?></p>
+                    <?php endif; ?>
+                  </div>
+                  <div class="dealer-meta text-end text-md-start">
+                    <strong><?=h($listing['dealer_name'])?></strong>
+                    <?php if (!empty($listing['dealer_company'])): ?><span><?=h($listing['dealer_company'])?></span><?php endif; ?>
+                    <?php if ($publishedAt): ?><span>Yayında: <?=h($publishedAt)?></span><?php endif; ?>
+                    <?php if ($packageCount): ?><span><?=h($packageCount)?> paket</span><?php endif; ?>
+                  </div>
                 </div>
-                <div class="meta-group">
-                  <span class="meta-chip"><i class="bi bi-box-seam"></i> <?=h($packageCount)?> paket</span>
-                  <?php if (!empty($listing['published_at'])): ?>
-                    <span class="meta-chip"><i class="bi bi-broadcast-pin"></i> <?=h(date('d.m.Y', strtotime($listing['published_at'])))?> yayında</span>
-                  <?php endif; ?>
+                <div class="listing-meta">
+                  <span><i class="bi bi-box-seam"></i><?=h($packageCount)?> paket</span>
+                  <span><i class="bi bi-tag"></i><?=h($listing['category_name'] ?? 'Kategori')?></span>
+                  <?php if ($publishedAt): ?><span><i class="bi bi-broadcast-pin"></i><?=h($publishedAt)?> yayında</span><?php endif; ?>
                 </div>
-                <?php if (!empty($listing['description'])): ?>
-                  <div class="listing-description"><?=nl2br(h($listing['description']))?></div>
-                <?php endif; ?>
-                <?php if ($packages): ?>
-                  <div class="package-stack">
-                    <?php foreach ($packages as $package): ?>
+                <?php if ($packagePreview): ?>
+                  <div class="package-list">
+                    <?php foreach ($packagePreview as $package): ?>
                       <div class="package-item">
-                        <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
-                          <strong><?=h($package['name'])?></strong>
-                          <span><?=format_currency((int)$package['price_cents'])?></span>
-                        </div>
+                        <strong><?=h($package['name'])?></strong>
+                        <span><?=format_currency((int)$package['price_cents'])?></span>
                         <?php if (!empty($package['description'])): ?>
-                          <p><?=h($package['description'])?></p>
+                          <div class="small text-muted mt-2"><?=h($package['description'])?></div>
                         <?php endif; ?>
                       </div>
                     <?php endforeach; ?>
                   </div>
+                  <?php if ($packageCount > count($packagePreview)): ?>
+                    <div class="small text-muted">+<?=h($packageCount - count($packagePreview))?> paket daha detay sayfasında.</div>
+                  <?php endif; ?>
                 <?php endif; ?>
-                <div class="contact-actions">
-                  <?php if (!empty($listing['dealer_email'])): ?>
-                    <a class="contact-chip" href="mailto:<?=h($listing['dealer_email'])?>"><i class="bi bi-envelope-open"></i> E-posta</a>
-                  <?php endif; ?>
-                  <?php if (!empty($listing['dealer_phone'])): ?>
-                    <a class="contact-chip" href="tel:<?=h(preg_replace('~[^0-9+]~', '', $listing['dealer_phone']))?>"><i class="bi bi-telephone-outbound"></i> Ara</a>
-                  <?php endif; ?>
-                  <a class="cta-link" href="<?=h(BASE_URL.'/dealer/login.php')?>"><i class="bi bi-person-plus"></i> Bayi Ol</a>
+                <div class="listing-footer">
+                  <div class="contact-links">
+                    <?php if ($contactEmail): ?>
+                      <a class="contact-chip" href="mailto:<?=h($contactEmail)?>"><i class="bi bi-envelope"></i> <?=h($contactEmail)?></a>
+                    <?php endif; ?>
+                    <?php if ($contactPhone && $dialPhone): ?>
+                      <a class="contact-chip" href="tel:<?=h($dialPhone)?>"><i class="bi bi-telephone-outbound"></i> <?=h($contactPhone)?></a>
+                    <?php endif; ?>
+                  </div>
+                  <a class="detail-link" href="<?=h($detailUrl)?>"><i class="bi bi-box-arrow-up-right"></i> Detayı Gör</a>
                 </div>
               </div>
             </article>

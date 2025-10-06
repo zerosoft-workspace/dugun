@@ -19,6 +19,171 @@ const LISTING_CATEGORY_REQUEST_REJECTED = 'rejected';
 
 const LISTING_MIN_PACKAGES = 3;
 const LISTING_MAX_PACKAGES = 5;
+const LISTING_MEDIA_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+
+function listing_media_allowed_mimes(): array {
+  return [
+    'image/jpeg' => 'jpg',
+    'image/png'  => 'png',
+    'image/webp' => 'webp',
+    'image/gif'  => 'gif',
+  ];
+}
+
+function listing_media_storage_dir(): string {
+  $dir = __DIR__.'/../uploads/listings';
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
+  }
+  return $dir;
+}
+
+function listing_media_listing_dir(int $listingId): string {
+  $dir = listing_media_storage_dir().'/'.$listingId;
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
+  }
+  return $dir;
+}
+
+function listing_media_public_url(?string $path): ?string {
+  if (!$path) {
+    return null;
+  }
+  if (preg_match('~^https?://~i', $path)) {
+    return $path;
+  }
+  return rtrim(BASE_URL, '/').'/uploads/'.ltrim($path, '/');
+}
+
+function dealer_listing_normalize_media_uploads(?array $files): array {
+  if (!$files || !isset($files['name']) || !is_array($files['name'])) {
+    return [];
+  }
+  $normalized = [];
+  $total = count($files['name']);
+  $finfo = new finfo(FILEINFO_MIME_TYPE);
+  $allowed = listing_media_allowed_mimes();
+  $maxSize = defined('MAX_UPLOAD_BYTES') ? min(LISTING_MEDIA_MAX_BYTES, (int)MAX_UPLOAD_BYTES) : LISTING_MEDIA_MAX_BYTES;
+  for ($i = 0; $i < $total; $i++) {
+    $error = $files['error'][$i] ?? UPLOAD_ERR_NO_FILE;
+    if ($error === UPLOAD_ERR_NO_FILE) {
+      continue;
+    }
+    if ($error !== UPLOAD_ERR_OK) {
+      throw new RuntimeException('Görsel yüklenirken bir hata oluştu.');
+    }
+    $tmp = $files['tmp_name'][$i] ?? '';
+    if ($tmp === '' || !is_uploaded_file($tmp)) {
+      throw new RuntimeException('Geçersiz görsel yüklemesi.');
+    }
+    $size = (int)($files['size'][$i] ?? 0);
+    if ($size <= 0) {
+      throw new RuntimeException('Görsel dosyası okunamadı.');
+    }
+    if ($size > $maxSize) {
+      throw new RuntimeException('Her bir görsel en fazla '.number_format($maxSize / (1024 * 1024), 0).' MB olabilir.');
+    }
+    $mime = $finfo ? $finfo->file($tmp) : null;
+    if (!$mime || !isset($allowed[$mime])) {
+      throw new RuntimeException('Görseller yalnızca JPG, PNG, WEBP veya GIF formatında yüklenebilir.');
+    }
+    $normalized[] = [
+      'tmp_name' => $tmp,
+      'extension' => $allowed[$mime],
+      'mime' => $mime,
+      'original_name' => $files['name'][$i] ?? ('upload.'.$allowed[$mime]),
+    ];
+  }
+  return $normalized;
+}
+
+function dealer_listing_add_media(int $listingId, array $uploads): void {
+  if (!$uploads) {
+    return;
+  }
+  $pdo = pdo();
+  $st = $pdo->prepare("SELECT COALESCE(MAX(sort_order), -1) FROM dealer_listing_media WHERE listing_id=?");
+  $st->execute([$listingId]);
+  $order = ((int)$st->fetchColumn()) + 1;
+  $insert = $pdo->prepare("INSERT INTO dealer_listing_media (listing_id, file_path, caption, sort_order, created_at, updated_at) VALUES (?,?,?,?,?,?)");
+  foreach ($uploads as $upload) {
+    $dir = listing_media_listing_dir($listingId);
+    $filename = 'listing_'.$listingId.'_'.date('Ymd_His').'_' . bin2hex(random_bytes(4)).'.'.$upload['extension'];
+    $dest = $dir.'/'.$filename;
+    if (!@move_uploaded_file($upload['tmp_name'], $dest)) {
+      throw new RuntimeException('Görsel kaydedilemedi.');
+    }
+    $relative = 'listings/'.$listingId.'/'.$filename;
+    $now = now();
+    try {
+      $insert->execute([$listingId, $relative, null, $order++, $now, $now]);
+    } catch (Throwable $e) {
+      @unlink($dest);
+      throw $e;
+    }
+  }
+}
+
+function dealer_listing_remove_media(int $listingId, array $removeIds): void {
+  $removeIds = array_values(array_unique(array_map('intval', array_filter($removeIds))));
+  if (!$removeIds) {
+    return;
+  }
+  $placeholders = implode(',', array_fill(0, count($removeIds), '?'));
+  $params = array_merge([$listingId], $removeIds);
+  $pdo = pdo();
+  $fetch = $pdo->prepare("SELECT id, file_path FROM dealer_listing_media WHERE listing_id=? AND id IN ($placeholders)");
+  $fetch->execute($params);
+  $rows = $fetch->fetchAll();
+  if (!$rows) {
+    return;
+  }
+  $delete = $pdo->prepare("DELETE FROM dealer_listing_media WHERE listing_id=? AND id IN ($placeholders)");
+  $delete->execute($params);
+  foreach ($rows as $row) {
+    $path = __DIR__.'/../uploads/'.ltrim($row['file_path'], '/');
+    if (is_file($path)) {
+      @unlink($path);
+    }
+  }
+}
+
+function dealer_listing_refresh_hero_image(int $listingId): void {
+  $pdo = pdo();
+  $st = $pdo->prepare("SELECT file_path FROM dealer_listing_media WHERE listing_id=? ORDER BY sort_order ASC LIMIT 1");
+  $st->execute([$listingId]);
+  $file = $st->fetchColumn() ?: null;
+  $update = $pdo->prepare("UPDATE dealer_listings SET hero_image=?, updated_at=? WHERE id=?");
+  $update->execute([$file ?: null, now(), $listingId]);
+}
+
+function listing_media_group(array $listingIds, bool $withUrls = false): array {
+  $listingIds = array_values(array_unique(array_map('intval', array_filter($listingIds))));
+  if (!$listingIds) {
+    return [];
+  }
+  $placeholders = implode(',', array_fill(0, count($listingIds), '?'));
+  $st = pdo()->prepare("SELECT * FROM dealer_listing_media WHERE listing_id IN ($placeholders) ORDER BY listing_id, sort_order");
+  $st->execute($listingIds);
+  $map = [];
+  while ($row = $st->fetch()) {
+    $lid = (int)$row['listing_id'];
+    if (!isset($map[$lid])) {
+      $map[$lid] = [];
+    }
+    if ($withUrls) {
+      $row['url'] = listing_media_public_url($row['file_path']);
+    }
+    $map[$lid][] = $row;
+  }
+  return $map;
+}
+
+function dealer_listing_media_for_listing(int $listingId): array {
+  $media = listing_media_group([$listingId], true);
+  return $media[$listingId] ?? [];
+}
 
 function listing_seed_default_categories(): void {
   static $seeded = false;
@@ -292,7 +457,7 @@ function dealer_listing_validate_category(?int $categoryId): ?int {
   return (int)$category['id'];
 }
 
-function dealer_listing_save(int $dealerId, array $data, array $packages, ?int $listingId = null): array {
+function dealer_listing_save(int $dealerId, array $data, array $packages, ?int $listingId = null, array $mediaOptions = []): array {
   if (!table_exists('dealer_listings')) {
     throw new RuntimeException('İlan tablosu hazır değil.');
   }
@@ -307,7 +472,17 @@ function dealer_listing_save(int $dealerId, array $data, array $packages, ?int $
   if ($city === '' || $district === '') {
     throw new InvalidArgumentException('İlan için şehir ve ilçe bilgisi zorunludur.');
   }
+  $contactEmail = trim($data['contact_email'] ?? '');
+  if ($contactEmail === '' || !filter_var($contactEmail, FILTER_VALIDATE_EMAIL)) {
+    throw new InvalidArgumentException('Geçerli bir iletişim e-posta adresi giriniz.');
+  }
+  $contactPhone = trim($data['contact_phone'] ?? '');
+  if ($contactPhone === '') {
+    throw new InvalidArgumentException('İlan için iletişim telefonunu yazmalısınız.');
+  }
   $categoryId = dealer_listing_validate_category(isset($data['category_id']) ? (int)$data['category_id'] : null);
+  $removeMedia = $mediaOptions['remove_ids'] ?? [];
+  $mediaUploads = dealer_listing_normalize_media_uploads($mediaOptions['files'] ?? null);
 
   $pdo = pdo();
   $pdo->beginTransaction();
@@ -336,6 +511,8 @@ function dealer_listing_save(int $dealerId, array $data, array $packages, ?int $
         'category_id = ?',
         'city = ?',
         'district = ?',
+        'contact_email = ?',
+        'contact_phone = ?',
         'status_note = NULL',
         'updated_at = ?',
       ];
@@ -347,6 +524,8 @@ function dealer_listing_save(int $dealerId, array $data, array $packages, ?int $
         $categoryId,
         $city,
         $district,
+        $contactEmail,
+        $contactPhone,
         $now,
       ];
       if ($statusChanged) {
@@ -366,7 +545,7 @@ function dealer_listing_save(int $dealerId, array $data, array $packages, ?int $
       $currentStatus = $newStatus;
     } else {
       $slug = dealer_listing_unique_slug($title);
-      $st = $pdo->prepare("INSERT INTO dealer_listings (dealer_id, category_id, title, slug, summary, description, city, district, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)");
+      $st = $pdo->prepare("INSERT INTO dealer_listings (dealer_id, category_id, title, slug, summary, description, city, district, contact_email, contact_phone, status, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)");
       $st->execute([
         $dealerId,
         $categoryId,
@@ -376,6 +555,8 @@ function dealer_listing_save(int $dealerId, array $data, array $packages, ?int $
         $description ?: null,
         $city,
         $district,
+        $contactEmail,
+        $contactPhone,
         LISTING_STATUS_DRAFT,
         $now,
         $now,
@@ -386,6 +567,9 @@ function dealer_listing_save(int $dealerId, array $data, array $packages, ?int $
     }
 
     dealer_listing_sync_packages($listingId, $packages);
+    dealer_listing_remove_media($listingId, $removeMedia);
+    dealer_listing_add_media($listingId, $mediaUploads);
+    dealer_listing_refresh_hero_image($listingId);
 
     $pdo->commit();
     return [
@@ -454,9 +638,14 @@ function dealer_listings_for_dealer(int $dealerId): array {
   if (!$rows) {
     return [];
   }
-  $packages = listing_packages_group(array_column($rows, 'id'));
+  $ids = array_column($rows, 'id');
+  $packages = listing_packages_group($ids);
+  $media = listing_media_group($ids, true);
   foreach ($rows as &$row) {
     $row['packages'] = $packages[$row['id']] ?? [];
+    $row['media'] = $media[$row['id']] ?? [];
+    $coverPath = $row['hero_image'] ?: ($row['media'][0]['file_path'] ?? null);
+    $row['hero_url'] = listing_media_public_url($coverPath);
   }
   return $rows;
 }
@@ -472,6 +661,9 @@ function dealer_listing_find_for_owner(int $dealerId, int $listingId): ?array {
     return null;
   }
   $row['packages'] = listing_packages_group([$listingId])[$listingId] ?? [];
+  $row['media'] = dealer_listing_media_for_listing($listingId);
+  $coverPath = $row['hero_image'] ?: ($row['media'][0]['file_path'] ?? null);
+  $row['hero_url'] = listing_media_public_url($coverPath);
   return $row;
 }
 
@@ -576,9 +768,16 @@ function listing_admin_search(array $filters = []): array {
   if (!$rows) {
     return [];
   }
-  $packages = listing_packages_group(array_column($rows, 'id'));
+  $ids = array_column($rows, 'id');
+  $packages = listing_packages_group($ids);
+  $media = listing_media_group($ids, true);
   foreach ($rows as &$row) {
     $row['packages'] = $packages[$row['id']] ?? [];
+    $row['media'] = $media[$row['id']] ?? [];
+    $row['contact_email'] = $row['contact_email'] ?: $row['dealer_email'];
+    $row['contact_phone'] = $row['contact_phone'] ?: $row['dealer_phone'];
+    $coverPath = $row['hero_image'] ?: ($row['media'][0]['file_path'] ?? null);
+    $row['hero_url'] = listing_media_public_url($coverPath);
   }
   return $rows;
 }
@@ -670,9 +869,22 @@ function listing_public_search(array $filters = []): array {
   if (!$rows) {
     return [];
   }
-  $packages = listing_packages_group(array_column($rows, 'id'));
+  $ids = array_column($rows, 'id');
+  $packages = listing_packages_group($ids);
+  $media = listing_media_group($ids, true);
   foreach ($rows as &$row) {
     $row['packages'] = $packages[$row['id']] ?? [];
+    $row['media'] = $media[$row['id']] ?? [];
+    $row['contact_email'] = $row['contact_email'] ?: $row['dealer_email'];
+    $row['contact_phone'] = $row['contact_phone'] ?: $row['dealer_phone'];
+    $coverPath = $row['hero_image'] ?: ($row['media'][0]['file_path'] ?? null);
+    $row['hero_image'] = $coverPath;
+    $row['hero_url'] = listing_media_public_url($coverPath);
+    foreach ($row['media'] as &$mediaItem) {
+      if (!isset($mediaItem['url'])) {
+        $mediaItem['url'] = listing_media_public_url($mediaItem['file_path']);
+      }
+    }
   }
   return $rows;
 }
@@ -704,13 +916,24 @@ function listing_find_by_slug(string $slug): ?array {
   if (!table_exists('dealer_listings')) {
     return null;
   }
-  $st = pdo()->prepare("SELECT l.*, c.name AS category_name, d.name AS dealer_name, d.company AS dealer_company FROM dealer_listings l JOIN dealers d ON d.id=l.dealer_id LEFT JOIN listing_categories c ON c.id=l.category_id WHERE l.slug=? LIMIT 1");
+  $st = pdo()->prepare("SELECT l.*, c.name AS category_name, d.name AS dealer_name, d.company AS dealer_company, d.phone AS dealer_phone, d.email AS dealer_email FROM dealer_listings l JOIN dealers d ON d.id=l.dealer_id LEFT JOIN listing_categories c ON c.id=l.category_id WHERE l.slug=? AND l.status='approved' LIMIT 1");
   $st->execute([$slug]);
   $row = $st->fetch();
   if (!$row) {
     return null;
   }
   $row['packages'] = listing_packages_group([$row['id']])[$row['id']] ?? [];
+  $row['media'] = dealer_listing_media_for_listing((int)$row['id']);
+  $row['contact_email'] = $row['contact_email'] ?: $row['dealer_email'];
+  $row['contact_phone'] = $row['contact_phone'] ?: $row['dealer_phone'];
+  $coverPath = $row['hero_image'] ?: ($row['media'][0]['file_path'] ?? null);
+  $row['hero_image'] = $coverPath;
+  $row['hero_url'] = listing_media_public_url($coverPath);
+  foreach ($row['media'] as &$item) {
+    if (!isset($item['url'])) {
+      $item['url'] = listing_media_public_url($item['file_path']);
+    }
+  }
   return $row;
 }
 
