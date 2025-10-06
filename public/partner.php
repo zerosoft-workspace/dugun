@@ -4,6 +4,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/site.php';
 require_once __DIR__.'/../includes/listings.php';
+require_once __DIR__.'/../includes/theme.php';
 
 install_schema();
 
@@ -54,7 +55,7 @@ $pageStyles = <<<'CSS'
     --brand-dark:#0b8b98;
     --surface:#ffffff;
   }
-  body { background:#f3f4f6; font-family:'Inter',sans-serif; color:var(--ink); }
+  body { background:#f3f4f6; font-family:'Inter',sans-serif; color:var(--ink); overflow-x:hidden; }
   .page-shell { max-width:1240px; margin:0 auto; padding:40px 0 80px; }
   .breadcrumb-link { color:var(--brand-dark); text-decoration:none; font-weight:600; }
   .breadcrumb-link:hover { text-decoration:underline; }
@@ -66,6 +67,20 @@ $pageStyles = <<<'CSS'
   .hero-title { font-size:2.8rem; font-weight:800; margin-bottom:12px; }
   .hero-location { display:flex; align-items:center; gap:10px; font-size:1.05rem; font-weight:600; margin-bottom:12px; }
   .hero-summary { max-width:680px; font-size:1.05rem; opacity:.92; }
+  .hero-title,
+  .hero-summary,
+  .description-card p,
+  .info-list,
+  .info-list span,
+  .packages-table td,
+  .packages-table th,
+  .panel-card,
+  .panel-card h3,
+  .contact-chip,
+  .contact-chip span {
+    word-break:break-word;
+    overflow-wrap:anywhere;
+  }
   .content-grid { display:grid; gap:32px; grid-template-columns:minmax(0,2fr) minmax(280px,1fr); margin-top:40px; }
   @media (max-width: 1100px) { .content-grid { grid-template-columns:1fr; } }
   .gallery-card { border-radius:24px; background:var(--surface); border:1px solid rgba(148,163,184,.25); box-shadow:0 30px 80px -50px rgba(15,23,42,.4); padding:20px; }
@@ -75,7 +90,27 @@ $pageStyles = <<<'CSS'
   .panel-card { border-radius:24px; background:var(--surface); border:1px solid rgba(148,163,184,.25); box-shadow:0 30px 70px -48px rgba(15,23,42,.38); padding:24px; }
   .panel-title { font-size:1.15rem; font-weight:700; margin-bottom:18px; }
   .contact-stack { display:flex; flex-direction:column; gap:12px; }
-  .contact-chip { display:flex; align-items:center; gap:10px; padding:12px 16px; border-radius:16px; background:rgba(14,165,181,.12); color:var(--brand-dark); font-weight:600; text-decoration:none; }
+  .contact-chip {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:12px 16px;
+    border-radius:16px;
+    background:rgba(14,165,181,.12);
+    color:var(--brand-dark);
+    font-weight:600;
+    text-decoration:none;
+    max-width:280px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .contact-chip span {
+    display:inline-block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
   .contact-chip:hover { background:rgba(14,165,181,.2); color:var(--ink); }
   .info-list { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:10px; font-size:.95rem; color:#475569; }
   .info-list span { font-weight:600; color:var(--ink); }
@@ -110,6 +145,7 @@ CSS;
   <title><?=h(APP_NAME)?> — <?=h($pageTitle)?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <?=theme_head_assets()?>
   <?=$pageStyles?>
 </head>
 <body>
@@ -186,10 +222,10 @@ CSS;
             <h3 class="panel-title">İletişim</h3>
             <div class="contact-stack">
               <?php if ($contactEmail): ?>
-                <a class="contact-chip" href="mailto:<?=h($contactEmail)?>"><i class="bi bi-envelope"></i> <?=h($contactEmail)?></a>
+                <a class="contact-chip" href="mailto:<?=h($contactEmail)?>" title="<?=h($contactEmail)?>"><i class="bi bi-envelope"></i> <span><?=h($contactEmail)?></span></a>
               <?php endif; ?>
               <?php if ($contactPhone && $dialPhone): ?>
-                <a class="contact-chip" href="tel:<?=h($dialPhone)?>"><i class="bi bi-telephone"></i> <?=h($contactPhone)?></a>
+                <a class="contact-chip" href="tel:<?=h($dialPhone)?>" title="<?=h($contactPhone)?>"><i class="bi bi-telephone"></i> <span><?=h($contactPhone)?></span></a>
               <?php endif; ?>
             </div>
             <p class="text-muted small mt-3 mb-0">Potansiyel müşteriler bu ilan üzerinden doğrudan bayiyle iletişime geçer.</p>

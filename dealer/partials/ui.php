@@ -1,7 +1,9 @@
 <?php
+require_once __DIR__.'/../../includes/theme.php';
+
 if (!function_exists('dealer_base_styles')) {
   function dealer_base_styles(): string {
-    return <<<'CSS'
+    return theme_head_assets().<<<'CSS'
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
       @import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css');
@@ -38,6 +40,7 @@ if (!function_exists('dealer_base_styles')) {
         display:flex;
         flex-direction:column;
         padding:28px 22px 32px;
+        overflow:hidden;
         position:relative;
         z-index:1030;
         transition:transform .3s ease,width .3s ease,padding .3s ease;
@@ -227,6 +230,17 @@ if (!function_exists('dealer_base_styles')) {
         gap:14px;
       }
 
+      .dealer-toolbar .toolbar-right [data-theme-toggle-anchor] {
+        display:flex;
+        align-items:center;
+      }
+
+      .dealer-toolbar .toolbar-right .theme-toggle {
+        width:38px;
+        height:38px;
+        box-shadow:0 12px 30px -22px rgba(15,23,42,.5);
+      }
+
       .dealer-toolbar .toolbar-user {
         display:flex;
         align-items:center;
@@ -300,6 +314,25 @@ if (!function_exists('dealer_base_styles')) {
       body.sidebar-collapsed .dealer-sidebar {
         width:96px;
         padding:28px 16px;
+      }
+
+      body.sidebar-collapsed .dealer-sidebar .sidebar-brand {
+        justify-content:center;
+        gap:0;
+      }
+
+      body.sidebar-collapsed .dealer-sidebar .sidebar-brand .brand-mark {
+        width:100%;
+        justify-content:center;
+        gap:0;
+      }
+
+      body.sidebar-collapsed .dealer-sidebar .sidebar-brand .brand-mark span {
+        min-width:44px;
+      }
+
+      body.sidebar-collapsed .dealer-sidebar .sidebar-summary {
+        display:none;
       }
 
       body.sidebar-collapsed .dealer-sidebar .brand-mark strong,
@@ -452,6 +485,7 @@ CSS;
     echo '<div class="toolbar-pill"><i class="bi bi-calendar3"></i>'.date('d.m.Y').'</div>';
     echo '</div>';
     echo '<div class="toolbar-right">';
+    echo '<div data-theme-toggle-anchor></div>';
     if ($balanceText !== null) {
       echo '<div class="toolbar-pill"><i class="bi bi-cash-stack"></i>'.$balanceText.'</div>';
     }

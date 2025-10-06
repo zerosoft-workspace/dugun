@@ -1,7 +1,9 @@
 <?php
+require_once __DIR__.'/../../includes/theme.php';
+
 if (!function_exists('admin_base_styles')) {
   function admin_base_styles(): string {
-    return <<<'CSS'
+    return theme_head_assets().<<<'CSS'
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
       @import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css');
@@ -47,6 +49,7 @@ if (!function_exists('admin_base_styles')) {
         position:relative;
         z-index:1030;
         transition:transform .3s ease,width .3s ease,padding .3s ease;
+        overflow:hidden;
       }
 
       .admin-sidebar .sidebar-brand {
@@ -206,6 +209,17 @@ if (!function_exists('admin_base_styles')) {
         display:flex;
         align-items:center;
         gap:18px;
+      }
+
+      .toolbar-right [data-theme-toggle-anchor] {
+        display:flex;
+        align-items:center;
+      }
+
+      .toolbar-right .theme-toggle {
+        width:40px;
+        height:40px;
+        box-shadow:0 14px 32px -24px rgba(15,23,42,.5);
       }
 
       .toolbar-chip {
@@ -406,6 +420,17 @@ if (!function_exists('admin_base_styles')) {
 
       body.sidebar-collapsed .admin-sidebar .sidebar-brand {
         justify-content:center;
+        gap:0;
+      }
+
+      body.sidebar-collapsed .admin-sidebar .sidebar-brand .brand-mark {
+        width:100%;
+        justify-content:center;
+        gap:0;
+      }
+
+      body.sidebar-collapsed .admin-sidebar .sidebar-brand .brand-mark span {
+        min-width:44px;
       }
 
       body.sidebar-collapsed .admin-sidebar .sidebar-brand strong {
@@ -530,6 +555,7 @@ CSS;
     echo '<div class="toolbar-search"><i class="bi bi-search"></i><input type="search" placeholder="Panelde ara..." aria-label="Panelde ara"></div>';
     echo '</div>';
     echo '<div class="toolbar-right">';
+    echo '<div data-theme-toggle-anchor></div>';
     echo '<div class="toolbar-chip"><i class="bi bi-calendar3"></i>'.date('d.m.Y').'</div>';
     echo '<div class="toolbar-user">';
     echo '<div class="avatar">'.h($initial).'</div>';

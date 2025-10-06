@@ -4,6 +4,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/site.php';
 require_once __DIR__.'/../includes/listings.php';
+require_once __DIR__.'/../includes/theme.php';
 
 install_schema();
 
@@ -35,7 +36,7 @@ $pageStyles = <<<'CSS'
     --brand-dark:#0b8b98;
     --surface:#ffffff;
   }
-  body { background:#f3f4f6; font-family:'Inter',sans-serif; color:var(--ink); }
+  body { background:#f3f4f6; font-family:'Inter',sans-serif; color:var(--ink); overflow-x:hidden; }
   .page-shell { max-width:1280px; margin:0 auto; }
   .hero { border-radius:32px; background:linear-gradient(135deg,rgba(14,165,181,.92),rgba(15,23,42,.85)); color:#fff; padding:72px 64px; position:relative; overflow:hidden; box-shadow:0 40px 110px -60px rgba(15,23,42,.55); }
   .hero::after { content:""; position:absolute; inset:auto -140px -180px -140px; height:320px; background:rgba(255,255,255,.16); filter:blur(90px); }
@@ -68,15 +69,59 @@ $pageStyles = <<<'CSS'
   .listing-summary { margin:0; color:#334155; font-size:.95rem; line-height:1.6; max-width:640px; }
   .dealer-meta { display:flex; flex-direction:column; gap:.3rem; color:#475569; font-size:.9rem; min-width:180px; }
   .dealer-meta strong { font-size:1rem; color:var(--ink); }
-  .listing-meta { display:flex; flex-wrap:wrap; gap:12px; font-size:.85rem; color:#64748b; font-weight:600; }
-  .listing-meta span { display:inline-flex; align-items:center; gap:.45rem; }
+  .listing-meta {
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    font-size:.85rem;
+    color:#64748b;
+    font-weight:600;
+  }
+  .listing-meta span {
+    display:inline-flex;
+    align-items:center;
+    gap:.45rem;
+  }
+  .listing-title,
+  .listing-summary,
+  .dealer-meta,
+  .dealer-meta strong,
+  .listing-meta span,
+  .package-item,
+  .package-item strong,
+  .package-item span,
+  .contact-chip,
+  .contact-chip span {
+    word-break:break-word;
+    overflow-wrap:anywhere;
+  }
   .package-list { display:grid; gap:12px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); }
   .package-item { border:1px solid rgba(14,165,181,.25); border-radius:16px; padding:12px 14px; background:rgba(14,165,181,.07); }
   .package-item strong { display:block; font-weight:600; color:var(--ink); margin-bottom:2px; }
   .package-item span { font-weight:700; color:var(--brand-dark); }
   .listing-footer { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
   .contact-links { display:flex; gap:10px; flex-wrap:wrap; }
-  .contact-chip { display:inline-flex; align-items:center; gap:6px; padding:8px 16px; border-radius:999px; background:rgba(14,165,181,.14); color:var(--brand-dark); font-weight:600; text-decoration:none; }
+  .contact-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:8px 16px;
+    border-radius:999px;
+    background:rgba(14,165,181,.14);
+    color:var(--brand-dark);
+    font-weight:600;
+    text-decoration:none;
+    max-width:260px;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .contact-chip span {
+    display:inline-block;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
   .contact-chip i { font-size:1rem; }
   .contact-chip:hover { background:rgba(14,165,181,.24); color:var(--ink); }
   .detail-link { margin-left:auto; display:inline-flex; align-items:center; gap:6px; padding:9px 18px; border-radius:999px; border:1px solid rgba(14,165,181,.45); color:var(--ink); font-weight:600; text-decoration:none; }
@@ -99,6 +144,7 @@ CSS;
   <title><?=h(APP_NAME)?> — Anlaşmalı Şirketler</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <?=theme_head_assets()?>
   <?=$pageStyles?>
 </head>
 <body>
@@ -238,10 +284,10 @@ CSS;
                 <div class="listing-footer">
                   <div class="contact-links">
                     <?php if ($contactEmail): ?>
-                      <a class="contact-chip" href="mailto:<?=h($contactEmail)?>"><i class="bi bi-envelope"></i> <?=h($contactEmail)?></a>
+                      <a class="contact-chip" href="mailto:<?=h($contactEmail)?>" title="<?=h($contactEmail)?>"><i class="bi bi-envelope"></i> <span><?=h($contactEmail)?></span></a>
                     <?php endif; ?>
                     <?php if ($contactPhone && $dialPhone): ?>
-                      <a class="contact-chip" href="tel:<?=h($dialPhone)?>"><i class="bi bi-telephone-outbound"></i> <?=h($contactPhone)?></a>
+                      <a class="contact-chip" href="tel:<?=h($dialPhone)?>" title="<?=h($contactPhone)?>"><i class="bi bi-telephone-outbound"></i> <span><?=h($contactPhone)?></span></a>
                     <?php endif; ?>
                   </div>
                   <a class="detail-link" href="<?=h($detailUrl)?>"><i class="bi bi-box-arrow-up-right"></i> Detayı Gör</a>

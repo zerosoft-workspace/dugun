@@ -2,6 +2,7 @@
 require_once __DIR__.'/_auth.php';                  // tek URL login + aktif düğün
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/license.php';    // lisans yardımcıları
+require_once __DIR__.'/../includes/theme.php';
 
 // Aktif etkinlik bilgisi
 $EVENT_ID = couple_current_event_id();
@@ -153,6 +154,7 @@ $pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'
 <title><?=h($ev['title'])?> — Çift Paneli</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<?=theme_head_assets()?>
 <style>
 :root{
   --ink:#0f172a;

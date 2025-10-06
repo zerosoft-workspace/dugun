@@ -1,7 +1,9 @@
 <?php
+require_once __DIR__.'/../../includes/theme.php';
+
 if (!function_exists('representative_base_styles')) {
   function representative_base_styles(): string {
-    return <<<'CSS'
+    return theme_head_assets().<<<'CSS'
     <style>
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
       @import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css');
@@ -38,6 +40,7 @@ if (!function_exists('representative_base_styles')) {
         padding:28px 22px 32px;
         box-shadow:0 30px 90px -50px rgba(15,23,42,.7);
         position:relative;
+        overflow:hidden;
         z-index:20;
       }
 
@@ -153,6 +156,7 @@ if (!function_exists('representative_base_styles')) {
         color:var(--rep-muted);
         font-size:.92rem;
         max-width:620px;
+        word-break:break-word;
       }
 
       .rep-topbar-actions {
@@ -161,6 +165,17 @@ if (!function_exists('representative_base_styles')) {
         gap:1rem;
         flex-wrap:wrap;
         justify-content:flex-end;
+      }
+
+      .rep-topbar-actions [data-theme-toggle-anchor] {
+        display:flex;
+        align-items:center;
+      }
+
+      .rep-topbar-actions .theme-toggle {
+        width:38px;
+        height:38px;
+        box-shadow:0 12px 28px -22px rgba(15,23,42,.5);
       }
 
       .rep-user-card {
@@ -195,6 +210,8 @@ if (!function_exists('representative_base_styles')) {
         display:block;
         font-size:.78rem;
         color:var(--rep-muted);
+        max-width:200px;
+        word-break:break-word;
       }
 
       .rep-logout {
@@ -459,6 +476,7 @@ if (!function_exists('representative_base_styles')) {
     }
     echo '</div>';
     echo '<div class="rep-topbar-actions">';
+    echo '<div data-theme-toggle-anchor></div>';
     echo '<div class="rep-user-card">';
     echo '<div class="rep-avatar">'.h($repInitial).'</div>';
     echo '<div>';
