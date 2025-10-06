@@ -487,6 +487,7 @@ CSS;
       'venues'    => ['href' => BASE_URL.'/admin/venues.php', 'label' => 'Salon Yönetimi', 'icon' => 'bi-building'],
       'users'     => ['href' => BASE_URL.'/admin/users.php', 'label' => 'Etkinlikler', 'icon' => 'bi-calendar3'],
       'dealers'   => ['href' => BASE_URL.'/admin/dealers.php', 'label' => 'Bayiler', 'icon' => 'bi-shop'],
+      'listings' => ['href' => BASE_URL.'/admin/listings.php', 'label' => 'Anlaşmalı Şirketler', 'icon' => 'bi-card-list'],
       'representatives' => ['href' => BASE_URL.'/admin/representatives.php', 'label' => 'Temsilciler', 'icon' => 'bi-person-badge'],
       'crm' => ['href' => BASE_URL.'/admin/representative_crm.php', 'label' => 'Temsilci CRM', 'icon' => 'bi-kanban'],
       'finance' => ['href' => BASE_URL.'/admin/finance.php', 'label' => 'Finans', 'icon' => 'bi-wallet2'],

@@ -110,6 +110,7 @@ unset($_SESSION['lead_success']);
         <li class="nav-item"><a class="nav-link" href="#nasil">Nasıl Çalışıyoruz</a></li>
         <li class="nav-item"><a class="nav-link" href="#paketler">Paketler</a></li>
         <li class="nav-item"><a class="nav-link" href="#sss">SSS</a></li>
+        <li class="nav-item"><a class="nav-link" href="<?=BASE_URL?>/public/partners.php">Anlaşmalı Şirketler</a></li>
         <li class="nav-item"><a class="nav-link" href="#iletisim">İletişim</a></li>
       </ul>
       <div class="cta-bar ms-lg-4">

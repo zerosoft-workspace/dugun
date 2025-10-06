@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240609_02');
+  define('APP_SCHEMA_VERSION', '20240609_03');
 }
 
 function pdo(): PDO {
@@ -82,6 +82,10 @@ function install_schema(){
       'dealer_representative_assignments',
       'representative_leads',
       'representative_lead_notes',
+      'listing_categories',
+      'dealer_listings',
+      'dealer_listing_packages',
+      'listing_category_requests',
     ];
     foreach ($criticalTables as $table) {
       if (!table_exists($table)) {
@@ -310,6 +314,75 @@ function install_schema(){
     created_at DATETIME NOT NULL,
     INDEX idx_wallet_dealer (dealer_id, created_at),
     FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS listing_categories(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(190) NOT NULL,
+    slug VARCHAR(190) NOT NULL UNIQUE,
+    description TEXT NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS listing_category_requests(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    details TEXT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'pending',
+    response_note TEXT NULL,
+    processed_by INT NULL,
+    processed_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_listing_request_status (status),
+    INDEX idx_listing_request_dealer (dealer_id, status),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (processed_by) REFERENCES users(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_listings(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    category_id INT NULL,
+    title VARCHAR(190) NOT NULL,
+    slug VARCHAR(190) NOT NULL UNIQUE,
+    summary VARCHAR(255) NULL,
+    description MEDIUMTEXT NULL,
+    city VARCHAR(100) NOT NULL,
+    district VARCHAR(100) NOT NULL,
+    status VARCHAR(16) NOT NULL DEFAULT 'draft',
+    status_note TEXT NULL,
+    requested_at DATETIME NULL,
+    approved_at DATETIME NULL,
+    rejected_at DATETIME NULL,
+    published_at DATETIME NULL,
+    processed_by INT NULL,
+    hero_image VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_listing_dealer (dealer_id, status),
+    INDEX idx_listing_category (category_id),
+    INDEX idx_listing_status (status),
+    INDEX idx_listing_city (city, district),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES listing_categories(id) ON DELETE SET NULL,
+    FOREIGN KEY (processed_by) REFERENCES users(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_listing_packages(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    listing_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    description TEXT NULL,
+    price_cents INT NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_listing_packages_listing (listing_id),
+    FOREIGN KEY (listing_id) REFERENCES dealer_listings(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_topups(
