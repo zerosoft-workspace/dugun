@@ -546,7 +546,7 @@ function listing_admin_search(array $filters = []): array {
   if (!table_exists('dealer_listings')) {
     return [];
   }
-  $sql = "SELECT l.*, d.name AS dealer_name, d.company AS dealer_company, c.name AS category_name FROM dealer_listings l JOIN dealers d ON d.id=l.dealer_id LEFT JOIN listing_categories c ON c.id=l.category_id";
+  $sql = "SELECT l.*, d.name AS dealer_name, d.company AS dealer_company, d.email AS dealer_email, d.phone AS dealer_phone, d.billing_address AS dealer_billing_address, d.tax_office AS dealer_tax_office, d.tax_number AS dealer_tax_number, d.invoice_email AS dealer_invoice_email, c.name AS category_name FROM dealer_listings l JOIN dealers d ON d.id=l.dealer_id LEFT JOIN listing_categories c ON c.id=l.category_id";
   $where = [];
   $params = [];
   if (!empty($filters['status']) && $filters['status'] !== 'all') {
