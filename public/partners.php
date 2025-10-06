@@ -5,6 +5,7 @@ require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/site.php';
 require_once __DIR__.'/../includes/listings.php';
 require_once __DIR__.'/../includes/theme.php';
+require_once __DIR__.'/../includes/public_header.php';
 
 install_schema();
 
@@ -37,6 +38,13 @@ $pageStyles = <<<'CSS'
     --surface:#ffffff;
   }
   body { background:#f3f4f6; font-family:'Inter',sans-serif; color:var(--ink); overflow-x:hidden; }
+  .cta-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .nav-link{font-weight:600;color:var(--muted)!important;}
+  .nav-link:hover,.nav-link.active{color:var(--brand)!important;}
+  .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:999px;padding:10px 24px;font-weight:700;}
+  .btn-brand:hover{background:var(--brand-dark);color:#fff;}
+  .btn-guest{border-radius:999px;border:1px solid rgba(14,165,181,0.3);color:var(--brand);font-weight:600;padding:10px 22px;background:rgba(14,165,181,0.08);}
+  .btn-guest:hover{color:#fff;background:var(--brand);border-color:var(--brand);}
   .page-shell { max-width:1280px; margin:0 auto; }
   .hero { border-radius:32px; background:linear-gradient(135deg,rgba(14,165,181,.92),rgba(15,23,42,.85)); color:#fff; padding:72px 64px; position:relative; overflow:hidden; box-shadow:0 40px 110px -60px rgba(15,23,42,.55); }
   .hero::after { content:""; position:absolute; inset:auto -140px -180px -140px; height:320px; background:rgba(255,255,255,.16); filter:blur(90px); }
@@ -148,6 +156,7 @@ CSS;
   <?=$pageStyles?>
 </head>
 <body>
+<?php site_public_header('partners'); ?>
   <div class="container py-5 page-shell">
     <header class="hero mb-5">
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 position-relative" style="z-index:2;">

@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/guests.php';
+require_once __DIR__.'/../includes/event_games.php';
 
 if (session_status() === PHP_SESSION_NONE) session_start();
 
@@ -56,6 +57,17 @@ $pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'
 $profile = guest_profile_current($event_id);
 $token_ok = token_valid($event_id, $token);
 $pageCsrf = csrf_token();
+
+$wheelEntries = event_wheel_entries_list($event_id, true);
+$activeQuiz = event_quiz_active_question($event_id);
+$activeAttempt = ($activeQuiz && $profile) ? event_quiz_attempt_for_profile($activeQuiz['id'], (int)$profile['id']) : null;
+$quizLeaderboard = event_quiz_scoreboard($event_id, 12);
+$quizStats = $profile ? event_quiz_profile_stats($event_id, (int)$profile['id']) : null;
+$quizFlash = null;
+if (!empty($_SESSION['quiz_flash']) && is_array($_SESSION['quiz_flash']) && isset($_SESSION['quiz_flash'][$event_id])) {
+  $quizFlash = $_SESSION['quiz_flash'][$event_id];
+  unset($_SESSION['quiz_flash'][$event_id]);
+}
 
 function json_fail(string $code, string $message, int $status = 400): never {
   http_response_code($status);
@@ -221,6 +233,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
 }
 
 $errors=[]; $okCount=0;
+
+if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='quiz_answer'){
+  csrf_or_die();
+  $redirectTo = BASE_URL.'/public/upload.php?event='.$event_id.'&t='.rawurlencode($token);
+  if(!$profile){
+    flash('err','Quiz sorularını cevaplamak için misafir girişi yapın.');
+    redirect($redirectTo);
+  }
+  $questionId = (int)($_POST['question_id'] ?? 0);
+  $answerId = (int)($_POST['answer_id'] ?? 0);
+  if($questionId <= 0 || $answerId <= 0){
+    flash('err','Lütfen bir cevap seçin.');
+    redirect($redirectTo);
+  }
+  try {
+    $result = event_quiz_attempt_submit($event_id, $questionId, $answerId, $profile);
+    if (!isset($_SESSION['quiz_flash']) || !is_array($_SESSION['quiz_flash'])) {
+      $_SESSION['quiz_flash'] = [];
+    }
+    $_SESSION['quiz_flash'][$event_id] = [
+      'question_id' => $questionId,
+      'answer_id' => $answerId,
+      'correct' => $result['is_correct'],
+      'points' => $result['points'],
+    ];
+    flash('ok','Cevabınız kaydedildi!');
+  } catch (Throwable $e) {
+    flash('err',$e->getMessage());
+  }
+  redirect($redirectTo);
+}
+
 if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='upload'){
   csrf_or_die();
   $p_token = trim($_POST['t']??'');
@@ -283,6 +327,7 @@ $directory = $profile ? guest_event_profile_directory($event_id, (int)$profile['
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?=h($ev['title'])?> — Misafir Yükleme</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <meta name="csrf" content="<?=h($pageCsrf)?>">
 <style>
 :root{ --zs:<?=h($PRIMARY)?>; --zs-soft:<?=h($ACCENT)?>; --ink:#0f172a; --muted:#64748b; --card:#ffffff; --border:#e2e8f0; }
@@ -325,6 +370,34 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
 .note-card{ border-radius:20px; border:1px solid rgba(148,163,184,.28); padding:1.8rem; background:#f8fafc; }
 .note-card textarea{ border-radius:16px; border:1px solid rgba(148,163,184,.32); padding:1rem; font-size:.98rem; }
 .note-card textarea:focus{ border-color:var(--zs); box-shadow:0 0 0 .25rem rgba(14,165,181,.2); }
+.quiz-card h5{font-weight:700;}
+.quiz-card .badge{background:rgba(14,165,181,.12);color:var(--zs);border-radius:999px;font-weight:600;padding:.4rem .9rem;}
+.quiz-option{border:1px solid rgba(148,163,184,.28);border-radius:14px;padding:1rem;display:flex;align-items:center;gap:.75rem;cursor:pointer;transition:all .2s ease;background:#fff;}
+.quiz-option:hover{border-color:rgba(14,165,181,.45);box-shadow:0 12px 30px -18px rgba(14,165,181,.6);}
+.quiz-option input{accent-color:var(--zs);width:18px;height:18px;}
+.quiz-option.selected{border-color:var(--zs);box-shadow:0 16px 40px -20px rgba(14,165,181,.45);}
+.quiz-result{border-radius:14px;padding:.85rem 1rem;font-weight:600;}
+.quiz-result.ok{background:rgba(22,163,74,.12);color:#15803d;}
+.quiz-result.err{background:rgba(248,113,113,.16);color:#b91c1c;}
+.scoreboard-card h5{font-weight:700;}
+.scoreboard-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.65rem;}
+.scoreboard-item{border:1px solid rgba(148,163,184,.24);border-radius:14px;padding:.75rem 1rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;background:#fff;}
+.scoreboard-item.me{border-color:var(--zs);background:rgba(14,165,181,.08);}
+.scoreboard-item strong{font-size:1.05rem;}
+.scoreboard-meta{display:flex;align-items:center;gap:.6rem;color:var(--muted);font-size:.9rem;}
+.spin-trigger{position:fixed;bottom:24px;right:24px;z-index:1080;border-radius:999px;padding:.85rem 1.4rem;font-weight:700;background:linear-gradient(135deg,var(--zs),#0b8b98);color:#fff;border:none;box-shadow:0 22px 60px -20px rgba(14,165,181,.6);}
+.spin-trigger:hover{color:#fff;filter:brightness(.98);}
+.wheel-visual{width:280px;height:280px;border-radius:50%;margin:0 auto 1.5rem;background:conic-gradient(#0ea5b5 0deg,#0ea5b5 360deg);position:relative;transition:transform 4.2s cubic-bezier(.19,1,.22,1);transform:rotate(var(--wheel-rotation,0deg));box-shadow:0 30px 90px -45px rgba(14,165,181,.6);}
+.wheel-visual::after{content:"";position:absolute;inset:18%;background:rgba(255,255,255,.85);border-radius:50%;}
+.wheel-pointer{position:absolute;top:-22px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:18px solid transparent;border-right:18px solid transparent;border-bottom:24px solid rgba(14,165,181,.85);filter:drop-shadow(0 6px 14px rgba(14,165,181,.4));}
+.wheel-modal .modal-content{border-radius:28px;border:none;}
+.wheel-entries{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5rem;}
+.wheel-entries li{display:flex;align-items:center;gap:.75rem;border:1px solid rgba(148,163,184,.24);border-radius:12px;padding:.55rem .75rem;background:#fff;}
+.wheel-chip{width:20px;height:20px;border-radius:50%;flex-shrink:0;}
+.wheel-result{font-weight:700;font-size:1.1rem;text-align:center;margin-top:.5rem;}
+.quiz-empty{color:var(--muted);font-style:italic;}
+.leaderboard-empty{color:var(--muted);font-style:italic;}
+@media(max-width:768px){.spin-trigger{right:16px;bottom:16px;padding:.75rem 1.2rem;font-size:.95rem;}}
 .modal-media{ width:100%; border-radius:20px; background:#000; overflow:hidden; }
 .modal-media img,.modal-media video{ width:100%; height:auto; display:block; }
 .comment-list{ max-height:300px; overflow:auto; display:flex; flex-direction:column; gap:1rem; }
@@ -438,6 +511,91 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
       </form>
     </div>
   <?php endif; ?>
+
+  <div class="row g-4 mb-4 align-items-stretch">
+    <div class="col-xl-7">
+      <div class="card-lite p-4 quiz-card h-100">
+        <div class="d-flex flex-column flex-md-row justify-content-between gap-3 mb-3">
+          <div>
+            <h5 class="mb-1"><i class="bi bi-patch-question-fill me-2"></i>Canlı Quiz</h5>
+            <div class="smallmuted">Etkinlik sahibi tarafından paylaşılan soruları cevaplayarak puan toplayın.</div>
+          </div>
+          <?php if($activeQuiz): ?>
+            <span class="badge align-self-start">Aktif Soru</span>
+          <?php endif; ?>
+        </div>
+        <?php if($quizFlash): ?>
+          <div class="quiz-result <?=$quizFlash['correct'] ? 'ok' : 'err'?> mb-3">
+            <?=$quizFlash['correct'] ? 'Tebrikler! Doğru cevabı verdiniz.' : 'Bu kez olmadı, bir sonraki soruya hazır olun.'?>
+            <?php if(isset($quizFlash['points']) && $quizFlash['points']>0): ?>
+              <span class="ms-2">(+<?=$quizFlash['points']?> puan)</span>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+        <?php if($activeQuiz): ?>
+          <h6 class="fw-semibold mb-3"><?=h($activeQuiz['question'])?></h6>
+          <?php if($profile): ?>
+            <form method="post" class="vstack gap-3">
+              <input type="hidden" name="_csrf" value="<?=h($pageCsrf)?>">
+              <input type="hidden" name="do" value="quiz_answer">
+              <input type="hidden" name="question_id" value="<?=$activeQuiz['id']?>">
+              <?php foreach($activeQuiz['answers'] as $ans):
+                $checked = $activeAttempt && $activeAttempt['answer_id'] === $ans['id'];
+              ?>
+              <label class="quiz-option <?=$checked?'selected':''?>">
+                <input type="radio" name="answer_id" value="<?=$ans['id']?>" <?=$checked?'checked':''?>>
+                <span><?=h($ans['text'])?></span>
+                <?php if($activeAttempt && $activeAttempt['answer_id'] === $ans['id']): ?>
+                  <span class="badge ms-auto <?=$activeAttempt['is_correct'] ? 'bg-success text-white' : 'bg-danger text-white'?>">
+                    <?=$activeAttempt['is_correct'] ? 'Seçiminiz' : 'Seçiminiz'?>
+                  </span>
+                <?php endif; ?>
+              </label>
+              <?php endforeach; ?>
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-zs" type="submit">Cevabı Gönder</button>
+                <?php if(!$activeAttempt): ?>
+                  <div class="smallmuted align-self-center">Her misafir bir soruyu bir kez cevaplayabilir.</div>
+                <?php else: ?>
+                  <div class="smallmuted align-self-center">Cevabınızı güncellemek isterseniz tekrar seçim yapıp gönderin.</div>
+                <?php endif; ?>
+              </div>
+            </form>
+          <?php else: ?>
+            <div class="quiz-empty">Quiz sorularını cevaplamak için <a href="<?=BASE_URL?>/public/guest_login.php" class="muted-link">misafir girişi</a> yapın.</div>
+          <?php endif; ?>
+        <?php else: ?>
+          <div class="quiz-empty">Şu anda aktif bir soru bulunmuyor. Yeni sorular geldiğinde buradan takip edebilirsiniz.</div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <div class="col-xl-5">
+      <div class="card-lite p-4 scoreboard-card h-100">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h5 class="mb-0"><i class="bi bi-trophy-fill me-2 text-warning"></i>Quiz Sıralaması</h5>
+          <?php if($quizStats && ($quizStats['points']>0 || $quizStats['attempts']>0)): ?>
+            <span class="badge bg-light text-dark">Sizin puanınız: <?=$quizStats['points']?></span>
+          <?php endif; ?>
+        </div>
+        <?php if($quizLeaderboard): ?>
+          <ul class="scoreboard-list">
+            <?php foreach($quizLeaderboard as $item):
+              $isMe = $profile && (int)$profile['id'] === $item['profile_id'];
+            ?>
+            <li class="scoreboard-item <?=$isMe?'me':''?>">
+              <div>
+                <strong>#<?=$item['rank']?> <?=h($item['name'])?></strong>
+                <div class="scoreboard-meta"><span><i class="bi bi-lightning-charge-fill text-warning"></i><?=$item['points']?> puan</span><span><i class="bi bi-check-circle-fill text-success"></i><?=$item['correct']?> doğru</span></div>
+              </div>
+            </li>
+            <?php endforeach; ?>
+          </ul>
+        <?php else: ?>
+          <div class="leaderboard-empty">Henüz puanlanan bir cevap yok. İlk puanı siz alın!</div>
+        <?php endif; ?>
+      </div>
+    </div>
+  </div>
 
   <div class="card-lite p-4">
     <div class="gallery-header">
@@ -553,6 +711,26 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
     </form>
   </div>
 </div>
+<?php endif; ?>
+
+<?php if($wheelEntries): ?>
+  <button class="spin-trigger" type="button" data-bs-toggle="modal" data-bs-target="#wheelModal"><i class="bi bi-record-circle me-2"></i>Çarkı Çevir</button>
+  <div class="modal fade wheel-modal" id="wheelModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content p-4">
+        <div class="wheel-pointer"></div>
+        <div class="wheel-visual" id="wheelVisual"></div>
+        <div class="wheel-result" id="wheelResult">Şanslı isim için çarkı çevirin!</div>
+        <div class="d-flex justify-content-center mt-3">
+          <button class="btn btn-zs" type="button" id="wheelSpin">Çevir</button>
+        </div>
+        <hr class="my-4">
+        <h6 class="fw-semibold mb-3">Çark Segmentleri</h6>
+        <ul class="wheel-entries" id="wheelEntriesList"></ul>
+      </div>
+    </div>
+  </div>
+  <script type="application/json" id="wheelData"><?=json_encode($wheelEntries, JSON_UNESCAPED_UNICODE)?></script>
 <?php endif; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -799,5 +977,89 @@ chatForm?.addEventListener('submit',ev=>{
 });
 renderDirectory();
 <?php endif; ?>
+
+document.querySelectorAll('.quiz-option input').forEach(input => {
+  input.addEventListener('change', () => {
+    document.querySelectorAll('.quiz-option').forEach(opt => opt.classList.remove('selected'));
+    const parent = input.closest('.quiz-option');
+    if (parent) parent.classList.add('selected');
+  });
+});
+
+(function(){
+  const dataEl = document.getElementById('wheelData');
+  if(!dataEl) return;
+  let entries = [];
+  try {
+    entries = JSON.parse(dataEl.textContent || '[]');
+  } catch(e) {
+    entries = [];
+  }
+  if(!Array.isArray(entries) || !entries.length) return;
+  const wheel = document.getElementById('wheelVisual');
+  const resultEl = document.getElementById('wheelResult');
+  const listEl = document.getElementById('wheelEntriesList');
+  const spinBtn = document.getElementById('wheelSpin');
+  if(listEl){
+    listEl.innerHTML='';
+    entries.forEach((entry, idx) => {
+      const color = entry.color && entry.color !== '' ? entry.color : palette(idx);
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="wheel-chip" style="background:${color}"></span><span>${escapeHtml(entry.label)}</span>`;
+      listEl.appendChild(li);
+      entry.__color = color;
+    });
+  }
+  const totalWeight = entries.reduce((acc, entry) => acc + Math.max(1, entry.weight || 1), 0);
+  let gradientParts = [];
+  let accWeight = 0;
+  entries.forEach((entry, idx) => {
+    const weight = Math.max(1, entry.weight || 1);
+    const start = (accWeight / totalWeight) * 360;
+    accWeight += weight;
+    const end = (accWeight / totalWeight) * 360;
+    const color = entry.__color || palette(idx);
+    gradientParts.push(`${color} ${start}deg ${end}deg`);
+    entry.__start = start;
+    entry.__end = end;
+  });
+  if(wheel){
+    wheel.style.background = `conic-gradient(${gradientParts.join(',')})`;
+  }
+  let spinning = false;
+  spinBtn?.addEventListener('click', () => {
+    if(spinning) return;
+    spinning = true;
+    const pool = [];
+    entries.forEach(entry => {
+      const w = Math.max(1, entry.weight || 1);
+      for(let i=0;i<w;i++) pool.push(entry);
+    });
+    const chosen = pool[Math.floor(Math.random()*pool.length)];
+    let mid = 0;
+    if(chosen){
+      mid = (chosen.__start + chosen.__end) / 2;
+    }
+    const rotation = (360 * 5) + (360 - mid);
+    if(wheel){
+      wheel.style.setProperty('--wheel-rotation', `${rotation}deg`);
+    }
+    setTimeout(() => {
+      if(resultEl && chosen){
+        resultEl.textContent = `Kazanan: ${chosen.label}`;
+      }
+      spinning = false;
+    }, 4200);
+  });
+
+  function palette(idx){
+    const colors = ['#0ea5b5','#6366f1','#f97316','#8b5cf6','#22c55e','#facc15','#ec4899','#14b8a6'];
+    return colors[idx % colors.length];
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  }
+})();
 </script>
 </body></html>

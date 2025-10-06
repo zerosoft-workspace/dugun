@@ -4,6 +4,7 @@ require_once __DIR__.'/includes/db.php';
 require_once __DIR__.'/includes/functions.php';
 require_once __DIR__.'/includes/site.php';
 require_once __DIR__.'/includes/theme.php';
+require_once __DIR__.'/includes/public_header.php';
 
 if (session_status() === PHP_SESSION_NONE) {
   session_start();
@@ -78,7 +79,8 @@ unset($_SESSION['lead_success']);
   .btn-guest:hover{color:#fff;background:var(--brand);border-color:var(--brand);}
   .muted{color:var(--muted);}
   .nav-link{font-weight:600;color:var(--muted)!important;}
-  .nav-link:hover,.nav-link:focus{color:var(--brand)!important;}
+  .nav-link:hover,.nav-link:focus,.nav-link.active{color:var(--brand)!important;}
+  .site-navbar{backdrop-filter:blur(10px);}
   .contact-card{border-radius:24px;background:#fff;box-shadow:0 24px 60px rgba(15,118,110,0.18);padding:32px;}
   .contact-card ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;}
   .contact-card ul li strong{color:var(--ink);min-width:84px;display:inline-block;}
@@ -100,29 +102,7 @@ unset($_SESSION['lead_success']);
   @media(max-width:768px){.form-section{padding:32px;}}
 </style>
 </head><body>
-<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm py-3 sticky-top">
-  <div class="container">
-    <a class="navbar-brand fw-bold fs-3" href="#hero"><?=h(APP_NAME)?></a>
-    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Menüyü Aç">
-      <span class="navbar-toggler-icon"></span>
-    </button>
-    <div class="collapse navbar-collapse" id="mainNav">
-      <ul class="navbar-nav ms-auto mb-3 mb-lg-0 align-items-lg-center gap-lg-3">
-        <li class="nav-item"><a class="nav-link" href="#hakkimizda">Hakkımızda</a></li>
-        <li class="nav-item"><a class="nav-link" href="#nasil">Nasıl Çalışıyoruz</a></li>
-        <li class="nav-item"><a class="nav-link" href="#paketler">Paketler</a></li>
-        <li class="nav-item"><a class="nav-link" href="#sss">SSS</a></li>
-        <li class="nav-item"><a class="nav-link" href="<?=BASE_URL?>/public/partners.php">Anlaşmalı Şirketler</a></li>
-        <li class="nav-item"><a class="nav-link" href="#iletisim">İletişim</a></li>
-      </ul>
-      <div class="cta-bar ms-lg-4">
-        <a class="btn btn-outline-secondary rounded-pill px-4" href="<?=BASE_URL?>/dealer/apply.php">Bayi Ol</a>
-        <a class="btn btn-guest" href="<?=BASE_URL?>/dealer/login.php">Bayi Girişi</a>
-        <a class="btn btn-brand" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
-      </div>
-    </div>
-  </div>
-</nav>
+<?php site_public_header('home'); ?>
 
 <main class="container py-5">
   <section class="hero mb-5">

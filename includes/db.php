@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240609_03');
+  define('APP_SCHEMA_VERSION', '20240609_04');
 }
 
 function pdo(): PDO {
@@ -87,6 +87,10 @@ function install_schema(){
       'dealer_listing_packages',
       'dealer_listing_media',
       'listing_category_requests',
+      'event_wheel_entries',
+      'event_quiz_questions',
+      'event_quiz_answers',
+      'event_quiz_attempts',
     ];
     foreach ($criticalTables as $table) {
       if (!table_exists($table)) {
@@ -398,6 +402,60 @@ function install_schema(){
     updated_at DATETIME NULL,
     INDEX idx_listing_media_listing (listing_id, sort_order),
     FOREIGN KEY (listing_id) REFERENCES dealer_listings(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_wheel_entries(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    label VARCHAR(190) NOT NULL,
+    weight INT NOT NULL DEFAULT 1,
+    color VARCHAR(16) NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_wheel_event (event_id, is_active),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_quiz_questions(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    question TEXT NOT NULL,
+    status ENUM('draft','active','closed') NOT NULL DEFAULT 'draft',
+    reveal_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_quiz_event (event_id, status),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_quiz_answers(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT NOT NULL,
+    answer_text VARCHAR(255) NOT NULL,
+    is_correct TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_quiz_answers_question (question_id, sort_order),
+    FOREIGN KEY (question_id) REFERENCES event_quiz_questions(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_quiz_attempts(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT NOT NULL,
+    answer_id INT NULL,
+    profile_id INT NULL,
+    guest_name VARCHAR(190) NULL,
+    is_correct TINYINT(1) NOT NULL DEFAULT 0,
+    points INT NOT NULL DEFAULT 0,
+    answered_at DATETIME NOT NULL,
+    INDEX idx_quiz_attempt_question (question_id, profile_id),
+    INDEX idx_quiz_attempt_profile (profile_id),
+    UNIQUE KEY uniq_quiz_attempt (question_id, profile_id),
+    FOREIGN KEY (question_id) REFERENCES event_quiz_questions(id) ON DELETE CASCADE,
+    FOREIGN KEY (answer_id) REFERENCES event_quiz_answers(id) ON DELETE SET NULL,
+    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_topups(

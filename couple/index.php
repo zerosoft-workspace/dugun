@@ -178,6 +178,8 @@ body{
 }
 .portal-navbar .navbar-brand{ font-weight:700; letter-spacing:-.01em; color:var(--ink); }
 .portal-navbar .btn{ border-radius:999px; font-weight:600; padding:.35rem 1rem; }
+.portal-navbar .btn-active{ background:linear-gradient(135deg,var(--zs),#0b8b98); color:#fff; border:none; box-shadow:0 12px 30px -16px rgba(14,165,181,.35); }
+.portal-navbar .btn-active:hover{ color:#fff; filter:brightness(.97); }
 
 .portal-hero{ padding:42px 0 28px; }
 .portal-hero-card{
@@ -306,6 +308,7 @@ body{
   <div class="container py-3">
     <a class="navbar-brand fw-semibold" href="<?=h(BASE_URL)?>"><?=h(APP_NAME)?></a>
     <div class="d-flex align-items-center gap-2 gap-md-3">
+      <a class="btn btn-sm btn-outline-secondary" href="engage.php"><i class="bi bi-stars me-1"></i>Etkileşim Araçları</a>
       <a class="btn btn-sm btn-outline-secondary" href="list.php"><i class="bi bi-images me-1"></i>Yüklemeler</a>
       <a class="btn btn-sm btn-outline-secondary" href="logout.php"><i class="bi bi-box-arrow-right me-1"></i>Çıkış</a>
     </div>

@@ -56,6 +56,13 @@ $pageStyles = <<<'CSS'
     --surface:#ffffff;
   }
   body { background:#f3f4f6; font-family:'Inter',sans-serif; color:var(--ink); overflow-x:hidden; }
+  .cta-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .nav-link{font-weight:600;color:var(--muted)!important;}
+  .nav-link:hover,.nav-link.active{color:var(--brand)!important;}
+  .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:999px;padding:10px 24px;font-weight:700;}
+  .btn-brand:hover{background:var(--brand-dark);color:#fff;}
+  .btn-guest{border-radius:999px;border:1px solid rgba(14,165,181,0.3);color:var(--brand);font-weight:600;padding:10px 22px;background:rgba(14,165,181,0.08);}
+  .btn-guest:hover{color:#fff;background:var(--brand);border-color:var(--brand);}
   .page-shell { max-width:1240px; margin:0 auto; padding:40px 0 80px; }
   .breadcrumb-link { color:var(--brand-dark); text-decoration:none; font-weight:600; }
   .breadcrumb-link:hover { text-decoration:underline; }
@@ -149,6 +156,7 @@ CSS;
   <?=$pageStyles?>
 </head>
 <body>
+<?php site_public_header('partners'); ?>
   <div class="container page-shell">
     <a class="breadcrumb-link" href="<?=h(BASE_URL.'/public/partners.php')?>"><i class="bi bi-arrow-left"></i> Anlaşmalı şirketlere dön</a>
 
