@@ -235,7 +235,14 @@ function event_quiz_attempt_submit(int $eventId, int $questionId, int $answerId,
 
 function event_quiz_scoreboard(int $eventId, int $limit = 10): array {
   install_schema();
-  $sql = "SELECT gp.id AS profile_id, COALESCE(gp.display_name, gp.guest_name, gp.email, CONCAT('Misafir #', gp.id)) AS name,
+  $sql = "SELECT gp.id AS profile_id,
+                 COALESCE(
+                   NULLIF(TRIM(gp.display_name), ''),
+                   NULLIF(TRIM(gp.name), ''),
+                   NULLIF(TRIM(MAX(COALESCE(a.guest_name, ''))), ''),
+                   gp.email,
+                   CONCAT('Misafir #', gp.id)
+                 ) AS name,
                  SUM(a.points) AS total_points,
                  SUM(CASE WHEN a.is_correct=1 THEN 1 ELSE 0 END) AS correct_count,
                  MAX(a.answered_at) AS last_answered
@@ -243,7 +250,7 @@ function event_quiz_scoreboard(int $eventId, int $limit = 10): array {
           INNER JOIN guest_profiles gp ON gp.id = a.profile_id
           INNER JOIN event_quiz_questions q ON q.id = a.question_id
           WHERE gp.event_id = :event_id AND q.event_id = :event_id
-          GROUP BY gp.id
+          GROUP BY gp.id, gp.display_name, gp.name, gp.email
           HAVING total_points > 0
           ORDER BY total_points DESC, correct_count DESC, last_answered ASC
           LIMIT :limit";
