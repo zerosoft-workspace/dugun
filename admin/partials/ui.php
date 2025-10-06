@@ -8,7 +8,8 @@ if (!function_exists('admin_base_styles')) {
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
       @import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css');
 
-      :root {
+      :root[data-theme="light"],
+      :root:not([data-theme]) {
         --admin-brand:#0ea5b5;
         --admin-brand-dark:#0b8b98;
         --admin-ink:#0f172a;
@@ -175,7 +176,7 @@ if (!function_exists('admin_base_styles')) {
 
       .sidebar-toggle {
         border:none;
-        background:#fff;
+        background:var(--admin-surface);
         color:var(--admin-ink);
         border-radius:12px;
         width:46px;
@@ -187,7 +188,7 @@ if (!function_exists('admin_base_styles')) {
       }
 
       .toolbar-search {
-        background:#fff;
+        background:var(--admin-surface);
         border-radius:14px;
         padding:10px 16px;
         display:flex;
@@ -226,7 +227,7 @@ if (!function_exists('admin_base_styles')) {
         display:flex;
         align-items:center;
         gap:10px;
-        background:#fff;
+        background:var(--admin-surface);
         border-radius:999px;
         padding:8px 16px;
         font-size:.85rem;
@@ -238,7 +239,7 @@ if (!function_exists('admin_base_styles')) {
         display:flex;
         align-items:center;
         gap:12px;
-        background:#fff;
+        background:var(--admin-surface);
         border-radius:999px;
         padding:8px 14px 8px 8px;
         box-shadow:0 18px 40px -24px rgba(15,23,42,.45);
@@ -499,6 +500,35 @@ if (!function_exists('admin_base_styles')) {
         .toolbar-search {
           display:none;
         }
+      }
+
+      [data-theme="dark"] .sidebar-toggle,
+      [data-theme="dark"] .toolbar-search,
+      [data-theme="dark"] .toolbar-chip,
+      [data-theme="dark"] .toolbar-user {
+        background:rgba(15,23,42,.86);
+        color:var(--ink);
+        box-shadow:0 32px 74px -48px rgba(8,47,73,.65);
+      }
+
+      [data-theme="dark"] .toolbar-user span,
+      [data-theme="dark"] .toolbar-chip {
+        color:var(--muted);
+      }
+
+      [data-theme="dark"] .toolbar-user .avatar {
+        background:rgba(56,189,248,.32);
+        color:#04121f;
+      }
+
+      [data-theme="dark"] .toolbar-chip i,
+      [data-theme="dark"] .toolbar-user i {
+        color:#38bdf8;
+      }
+
+      [data-theme="dark"] .admin-hero-card {
+        background:linear-gradient(130deg,rgba(56,189,248,.25),rgba(15,23,42,.92));
+        box-shadow:0 48px 92px -48px rgba(8,47,73,.68);
       }
     </style>
 CSS;

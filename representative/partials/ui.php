@@ -8,7 +8,8 @@ if (!function_exists('representative_base_styles')) {
       @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
       @import url('https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css');
 
-      :root {
+      :root[data-theme="light"],
+      :root:not([data-theme]) {
         --rep-brand:#0ea5b5;
         --rep-brand-dark:#0b8b98;
         --rep-ink:#0f172a;
@@ -105,7 +106,7 @@ if (!function_exists('representative_base_styles')) {
       }
 
       .rep-nav-link.active {
-        background:#fff;
+        background:var(--rep-surface);
         color:var(--rep-ink);
         box-shadow:0 18px 40px -32px rgba(15,23,42,.6);
       }
@@ -238,7 +239,7 @@ if (!function_exists('representative_base_styles')) {
         display:flex;
         align-items:center;
         gap:.65rem;
-        background:#f1f5f9;
+        background:var(--surface-alt);
         border-radius:12px;
         padding:.35rem .75rem;
         border:1px solid rgba(148,163,184,.25);
@@ -265,7 +266,7 @@ if (!function_exists('representative_base_styles')) {
       }
 
       .rep-selector select option {
-        color:#0f172a;
+        color:var(--rep-ink);
       }
 
       .rep-selector-wrapper {
@@ -406,8 +407,44 @@ if (!function_exists('representative_base_styles')) {
           padding:1.6rem 1.4rem;
         }
       }
+      [data-theme="dark"] .rep-nav-link.active {
+        background:rgba(56,189,248,.18);
+        color:var(--rep-ink);
+        box-shadow:0 36px 70px -40px rgba(8,47,73,.7);
+      }
+
+      [data-theme="dark"] .rep-topbar,
+      [data-theme="dark"] .rep-footer {
+        background:var(--surface);
+        box-shadow:0 32px 70px -48px rgba(8,47,73,.65);
+        border-color:var(--outline);
+      }
+
+      [data-theme="dark"] .rep-user-card {
+        background:linear-gradient(160deg,rgba(56,189,248,.22),rgba(15,23,42,.9));
+        border-color:rgba(56,189,248,.28);
+      }
+
+      [data-theme="dark"] .rep-avatar {
+        background:rgba(56,189,248,.28);
+        color:#04121f;
+      }
+
+      [data-theme="dark"] .rep-selector {
+        background:rgba(15,23,42,.86);
+        border-color:var(--outline);
+      }
+
+      [data-theme="dark"] .rep-selector select option {
+        color:var(--rep-ink);
+      }
+
+      [data-theme="dark"] .rep-dealer-pill {
+        background:rgba(56,189,248,.18);
+        color:#e0f2fe;
+      }
     </style>
-    CSS;
+CSS;
   }
 
   function representative_layout_start(array $options = []): void {

@@ -6,12 +6,41 @@ if (!function_exists('theme_head_assets')) {
 <style>
   :root {
     color-scheme: light;
+    --ink:#0f172a;
+    --muted:#64748b;
+    --surface:#ffffff;
+    --surface-alt:#f8fafc;
+    --outline:#e2e8f0;
+    --shadow:0 18px 40px -28px rgba(15,23,42,.2);
+    --brand:#0ea5b5;
+    --brand-dark:#0b8b98;
+    --admin-bg:#eef2f9;
+    --admin-surface:#ffffff;
+    --admin-ink:#0f172a;
+    --admin-muted:#64748b;
+    --admin-sidebar:#0ea5b5;
+    --admin-sidebar-accent:#0b8b98;
+    --rep-bg:#eef2f9;
+    --rep-surface:#ffffff;
+    --rep-ink:#0f172a;
+    --rep-muted:#64748b;
+    --rep-sidebar:#0ea5b5;
+    --rep-sidebar-accent:#0b8b98;
+    --dealer-bg:#eef2f9;
+    --dealer-surface:#ffffff;
+    --dealer-ink:#0f172a;
+    --dealer-muted:#64748b;
+    --dealer-sidebar:#0ea5b5;
+    --dealer-sidebar-accent:#0b8b98;
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
     --ink:#e2e8f0;
     --muted:#94a3b8;
     --surface:#0f172a;
+    --surface-alt:#101a33;
+    --outline:rgba(148,163,184,.35);
+    --shadow:0 30px 70px -48px rgba(8,47,73,.6);
     --brand:#38bdf8;
     --brand-dark:#0ea5b5;
     --admin-bg:#020617;
@@ -51,18 +80,30 @@ if (!function_exists('theme_head_assets')) {
   .dealer-sidebar,
   .rep-app,
   .dealer-app,
-  .admin-app {
+  .admin-app,
+  .modal-content,
+  .offcanvas,
+  .dropdown-menu,
+  .list-group-item {
     transition:background-color .3s ease,color .3s ease,border-color .3s ease,box-shadow .3s ease;
+  }
+  body {
+    background:var(--surface-alt);
+    color:var(--ink);
   }
   [data-theme="dark"] body {
     background:#020617;
-    color:#e2e8f0;
+    color:var(--ink);
   }
   [data-theme="dark"] .hero,
   [data-theme="dark"] .hero-card {
     background:linear-gradient(135deg,rgba(14,165,181,.32),rgba(15,23,42,.92));
     color:#e2e8f0;
   }
+  [data-theme="dark"] .card,
+  [data-theme="dark"] .modal-content,
+  [data-theme="dark"] .dropdown-menu,
+  [data-theme="dark"] .offcanvas,
   [data-theme="dark"] .filter-card,
   [data-theme="dark"] .listing-card,
   [data-theme="dark"] .panel-card,
@@ -74,11 +115,12 @@ if (!function_exists('theme_head_assets')) {
   [data-theme="dark"] .rep-topbar,
   [data-theme="dark"] .rep-sidebar,
   [data-theme="dark"] .dealer-sidebar,
-  [data-theme="dark"] .admin-sidebar {
-    background:rgba(15,23,42,.88);
-    color:#e2e8f0;
-    border-color:rgba(148,163,184,.35) !important;
-    box-shadow:0 30px 70px -48px rgba(8,47,73,.6);
+  [data-theme="dark"] .admin-sidebar,
+  [data-theme="dark"] .list-group-item {
+    background:var(--surface);
+    color:var(--ink);
+    border-color:var(--outline) !important;
+    box-shadow:var(--shadow);
   }
   [data-theme="dark"] .listing-media.no-image {
     background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(14,165,181,.24));
@@ -106,7 +148,9 @@ if (!function_exists('theme_head_assets')) {
   [data-theme="dark"] .dealer-meta strong,
   [data-theme="dark"] .rep-sidebar-meta,
   [data-theme="dark"] .rep-topbar-info p,
-  [data-theme="dark"] .rep-dealer-pill {
+  [data-theme="dark"] .rep-dealer-pill,
+  [data-theme="dark"] .table td,
+  [data-theme="dark"] .table th {
     color:#cbd5f5 !important;
   }
   [data-theme="dark"] .contact-chip {
@@ -163,6 +207,40 @@ if (!function_exists('theme_head_assets')) {
   }
   [data-theme="dark"] .table tbody tr {
     --bs-table-bg:rgba(15,23,42,.9);
+  }
+  [data-theme="dark"] .table-striped>tbody>tr:nth-of-type(odd) {
+    --bs-table-bg:rgba(15,23,42,.82);
+  }
+  [data-theme="dark"] .form-control,
+  [data-theme="dark"] .form-select,
+  [data-theme="dark"] .form-control:focus,
+  [data-theme="dark"] .form-select:focus,
+  [data-theme="dark"] .input-group-text,
+  [data-theme="dark"] .form-check-input,
+  [data-theme="dark"] textarea {
+    background:rgba(15,23,42,.86);
+    color:var(--ink);
+    border-color:var(--outline);
+  }
+  [data-theme="dark"] .form-control::placeholder,
+  [data-theme="dark"] .form-select option,
+  [data-theme="dark"] textarea::placeholder {
+    color:var(--muted);
+  }
+  [data-theme="dark"] .form-check-input:checked {
+    background-color:#0ea5b5;
+    border-color:#0ea5b5;
+  }
+  [data-theme="dark"] .finance-summary .card {
+    background:linear-gradient(135deg,rgba(56,189,248,.22),rgba(15,23,42,.94));
+    box-shadow:0 30px 70px -48px rgba(8,47,73,.7);
+  }
+  [data-theme="dark"] .finance-card .card-header {
+    background:rgba(15,23,42,.72);
+    border-bottom:1px solid var(--outline);
+  }
+  [data-theme="dark"] .finance-card table tr+tr {
+    border-top:1px solid rgba(148,163,184,.25);
   }
   .theme-toggle {
     border:none;

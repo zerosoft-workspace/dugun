@@ -9,6 +9,7 @@ require_once __DIR__.'/../includes/finance.php';
 require_once __DIR__.'/partials/ui.php';
 
 require_admin();
+$admin = admin_user();
 install_schema();
 
 $action = $_POST['do'] ?? '';
@@ -111,8 +112,6 @@ if ($action === 'cashback_pay') {
   redirect($_SERVER['PHP_SELF'].'#cashbacks');
 }
 
-$admin = admin_user();
-
 $overview = finance_overview();
 $totals = $overview['totals'] ?? ['revenue_total' => 0, 'revenue_last_30' => 0, 'payout_total' => 0, 'payout_last_30' => 0, 'net_last_30' => 0];
 $topups = $overview['topups'] ?? [];
@@ -163,7 +162,7 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
     border: 0;
     border-radius: 18px;
     box-shadow: 0 18px 40px -28px rgba(15, 23, 42, .35);
-    background: linear-gradient(135deg, rgba(14,165,181,.12), #ffffff);
+    background: linear-gradient(135deg, rgba(14,165,181,.12), var(--admin-surface));
   }
   .finance-summary .card-title {
     text-transform: uppercase;
@@ -185,9 +184,10 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
     border: 1px solid rgba(15,23,42,.08);
     border-radius: 18px;
     box-shadow: 0 16px 42px -30px rgba(15,23,42,.35);
+    background: var(--admin-surface);
   }
   .finance-card .card-header {
-    background: #f8fafc;
+    background: var(--surface-alt);
     border-bottom: 1px solid rgba(15,23,42,.08);
   }
   .status-badge {
@@ -203,6 +203,11 @@ $subtitle = 'Gelirleri, giderleri ve ödeme onay süreçlerini tek ekrandan yön
   .status-badge.approved { background: #ccfbf1; color: #0f766e; }
   .status-badge.paid { background: #dcfce7; color: #166534; }
   .status-badge.rejected { background: #fee2e2; color: #b91c1c; }
+  [data-theme="dark"] .status-badge.pending { background: rgba(250,204,21,.16); color: #facc15; }
+  [data-theme="dark"] .status-badge.review { background: rgba(59,130,246,.16); color: #60a5fa; }
+  [data-theme="dark"] .status-badge.approved { background: rgba(34,197,94,.16); color: #4ade80; }
+  [data-theme="dark"] .status-badge.paid { background: rgba(16,185,129,.16); color: #5eead4; }
+  [data-theme="dark"] .status-badge.rejected { background: rgba(248,113,113,.16); color: #fca5a5; }
   .action-stack {
     display: flex;
     flex-direction: column;
