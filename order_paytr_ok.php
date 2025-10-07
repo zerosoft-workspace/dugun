@@ -30,6 +30,10 @@ try {
     'login_url'      => $result['event']['login_url'],
     'plain_password' => $result['event']['plain_password'],
     'customer_email' => $result['customer']['email'],
+    'addons'         => $result['addons'],
+    'base_price'     => (int)$result['order']['base_price_cents'],
+    'addons_total'   => (int)$result['order']['addons_total_cents'],
+    'order_total'    => (int)$result['order']['price_cents'],
   ];
   $_SESSION['current_order_id'] = $result['order']['id'];
   $_SESSION['current_order_oid'] = $merchantOid;

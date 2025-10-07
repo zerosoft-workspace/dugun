@@ -35,13 +35,12 @@ $_SESSION['lead_form'] = $formData;
 try {
   $created = site_create_customer_order($formData);
   $order = $created['order'];
-  $paytr = site_ensure_order_paytr_token($order['id']);
 } catch (Throwable $e) {
   flash('err', $e->getMessage());
   redirect('index.php#lead-form');
 }
 
-$_SESSION['current_order_id'] = $paytr['order']['id'];
-$_SESSION['current_order_oid'] = $paytr['merchant_oid'];
+$_SESSION['current_order_id'] = $order['id'];
+$_SESSION['order_addons_open'] = true;
 
-redirect('order_paytr.php?order_id='.(int)$paytr['order']['id']);
+redirect('order_extras.php');

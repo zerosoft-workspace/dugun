@@ -31,6 +31,10 @@ try {
       'login_url'      => $result['event']['login_url'],
       'plain_password' => $result['event']['plain_password'],
       'customer_email' => $result['customer']['email'],
+      'addons'         => $result['addons'],
+      'base_price'     => (int)$result['order']['base_price_cents'],
+      'addons_total'   => (int)$result['order']['addons_total_cents'],
+      'order_total'    => (int)$result['order']['price_cents'],
     ];
     redirect('order_thanks.php');
   }
@@ -48,6 +52,10 @@ try {
       'login_url'      => $result['event']['login_url'],
       'plain_password' => $result['event']['plain_password'],
       'customer_email' => $result['customer']['email'],
+      'addons'         => $result['addons'],
+      'base_price'     => (int)$result['order']['base_price_cents'],
+      'addons_total'   => (int)$result['order']['addons_total_cents'],
+      'order_total'    => (int)$result['order']['price_cents'],
     ];
     redirect('order_thanks.php');
   }
@@ -87,6 +95,9 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
       <div class="text-lg-end">
         <div class="price mb-1"><?=h(format_currency((int)$order['price_cents']))?></div>
         <div class="text-muted small">Paket: <?=h($package['name'])?></div>
+        <?php if (!empty($order['addons'])): ?>
+          <div class="text-muted small">Ek Hizmetler: <?=count($order['addons'])?> adet</div>
+        <?php endif; ?>
       </div>
     </div>
 
@@ -108,7 +119,7 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
         <div class="summary-card mb-4">
           <h5 class="fw-semibold mb-3">Sipariş Özeti</h5>
           <ul class="list-unstyled small text-muted mb-0">
-            <li class="mb-2"><strong>Paket:</strong> <?=h($package['name'])?></li>
+            <li class="mb-2"><strong>Paket:</strong> <?=h($package['name'])?> <span class="ms-2 badge bg-info-subtle text-info-emphasis"><?=h(format_currency((int)$order['base_price_cents']))?></span></li>
             <li class="mb-2"><strong>Ad Soyad:</strong> <?=h($order['customer_name'])?></li>
             <li class="mb-2"><strong>E-posta:</strong> <?=h($order['customer_email'])?></li>
             <?php if (!empty($order['customer_phone'])): ?>
@@ -117,6 +128,19 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
             <li class="mb-2"><strong>Etkinlik:</strong> <?=h($order['event_title'])?></li>
             <?php if (!empty($order['event_date'])): ?>
               <li><strong>Tarih:</strong> <?=h(date('d.m.Y', strtotime($order['event_date'])))?></li>
+            <?php endif; ?>
+            <?php if (!empty($order['addons'])): ?>
+              <li class="mt-3"><strong>Seçilen Ek Hizmetler</strong></li>
+              <ul class="small ps-3 mb-2">
+                <?php foreach ($order['addons'] as $addonLine): ?>
+                  <li class="d-flex justify-content-between">
+                    <span><?=h($addonLine['addon_name'])?> × <?= (int)$addonLine['quantity'] ?></span>
+                    <span><?=h(format_currency((int)$addonLine['total_cents']))?></span>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+              <li><strong>Ek Hizmet Toplamı:</strong> <?=h(format_currency((int)$order['addons_total_cents']))?></li>
+              <li class="fw-semibold"><strong>Genel Toplam:</strong> <?=h(format_currency((int)$order['price_cents']))?></li>
             <?php endif; ?>
           </ul>
         </div>

@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240609_04');
+  define('APP_SCHEMA_VERSION', '20240615_01');
 }
 
 function pdo(): PDO {
@@ -824,6 +824,8 @@ function install_schema(){
     paytr_token VARCHAR(64) NULL,
     paytr_reference VARCHAR(64) NULL,
     price_cents INT NOT NULL DEFAULT 0,
+    base_price_cents INT NOT NULL DEFAULT 0,
+    addons_total_cents INT NOT NULL DEFAULT 0,
     cashback_cents INT NOT NULL DEFAULT 0,
     paid_at DATETIME NULL,
     meta_json $jsonMeta NULL,
@@ -848,6 +850,13 @@ function install_schema(){
   if (!column_exists('site_orders', 'paid_at')) {
     pdo()->exec("ALTER TABLE site_orders ADD paid_at DATETIME NULL AFTER cashback_cents");
   }
+  if (!column_exists('site_orders', 'base_price_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD base_price_cents INT NOT NULL DEFAULT 0 AFTER price_cents");
+    pdo()->exec("UPDATE site_orders SET base_price_cents = price_cents WHERE base_price_cents = 0");
+  }
+  if (!column_exists('site_orders', 'addons_total_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD addons_total_cents INT NOT NULL DEFAULT 0 AFTER base_price_cents");
+  }
   if (!column_exists('site_orders', 'payload_json')) {
     pdo()->exec("ALTER TABLE site_orders ADD payload_json $jsonMeta NULL AFTER meta_json");
   }
@@ -859,6 +868,38 @@ function install_schema(){
   } catch (Throwable $e) {
     // index already exists
   }
+
+  /* sipariş ek hizmet kataloğu */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS site_addons(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(190) NOT NULL,
+    slug VARCHAR(190) NOT NULL UNIQUE,
+    description TEXT NULL,
+    category VARCHAR(120) NULL,
+    price_cents INT NOT NULL DEFAULT 0,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    display_order INT NOT NULL DEFAULT 0,
+    meta_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* sipariş ek hizmet seçimleri */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS site_order_addons(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    addon_id INT NOT NULL,
+    addon_name VARCHAR(190) NOT NULL,
+    addon_description TEXT NULL,
+    price_cents INT NOT NULL DEFAULT 0,
+    quantity INT NOT NULL DEFAULT 1,
+    total_cents INT NOT NULL DEFAULT 0,
+    meta_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES site_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (addon_id) REFERENCES site_addons(id) ON DELETE RESTRICT,
+    INDEX idx_site_order_addons_order (order_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* uploads */
   pdo()->exec("CREATE TABLE IF NOT EXISTS uploads(

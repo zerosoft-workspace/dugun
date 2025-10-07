@@ -6,6 +6,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/db.php';
 require_once __DIR__.'/functions.php';
 require_once __DIR__.'/dealers.php';
+require_once __DIR__.'/addons.php';
 
 if (!defined('SITE_ORDER_STATUS_PENDING')) {
   define('SITE_ORDER_STATUS_PENDING', 'pending_payment');
@@ -403,6 +404,11 @@ function site_order_normalize_row(?array $row): ?array {
   $row['dealer_id'] = $row['dealer_id'] !== null ? (int)$row['dealer_id'] : null;
   $row['event_id'] = $row['event_id'] !== null ? (int)$row['event_id'] : null;
   $row['price_cents'] = (int)$row['price_cents'];
+  $row['base_price_cents'] = isset($row['base_price_cents']) ? (int)$row['base_price_cents'] : $row['price_cents'];
+  if ($row['base_price_cents'] === 0 && $row['price_cents'] > 0) {
+    $row['base_price_cents'] = $row['price_cents'];
+  }
+  $row['addons_total_cents'] = isset($row['addons_total_cents']) ? (int)$row['addons_total_cents'] : 0;
   $row['cashback_cents'] = (int)$row['cashback_cents'];
   $row['meta'] = !empty($row['meta_json']) ? (safe_json_decode($row['meta_json']) ?: []) : [];
   $row['payload'] = !empty($row['payload_json']) ? (safe_json_decode($row['payload_json']) ?: []) : [];
@@ -478,14 +484,15 @@ function site_create_customer_order(array $input): array {
 
   $pdo = pdo();
   $now = now();
-  $price = (int)$package['price_cents'];
+  $basePrice = (int)$package['price_cents'];
+  $price = $basePrice;
   $cashbackRate = $dealer ? max(0, (float)$package['cashback_rate']) : 0.0;
   $cashbackCents = $dealer ? (int)round($price * $cashbackRate) : 0;
   $meta = array_filter([
     'notes' => $notes !== '' ? $notes : null,
   ]);
   $pdo->prepare(
-    "INSERT INTO site_orders (package_id, dealer_id, customer_name, customer_email, customer_phone, event_title, event_date, referral_code, status, price_cents, cashback_cents, meta_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "INSERT INTO site_orders (package_id, dealer_id, customer_name, customer_email, customer_phone, event_title, event_date, referral_code, status, price_cents, base_price_cents, addons_total_cents, cashback_cents, meta_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
   )->execute([
     $packageId,
     $dealer ? (int)$dealer['id'] : null,
@@ -497,6 +504,8 @@ function site_create_customer_order(array $input): array {
     $referral !== '' ? $referral : null,
     SITE_ORDER_STATUS_PENDING,
     $price,
+    $basePrice,
+    0,
     $cashbackCents,
     $meta ? safe_json_encode($meta) : null,
     $now,
@@ -557,7 +566,15 @@ function site_ensure_order_paytr_token(int $order_id): array {
     $ip = '1.2.3.4';
   }
 
+  $addons = site_order_addons_list($order['id']);
+  $addonsTotal = 0;
+  foreach ($addons as $addonLine) {
+    $addonsTotal += (int)$addonLine['total_cents'];
+  }
   $amount_cents = max(0, (int)$order['price_cents']);
+  if ($amount_cents === 0) {
+    $amount_cents = max(0, (int)$order['base_price_cents'] + $addonsTotal);
+  }
   if ($amount_cents <= 0) {
     throw new RuntimeException('Ödeme tutarı geçersiz.');
   }
@@ -567,6 +584,18 @@ function site_ensure_order_paytr_token(int $order_id): array {
     number_format($amount_cents / 100, 2, '.', ''),
     1,
   ]];
+  if ($addons) {
+    $basket[0][1] = number_format($order['base_price_cents'] / 100, 2, '.', '');
+    foreach ($addons as $addonLine) {
+      $basket[] = [
+        $addonLine['addon_name'],
+        number_format($addonLine['price_cents'] / 100, 2, '.', ''),
+        max(1, (int)$addonLine['quantity']),
+      ];
+    }
+    $amount_cents = max(0, (int)$order['base_price_cents'] + $addonsTotal);
+  }
+  $order['price_cents'] = $amount_cents;
   $user_basket = base64_encode(json_encode($basket, JSON_UNESCAPED_UNICODE));
 
   $merchantOid = $order['merchant_oid'] ?: site_generate_order_oid($order['id']);
@@ -676,6 +705,7 @@ function site_ensure_order_paytr_token(int $order_id): array {
       ]);
 
   $order = site_get_order($order['id']);
+  $order['addons'] = $addons;
 
   return [
     'order' => $order,
@@ -888,6 +918,9 @@ function site_finalize_order(int $order_id, array $options = []): array {
 
   $pdo->commit();
 
+  $addons = site_order_addons_list($order['id']);
+  $order['addons'] = $addons;
+
   $eventMeta = [
     'id' => $eventSummary['id'],
     'title' => $order['event_title'],
@@ -910,6 +943,7 @@ function site_finalize_order(int $order_id, array $options = []): array {
       'email' => $order['customer_email'],
       'phone' => $order['customer_phone'] ?? '',
     ],
+    'addons' => $addons,
     'cashback_cents' => (int)$order['cashback_cents'],
     'just_created' => $justCreated,
   ];
