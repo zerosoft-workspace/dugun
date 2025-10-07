@@ -75,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title><?=h(APP_NAME)?> — Bayi Başvurusu</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <?=login_header_styles()?>
   <style>
+    <?=login_header_styles()?>
     :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#5b6678; }
     *{box-sizing:border-box;}
     body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#e0f7fb 0%,#f8fafc 55%,#fff);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
