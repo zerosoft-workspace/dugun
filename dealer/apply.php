@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealers.php';
+require_once __DIR__.'/../includes/public_header.php';
 
 install_schema();
 
@@ -76,7 +77,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <style>
     :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#5b6678; }
     *{box-sizing:border-box;}
-    body{margin:0;min-height:100vh;padding:2.5rem;background:radial-gradient(circle at top,#e0f7fb 0%,#f8fafc 55%,#fff);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);display:flex;align-items:center;justify-content:center;}
+    body{margin:0;min-height:100vh;background:radial-gradient(circle at top,#e0f7fb 0%,#f8fafc 55%,#fff);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    .apply-main{min-height:calc(100vh - 86px);display:flex;align-items:center;justify-content:center;padding:5rem 2.5rem;}
     .apply-shell{width:100%;max-width:1200px;background:#fff;border-radius:32px;border:1px solid rgba(148,163,184,.18);box-shadow:0 50px 140px -65px rgba(15,23,42,.55);display:flex;overflow:hidden;}
     .apply-visual{flex:1.1;position:relative;padding:3rem 3.4rem;background:linear-gradient(145deg,rgba(14,165,181,.9),rgba(14,116,144,.85)),url('https://images.unsplash.com/photo-1526948128573-703ee1aeb6fa?auto=format&fit=crop&w=1200&q=80') center/cover;color:#fff;display:flex;flex-direction:column;justify-content:space-between;}
     .apply-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(155deg,rgba(15,23,42,.18),rgba(15,23,42,.5));}
@@ -108,11 +110,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     .success-card a{align-self:flex-start;font-weight:700;color:var(--brand);text-decoration:none;}
     .success-card a:hover{text-decoration:underline;color:var(--brand-dark);}
     .contact-hint{font-size:.9rem;color:var(--muted);} 
-    @media(max-width:992px){body{padding:1.5rem;} .apply-shell{flex-direction:column;} .apply-visual{padding:2.6rem;} .apply-form{padding:2.4rem;}}
-    @media(max-width:576px){.apply-form{padding:2rem;} .visual-title{font-size:1.8rem;}}
+    @media(max-width:992px){.apply-main{padding:4rem 1.5rem;} .apply-shell{flex-direction:column;} .apply-visual{padding:2.6rem;} .apply-form{padding:2.4rem;}}
+    @media(max-width:576px){.apply-main{padding:3.5rem 1.25rem;} .apply-form{padding:2rem;} .visual-title{font-size:1.8rem;}}
   </style>
 </head>
 <body>
+  <?php site_public_header(); ?>
+  <main class="apply-main">
   <div class="apply-shell">
     <aside class="apply-visual">
       <div>
@@ -207,5 +211,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?php endif; ?>
     </section>
   </div>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
