@@ -4,6 +4,32 @@ require_once __DIR__.'/db.php';
 require_once __DIR__.'/functions.php';
 require_once __DIR__.'/order_helpers.php';
 
+install_schema();
+
+function site_campaign_tables_ready(): bool {
+  static $catalogReady = null;
+  if ($catalogReady === null) {
+    try {
+      $catalogReady = table_exists('site_campaigns');
+    } catch (Throwable $e) {
+      $catalogReady = false;
+    }
+  }
+  return $catalogReady;
+}
+
+function site_campaign_order_table_ready(): bool {
+  static $orderReady = null;
+  if ($orderReady === null) {
+    try {
+      $orderReady = table_exists('site_order_campaigns');
+    } catch (Throwable $e) {
+      $orderReady = false;
+    }
+  }
+  return $orderReady;
+}
+
 function site_campaign_upload_dir(): string {
   $dir = __DIR__.'/../uploads/campaigns';
   if (!is_dir($dir)) {
@@ -85,6 +111,9 @@ function site_campaign_normalize(array $row): array {
 }
 
 function site_campaign_all(bool $onlyActive = true): array {
+  if (!site_campaign_tables_ready()) {
+    return [];
+  }
   $sql = 'SELECT * FROM site_campaigns';
   $conds = [];
   if ($onlyActive) {
@@ -94,15 +123,26 @@ function site_campaign_all(bool $onlyActive = true): array {
     $sql .= ' WHERE '.implode(' AND ', $conds);
   }
   $sql .= ' ORDER BY display_order ASC, name ASC';
-  $st = pdo()->query($sql);
-  $rows = $st->fetchAll();
+  try {
+    $st = pdo()->query($sql);
+    $rows = $st->fetchAll();
+  } catch (Throwable $e) {
+    return [];
+  }
   return array_map('site_campaign_normalize', $rows ?: []);
 }
 
 function site_campaign_get(int $id): ?array {
-  $st = pdo()->prepare('SELECT * FROM site_campaigns WHERE id=? LIMIT 1');
-  $st->execute([$id]);
-  $row = $st->fetch();
+  if (!site_campaign_tables_ready()) {
+    return null;
+  }
+  try {
+    $st = pdo()->prepare('SELECT * FROM site_campaigns WHERE id=? LIMIT 1');
+    $st->execute([$id]);
+    $row = $st->fetch();
+  } catch (Throwable $e) {
+    return null;
+  }
   return $row ? site_campaign_normalize($row) : null;
 }
 
@@ -111,9 +151,16 @@ function site_campaign_find_by_slug(string $slug): ?array {
   if ($slug === '') {
     return null;
   }
-  $st = pdo()->prepare('SELECT * FROM site_campaigns WHERE slug=? LIMIT 1');
-  $st->execute([$slug]);
-  $row = $st->fetch();
+  if (!site_campaign_tables_ready()) {
+    return null;
+  }
+  try {
+    $st = pdo()->prepare('SELECT * FROM site_campaigns WHERE slug=? LIMIT 1');
+    $st->execute([$slug]);
+    $row = $st->fetch();
+  } catch (Throwable $e) {
+    return null;
+  }
   return $row ? site_campaign_normalize($row) : null;
 }
 
@@ -138,6 +185,10 @@ function site_campaign_save(array $input, ?int $id = null): int {
   $imagePath = trim($input['image_path'] ?? '');
   $displayOrder = isset($input['display_order']) ? (int)$input['display_order'] : 0;
   $isActive = !empty($input['is_active']) ? 1 : 0;
+
+  if (!site_campaign_tables_ready()) {
+    throw new RuntimeException('Kampanya tabloları oluşturulamadı. Lütfen daha sonra tekrar deneyin.');
+  }
 
   $pdo = pdo();
   $now = now();
@@ -180,6 +231,9 @@ function site_campaign_save(array $input, ?int $id = null): int {
 }
 
 function site_campaign_delete(int $id): void {
+  if (!site_campaign_tables_ready()) {
+    return;
+  }
   $campaign = site_campaign_get($id);
   if (!$campaign) {
     return;
@@ -195,6 +249,9 @@ function site_campaign_delete(int $id): void {
 }
 
 function site_order_campaigns_list(int $orderId): array {
+  if (!site_campaign_order_table_ready()) {
+    return [];
+  }
   try {
     $st = pdo()->prepare('SELECT * FROM site_order_campaigns WHERE order_id=? ORDER BY id ASC');
     $st->execute([$orderId]);
@@ -231,6 +288,12 @@ function site_order_campaigns_list(int $orderId): array {
 }
 
 function site_order_sync_campaigns(int $orderId, array $selectedCampaigns): void {
+  if (!site_campaign_order_table_ready()) {
+    return;
+  }
+  if (!site_campaign_tables_ready()) {
+    return;
+  }
   $pdo = pdo();
   $pdo->beginTransaction();
 
@@ -279,6 +342,9 @@ function site_order_sync_campaigns(int $orderId, array $selectedCampaigns): void
 }
 
 function site_order_campaigns_total(int $orderId): int {
+  if (!site_campaign_order_table_ready()) {
+    return 0;
+  }
   try {
     $st = pdo()->prepare('SELECT COALESCE(SUM(total_cents),0) FROM site_order_campaigns WHERE order_id=?');
     $st->execute([$orderId]);
