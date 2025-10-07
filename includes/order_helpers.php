@@ -33,12 +33,20 @@ function site_order_recalculate_totals(int $orderId, ?int $addonsTotal = null, ?
   $basePrice = max(0, (int)($row['base_price_cents'] ?? 0));
   $price = $basePrice + $addonsTotal + $campaignsTotal;
 
-  $sql = 'UPDATE site_orders SET addons_total_cents=?, campaigns_total_cents=?, price_cents=?, updated_at=? WHERE id=?';
-  $pdo->prepare($sql)->execute([
-    $addonsTotal,
-    $campaignsTotal,
-    $price,
-    now(),
-    $orderId,
-  ]);
+  $set = ['addons_total_cents=?'];
+  $params = [$addonsTotal];
+
+  if (ensure_site_orders_campaigns_column()) {
+    $set[] = 'campaigns_total_cents=?';
+    $params[] = $campaignsTotal;
+  }
+
+  $set[] = 'price_cents=?';
+  $params[] = $price;
+  $set[] = 'updated_at=?';
+  $params[] = now();
+  $params[] = $orderId;
+
+  $sql = 'UPDATE site_orders SET '.implode(', ', $set).' WHERE id=?';
+  $pdo->prepare($sql)->execute($params);
 }

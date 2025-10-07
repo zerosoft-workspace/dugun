@@ -26,6 +26,29 @@ function table_exists(string $t): bool {
   $st->execute([$t]);
   return (bool)$st->fetchColumn();
 }
+
+function ensure_site_orders_campaigns_column(): bool {
+  static $cached = null;
+  if ($cached !== null) {
+    return $cached;
+  }
+
+  try {
+    if (!table_exists('site_orders')) {
+      return false;
+    }
+
+    if (!column_exists('site_orders', 'campaigns_total_cents')) {
+      pdo()->exec("ALTER TABLE site_orders ADD campaigns_total_cents INT NOT NULL DEFAULT 0 AFTER addons_total_cents");
+    }
+
+    $cached = column_exists('site_orders', 'campaigns_total_cents');
+  } catch (Throwable $e) {
+    $cached = false;
+  }
+
+  return $cached;
+}
 function supports_json(): bool { try{pdo()->query("SELECT JSON_VALID('[]')");return true;}catch(Throwable){return false;} }
 
 function ensure_schema_patches(PDO $pdo): void {

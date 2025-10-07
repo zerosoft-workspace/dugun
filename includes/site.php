@@ -493,27 +493,35 @@ function site_create_customer_order(array $input): array {
   $meta = array_filter([
     'notes' => $notes !== '' ? $notes : null,
   ]);
-  $pdo->prepare(
-    "INSERT INTO site_orders (package_id, dealer_id, customer_name, customer_email, customer_phone, event_title, event_date, referral_code, status, price_cents, base_price_cents, addons_total_cents, campaigns_total_cents, cashback_cents, meta_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
-  )->execute([
-    $packageId,
-    $dealer ? (int)$dealer['id'] : null,
-    $customerName,
-    $customerEmail,
-    $customerPhone !== '' ? $customerPhone : null,
-    $eventTitle,
-    site_normalize_event_date($eventDate),
-    $referral !== '' ? $referral : null,
-    SITE_ORDER_STATUS_PENDING,
-    $price,
-    $basePrice,
-    0,
-    0,
-    $cashbackCents,
-    $meta ? safe_json_encode($meta) : null,
-    $now,
-    $now,
+  $columns = [
+    'package_id' => $packageId,
+    'dealer_id' => $dealer ? (int)$dealer['id'] : null,
+    'customer_name' => $customerName,
+    'customer_email' => $customerEmail,
+    'customer_phone' => $customerPhone !== '' ? $customerPhone : null,
+    'event_title' => $eventTitle,
+    'event_date' => site_normalize_event_date($eventDate),
+    'referral_code' => $referral !== '' ? $referral : null,
+    'status' => SITE_ORDER_STATUS_PENDING,
+    'price_cents' => $price,
+    'base_price_cents' => $basePrice,
+    'addons_total_cents' => 0,
+  ];
+
+  if (ensure_site_orders_campaigns_column()) {
+    $columns['campaigns_total_cents'] = 0;
+  }
+
+  $columns = array_merge($columns, [
+    'cashback_cents' => $cashbackCents,
+    'meta_json' => $meta ? safe_json_encode($meta) : null,
+    'created_at' => $now,
+    'updated_at' => $now,
   ]);
+
+  $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+  $sql = 'INSERT INTO site_orders ('.implode(', ', array_keys($columns)).') VALUES ('.$placeholders.')';
+  $pdo->prepare($sql)->execute(array_values($columns));
 
   $orderId = (int)$pdo->lastInsertId();
   $order = site_get_order($orderId);
