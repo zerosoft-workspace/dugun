@@ -25,11 +25,15 @@ function site_public_header(string $active = 'home'): void {
     echo '<li class="nav-item"><a class="'.$class.'" href="'.h($link['url']).'">'.h($link['label']).'</a></li>';
   }
   echo '</ul>';
-  echo '<div class="cta-bar ms-lg-4">';
+  echo '<div class="cta-bar ms-lg-4 d-flex flex-column flex-lg-row align-items-lg-center gap-2">';
   echo '<a class="btn btn-outline-secondary rounded-pill px-4" href="'.h(BASE_URL).'/dealer/apply.php">Bayi Ol</a>';
-  echo '<a class="btn btn-guest" href="'.h(BASE_URL).'/dealer/login.php">Bayi Girişi</a>';
-  echo '<a class="btn btn-outline-secondary rounded-pill px-4" href="'.h(BASE_URL).'/representative/login.php">Temsilci Girişi</a>';
-  echo '<a class="btn btn-brand" href="'.h(BASE_URL).'/public/guest_login.php">Misafir Girişi</a>';
+  echo '<div class="dropdown">';
+  echo '<button class="btn btn-brand dropdown-toggle px-4" type="button" id="loginDropdown" data-bs-toggle="dropdown" aria-expanded="false">Giriş Yap</button>';
+  echo '<ul class="dropdown-menu dropdown-menu-end shadow-sm rounded-4" aria-labelledby="loginDropdown">';
+  echo '<li><a class="dropdown-item" href="'.h(BASE_URL).'/portal/login.php?tab=dealer">Bayi &amp; Temsilci Girişi</a></li>';
+  echo '<li><a class="dropdown-item" href="'.h(BASE_URL).'/public/guest_login.php">Etkinlik &amp; Davetli Girişi</a></li>';
+  echo '</ul>';
+  echo '</div>';
   echo '</div>';
   echo '</div>';
   echo '</div>';
