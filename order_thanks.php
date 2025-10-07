@@ -42,7 +42,8 @@ unset($_SESSION['lead_success'], $_SESSION['order_summary']);
           <?php if (!empty($summary['plain_password'])): ?>
             <li class="mt-2"><strong>Geçici şifre:</strong> <?=h($summary['plain_password'])?> <span class="badge bg-warning-subtle text-warning-emphasis ms-2">İlk girişte değiştirin</span></li>
           <?php endif; ?>
-          <?php if (!empty($summary['addons'])): ?>
+          <?php $hasAddons = !empty($summary['addons']); $hasCampaigns = !empty($summary['campaigns']); ?>
+          <?php if ($hasAddons): ?>
             <li class="mt-3"><strong>Satın Alınan Ek Hizmetler</strong></li>
             <ul class="small ps-3 mb-2">
               <?php foreach ($summary['addons'] as $addon): ?>
@@ -52,9 +53,25 @@ unset($_SESSION['lead_success'], $_SESSION['order_summary']);
                 </li>
               <?php endforeach; ?>
             </ul>
-            <li><strong>Ek Hizmet Toplamı:</strong> <?=h(format_currency((int)$summary['addons_total']))?></li>
-            <li><strong>Genel Toplam:</strong> <?=h(format_currency((int)$summary['order_total']))?></li>
           <?php endif; ?>
+          <?php if ($hasCampaigns): ?>
+            <li class="<?= $hasAddons ? 'mt-2' : 'mt-3'?>"><strong>Desteklediğiniz Hayır Kampanyaları</strong></li>
+            <ul class="small ps-3 mb-2">
+              <?php foreach ($summary['campaigns'] as $campaign): ?>
+                <li class="d-flex justify-content-between">
+                  <span><?=h($campaign['campaign_name'])?> × <?= (int)$campaign['quantity'] ?></span>
+                  <span><?=h(format_currency((int)$campaign['total_cents']))?></span>
+                </li>
+              <?php endforeach; ?>
+            </ul>
+          <?php endif; ?>
+          <?php if ($hasAddons): ?>
+            <li><strong>Ek Hizmet Toplamı:</strong> <?=h(format_currency((int)$summary['addons_total']))?></li>
+          <?php endif; ?>
+          <?php if ($hasCampaigns): ?>
+            <li><strong>Hayır Kampanyası Toplamı:</strong> <?=h(format_currency((int)($summary['campaigns_total'] ?? 0)))?></li>
+          <?php endif; ?>
+          <li><strong>Genel Toplam:</strong> <?=h(format_currency((int)$summary['order_total']))?></li>
         </ul>
         <div class="d-flex flex-wrap gap-2">
           <a class="btn btn-outline-info" href="<?=h($summary['upload_url'])?>" target="_blank" rel="noopener">Misafir Sayfasını Aç</a>

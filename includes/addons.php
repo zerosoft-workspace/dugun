@@ -2,6 +2,7 @@
 require_once __DIR__.'/../config.php';
 require_once __DIR__.'/db.php';
 require_once __DIR__.'/functions.php';
+require_once __DIR__.'/order_helpers.php';
 
 function site_addon_normalize(array $row): array {
   $row['id'] = (int)$row['id'];
@@ -174,8 +175,7 @@ function site_order_sync_addons(int $orderId, array $selectedAddons): void {
         ]);
   }
 
-  $pdo->prepare('UPDATE site_orders SET addons_total_cents=?, price_cents=base_price_cents + ?, updated_at=? WHERE id=?')
-      ->execute([$total, $total, $now, $orderId]);
+  site_order_recalculate_totals($orderId, $total, null);
 
   $pdo->commit();
 }

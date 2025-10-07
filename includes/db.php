@@ -826,6 +826,7 @@ function install_schema(){
     price_cents INT NOT NULL DEFAULT 0,
     base_price_cents INT NOT NULL DEFAULT 0,
     addons_total_cents INT NOT NULL DEFAULT 0,
+    campaigns_total_cents INT NOT NULL DEFAULT 0,
     cashback_cents INT NOT NULL DEFAULT 0,
     paid_at DATETIME NULL,
     meta_json $jsonMeta NULL,
@@ -857,6 +858,9 @@ function install_schema(){
   if (!column_exists('site_orders', 'addons_total_cents')) {
     pdo()->exec("ALTER TABLE site_orders ADD addons_total_cents INT NOT NULL DEFAULT 0 AFTER base_price_cents");
   }
+  if (!column_exists('site_orders', 'campaigns_total_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD campaigns_total_cents INT NOT NULL DEFAULT 0 AFTER addons_total_cents");
+  }
   if (!column_exists('site_orders', 'payload_json')) {
     pdo()->exec("ALTER TABLE site_orders ADD payload_json $jsonMeta NULL AFTER meta_json");
   }
@@ -884,6 +888,21 @@ function install_schema(){
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+  /* hayır kampanyası kataloğu */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS site_campaigns(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(190) NOT NULL,
+    slug VARCHAR(190) NOT NULL UNIQUE,
+    summary TEXT NULL,
+    detail LONGTEXT NULL,
+    price_cents INT NOT NULL DEFAULT 0,
+    image_path VARCHAR(255) NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    display_order INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
   /* sipariş ek hizmet seçimleri */
   pdo()->exec("CREATE TABLE IF NOT EXISTS site_order_addons(
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -899,6 +918,23 @@ function install_schema(){
     FOREIGN KEY (order_id) REFERENCES site_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (addon_id) REFERENCES site_addons(id) ON DELETE RESTRICT,
     INDEX idx_site_order_addons_order (order_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* sipariş kampanya seçimleri */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS site_order_campaigns(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    campaign_id INT NOT NULL,
+    campaign_name VARCHAR(190) NOT NULL,
+    campaign_summary TEXT NULL,
+    price_cents INT NOT NULL DEFAULT 0,
+    quantity INT NOT NULL DEFAULT 1,
+    total_cents INT NOT NULL DEFAULT 0,
+    meta_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES site_orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (campaign_id) REFERENCES site_campaigns(id) ON DELETE RESTRICT,
+    INDEX idx_site_order_campaigns_order (order_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* uploads */

@@ -25,16 +25,18 @@ try {
     $result = site_finalize_order($order['id']);
     $_SESSION['lead_success'] = 'Ödemeniz alınmış, etkinliğiniz oluşturulmuş durumda.';
     $_SESSION['order_summary'] = [
-      'event_title'    => $result['event']['title'],
-      'upload_url'     => $result['event']['upload_url'],
-      'qr_image'       => $result['event']['qr_image_url'],
-      'login_url'      => $result['event']['login_url'],
-      'plain_password' => $result['event']['plain_password'],
-      'customer_email' => $result['customer']['email'],
-      'addons'         => $result['addons'],
-      'base_price'     => (int)$result['order']['base_price_cents'],
-      'addons_total'   => (int)$result['order']['addons_total_cents'],
-      'order_total'    => (int)$result['order']['price_cents'],
+      'event_title'      => $result['event']['title'],
+      'upload_url'       => $result['event']['upload_url'],
+      'qr_image'         => $result['event']['qr_image_url'],
+      'login_url'        => $result['event']['login_url'],
+      'plain_password'   => $result['event']['plain_password'],
+      'customer_email'   => $result['customer']['email'],
+      'addons'           => $result['addons'],
+      'campaigns'        => $result['campaigns'] ?? [],
+      'base_price'       => (int)$result['order']['base_price_cents'],
+      'addons_total'     => (int)$result['order']['addons_total_cents'],
+      'campaigns_total'  => (int)($result['order']['campaigns_total_cents'] ?? 0),
+      'order_total'      => (int)$result['order']['price_cents'],
     ];
     redirect('order_thanks.php');
   }
@@ -46,16 +48,18 @@ try {
     $result = $paytr['result'];
     $_SESSION['lead_success'] = 'Test modunda ödeme başarıyla işlendi.';
     $_SESSION['order_summary'] = [
-      'event_title'    => $result['event']['title'],
-      'upload_url'     => $result['event']['upload_url'],
-      'qr_image'       => $result['event']['qr_image_url'],
-      'login_url'      => $result['event']['login_url'],
-      'plain_password' => $result['event']['plain_password'],
-      'customer_email' => $result['customer']['email'],
-      'addons'         => $result['addons'],
-      'base_price'     => (int)$result['order']['base_price_cents'],
-      'addons_total'   => (int)$result['order']['addons_total_cents'],
-      'order_total'    => (int)$result['order']['price_cents'],
+      'event_title'      => $result['event']['title'],
+      'upload_url'       => $result['event']['upload_url'],
+      'qr_image'         => $result['event']['qr_image_url'],
+      'login_url'        => $result['event']['login_url'],
+      'plain_password'   => $result['event']['plain_password'],
+      'customer_email'   => $result['customer']['email'],
+      'addons'           => $result['addons'],
+      'campaigns'        => $result['campaigns'] ?? [],
+      'base_price'       => (int)$result['order']['base_price_cents'],
+      'addons_total'     => (int)$result['order']['addons_total_cents'],
+      'campaigns_total'  => (int)($result['order']['campaigns_total_cents'] ?? 0),
+      'order_total'      => (int)$result['order']['price_cents'],
     ];
     redirect('order_thanks.php');
   }
@@ -98,6 +102,9 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
         <?php if (!empty($order['addons'])): ?>
           <div class="text-muted small">Ek Hizmetler: <?=count($order['addons'])?> adet</div>
         <?php endif; ?>
+        <?php if (!empty($order['campaigns'])): ?>
+          <div class="text-muted small">Hayır Kampanyaları: <?=count($order['campaigns'])?> adet</div>
+        <?php endif; ?>
       </div>
     </div>
 
@@ -118,6 +125,7 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
       <div class="col-lg-5">
         <div class="summary-card mb-4">
           <h5 class="fw-semibold mb-3">Sipariş Özeti</h5>
+          <?php $hasAddons = !empty($order['addons']); $hasCampaigns = !empty($order['campaigns']); ?>
           <ul class="list-unstyled small text-muted mb-0">
             <li class="mb-2"><strong>Paket:</strong> <?=h($package['name'])?> <span class="ms-2 badge bg-info-subtle text-info-emphasis"><?=h(format_currency((int)$order['base_price_cents']))?></span></li>
             <li class="mb-2"><strong>Ad Soyad:</strong> <?=h($order['customer_name'])?></li>
@@ -129,7 +137,7 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
             <?php if (!empty($order['event_date'])): ?>
               <li><strong>Tarih:</strong> <?=h(date('d.m.Y', strtotime($order['event_date'])))?></li>
             <?php endif; ?>
-            <?php if (!empty($order['addons'])): ?>
+            <?php if ($hasAddons): ?>
               <li class="mt-3"><strong>Seçilen Ek Hizmetler</strong></li>
               <ul class="small ps-3 mb-2">
                 <?php foreach ($order['addons'] as $addonLine): ?>
@@ -139,9 +147,25 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
                   </li>
                 <?php endforeach; ?>
               </ul>
-              <li><strong>Ek Hizmet Toplamı:</strong> <?=h(format_currency((int)$order['addons_total_cents']))?></li>
-              <li class="fw-semibold"><strong>Genel Toplam:</strong> <?=h(format_currency((int)$order['price_cents']))?></li>
             <?php endif; ?>
+            <?php if ($hasCampaigns): ?>
+              <li class="<?= $hasAddons ? 'mt-2' : 'mt-3'?>"><strong>Desteklenen Hayır Kampanyaları</strong></li>
+              <ul class="small ps-3 mb-2">
+                <?php foreach ($order['campaigns'] as $campaignLine): ?>
+                  <li class="d-flex justify-content-between">
+                    <span><?=h($campaignLine['campaign_name'])?> × <?= (int)$campaignLine['quantity'] ?></span>
+                    <span><?=h(format_currency((int)$campaignLine['total_cents']))?></span>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
+            <?php if ($hasAddons): ?>
+              <li><strong>Ek Hizmet Toplamı:</strong> <?=h(format_currency((int)$order['addons_total_cents']))?></li>
+            <?php endif; ?>
+            <?php if ($hasCampaigns): ?>
+              <li><strong>Hayır Kampanyası Toplamı:</strong> <?=h(format_currency((int)$order['campaigns_total_cents']))?></li>
+            <?php endif; ?>
+            <li class="fw-semibold"><strong>Genel Toplam:</strong> <?=h(format_currency((int)$order['price_cents']))?></li>
           </ul>
         </div>
         <div>

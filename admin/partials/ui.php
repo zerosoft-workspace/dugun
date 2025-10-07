@@ -552,6 +552,7 @@ CSS;
       $links['packages'] = ['href' => BASE_URL.'/admin/dealer_packages.php', 'label' => 'Paketler', 'icon' => 'bi-boxes'];
       $links['team']     = ['href' => BASE_URL.'/admin/team.php', 'label' => 'Yönetici Ekibi', 'icon' => 'bi-people'];
       $links['site']     = ['href' => BASE_URL.'/admin/site_content.php', 'label' => 'Site İçerikleri', 'icon' => 'bi-sliders'];
+      $links['order_campaigns'] = ['href' => BASE_URL.'/admin/order_campaigns.php', 'label' => 'Hayır Kampanyaları', 'icon' => 'bi-heart-fill'];
       $links['order_addons'] = ['href' => BASE_URL.'/admin/order_addons.php', 'label' => 'Ek Hizmetler', 'icon' => 'bi-stars'];
     }
 

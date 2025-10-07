@@ -7,6 +7,7 @@ require_once __DIR__.'/db.php';
 require_once __DIR__.'/functions.php';
 require_once __DIR__.'/dealers.php';
 require_once __DIR__.'/addons.php';
+require_once __DIR__.'/campaigns.php';
 
 if (!defined('SITE_ORDER_STATUS_PENDING')) {
   define('SITE_ORDER_STATUS_PENDING', 'pending_payment');
@@ -409,6 +410,7 @@ function site_order_normalize_row(?array $row): ?array {
     $row['base_price_cents'] = $row['price_cents'];
   }
   $row['addons_total_cents'] = isset($row['addons_total_cents']) ? (int)$row['addons_total_cents'] : 0;
+  $row['campaigns_total_cents'] = isset($row['campaigns_total_cents']) ? (int)$row['campaigns_total_cents'] : 0;
   $row['cashback_cents'] = (int)$row['cashback_cents'];
   $row['meta'] = !empty($row['meta_json']) ? (safe_json_decode($row['meta_json']) ?: []) : [];
   $row['payload'] = !empty($row['payload_json']) ? (safe_json_decode($row['payload_json']) ?: []) : [];
@@ -492,7 +494,7 @@ function site_create_customer_order(array $input): array {
     'notes' => $notes !== '' ? $notes : null,
   ]);
   $pdo->prepare(
-    "INSERT INTO site_orders (package_id, dealer_id, customer_name, customer_email, customer_phone, event_title, event_date, referral_code, status, price_cents, base_price_cents, addons_total_cents, cashback_cents, meta_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+    "INSERT INTO site_orders (package_id, dealer_id, customer_name, customer_email, customer_phone, event_title, event_date, referral_code, status, price_cents, base_price_cents, addons_total_cents, campaigns_total_cents, cashback_cents, meta_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
   )->execute([
     $packageId,
     $dealer ? (int)$dealer['id'] : null,
@@ -505,6 +507,7 @@ function site_create_customer_order(array $input): array {
     SITE_ORDER_STATUS_PENDING,
     $price,
     $basePrice,
+    0,
     0,
     $cashbackCents,
     $meta ? safe_json_encode($meta) : null,
@@ -567,13 +570,18 @@ function site_ensure_order_paytr_token(int $order_id): array {
   }
 
   $addons = site_order_addons_list($order['id']);
+  $campaigns = site_order_campaigns_list($order['id']);
   $addonsTotal = 0;
   foreach ($addons as $addonLine) {
     $addonsTotal += (int)$addonLine['total_cents'];
   }
-  $amount_cents = max(0, (int)$order['price_cents']);
-  if ($amount_cents === 0) {
-    $amount_cents = max(0, (int)$order['base_price_cents'] + $addonsTotal);
+  $campaignsTotal = 0;
+  foreach ($campaigns as $campaignLine) {
+    $campaignsTotal += (int)$campaignLine['total_cents'];
+  }
+  $amount_cents = (int)$order['base_price_cents'] + $addonsTotal + $campaignsTotal;
+  if ($amount_cents <= 0) {
+    $amount_cents = max(0, (int)$order['price_cents']);
   }
   if ($amount_cents <= 0) {
     throw new RuntimeException('Ödeme tutarı geçersiz.');
@@ -581,11 +589,10 @@ function site_ensure_order_paytr_token(int $order_id): array {
 
   $basket = [[
     $package['name'],
-    number_format($amount_cents / 100, 2, '.', ''),
+    number_format($order['base_price_cents'] / 100, 2, '.', ''),
     1,
   ]];
   if ($addons) {
-    $basket[0][1] = number_format($order['base_price_cents'] / 100, 2, '.', '');
     foreach ($addons as $addonLine) {
       $basket[] = [
         $addonLine['addon_name'],
@@ -593,9 +600,21 @@ function site_ensure_order_paytr_token(int $order_id): array {
         max(1, (int)$addonLine['quantity']),
       ];
     }
-    $amount_cents = max(0, (int)$order['base_price_cents'] + $addonsTotal);
+  }
+  if ($campaigns) {
+    foreach ($campaigns as $campaignLine) {
+      $basket[] = [
+        'Hayır Kampanyası: '.$campaignLine['campaign_name'],
+        number_format($campaignLine['price_cents'] / 100, 2, '.', ''),
+        max(1, (int)$campaignLine['quantity']),
+      ];
+    }
   }
   $order['price_cents'] = $amount_cents;
+  $order['addons'] = $addons;
+  $order['campaigns'] = $campaigns;
+  $order['addons_total_cents'] = $addonsTotal;
+  $order['campaigns_total_cents'] = $campaignsTotal;
   $user_basket = base64_encode(json_encode($basket, JSON_UNESCAPED_UNICODE));
 
   $merchantOid = $order['merchant_oid'] ?: site_generate_order_oid($order['id']);
@@ -706,6 +725,9 @@ function site_ensure_order_paytr_token(int $order_id): array {
 
   $order = site_get_order($order['id']);
   $order['addons'] = $addons;
+  $order['campaigns'] = $campaigns;
+  $order['addons_total_cents'] = $addonsTotal;
+  $order['campaigns_total_cents'] = $campaignsTotal;
 
   return [
     'order' => $order,
@@ -919,7 +941,19 @@ function site_finalize_order(int $order_id, array $options = []): array {
   $pdo->commit();
 
   $addons = site_order_addons_list($order['id']);
+  $campaigns = site_order_campaigns_list($order['id']);
+  $addonsTotal = 0;
+  foreach ($addons as $line) {
+    $addonsTotal += (int)$line['total_cents'];
+  }
+  $campaignsTotal = 0;
+  foreach ($campaigns as $line) {
+    $campaignsTotal += (int)$line['total_cents'];
+  }
   $order['addons'] = $addons;
+  $order['campaigns'] = $campaigns;
+  $order['addons_total_cents'] = $addonsTotal;
+  $order['campaigns_total_cents'] = $campaignsTotal;
 
   $eventMeta = [
     'id' => $eventSummary['id'],
@@ -944,6 +978,8 @@ function site_finalize_order(int $order_id, array $options = []): array {
       'phone' => $order['customer_phone'] ?? '',
     ],
     'addons' => $addons,
+    'campaigns' => $campaigns,
+    'campaigns_total_cents' => $campaignsTotal,
     'cashback_cents' => (int)$order['cashback_cents'],
     'just_created' => $justCreated,
   ];
@@ -994,6 +1030,17 @@ function site_send_customer_order_mail(array $result): void {
     .'<p>Ödemeniz alındı ve etkinlik paneliniz dakikalar içinde hazırlandı. Aşağıdaki bağlantılardan BİKARE deneyiminizi başlatabilirsiniz.</p>'
     .'<table style="width:100%;margin:20px 0;border-collapse:collapse;font-size:14px;">'.$rows.'</table>'
     .'<p>Seçtiğiniz paket: <strong>'.h($package['name']).'</strong> — '.h(format_currency((int)$package['price_cents'])).'</p>';
+  $campaigns = $result['campaigns'] ?? [];
+  if ($campaigns) {
+    $body .= '<p style="margin-top:18px;">Desteklediğiniz hayır kampanyaları:</p>'
+      .'<ul style="padding-left:20px;margin:12px 0;">';
+    foreach ($campaigns as $campaign) {
+      $body .= '<li>'.h($campaign['campaign_name']).' — '.h(format_currency((int)$campaign['total_cents'])).'</li>';
+    }
+    $totalDonation = $result['campaigns_total_cents'] ?? 0;
+    $body .= '<li><strong>Toplam Bağış:</strong> '.h(format_currency((int)$totalDonation)).'</li>';
+    $body .= '</ul>';
+  }
   if ($qrImage) {
     $body .= '<p style="margin-top:18px;">QR kod görselinizi baskı almak için kullanabilirsiniz:</p>'
       .'<p style="text-align:center;"><img src="'.h($qrImage).'" alt="QR Kod" width="220" height="220" style="border-radius:12px;box-shadow:0 12px 35px rgba(14,165,181,0.28);"></p>';
@@ -1037,6 +1084,17 @@ function site_send_dealer_order_mail(array $result): void {
     .'<table style="width:100%;margin:20px 0;border-collapse:collapse;font-size:14px;">'.$rows.'</table>'
     .'<p>Ekibimiz desteğe her zaman hazır. İş ortaklığınız için teşekkür ederiz.</p>'
     .'<p><strong>BİKARE Bayi Destek</strong></p>';
+  $campaigns = $result['campaigns'] ?? [];
+  if ($campaigns) {
+    $body .= '<p style="margin-top:16px;">Müşterinizin desteklediği hayır kampanyaları:</p>'
+      .'<ul style="padding-left:20px;margin:10px 0;">';
+    foreach ($campaigns as $campaign) {
+      $body .= '<li>'.h($campaign['campaign_name']).' — '.h(format_currency((int)$campaign['total_cents'])).'</li>';
+    }
+    $totalDonation = $result['campaigns_total_cents'] ?? 0;
+    $body .= '<li><strong>Toplam Bağış:</strong> '.h(format_currency((int)$totalDonation)).'</li>';
+    $body .= '</ul>';
+  }
   if ($cashback > 0) {
     $body .= '<p style="margin-top:18px;color:#475569;">Cashback tutarınız finans ekibimizin onayına iletildi. Onaylandığında bakiyenize eklenecek ve ayrıca e-posta ile bilgilendirileceksiniz.</p>';
   }
