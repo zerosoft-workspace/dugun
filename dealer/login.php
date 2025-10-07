@@ -4,6 +4,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealer_auth.php';
 require_once __DIR__.'/../includes/dealers.php';
+require_once __DIR__.'/../includes/login_header.php';
 
 install_schema();
 
@@ -35,9 +36,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <title><?=h(APP_NAME)?> — Bayi Girişi</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    <?=login_header_styles()?>
     :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#5f6c7b; }
     *{box-sizing:border-box;}
-    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2.5rem;background:radial-gradient(circle at 20% 20%,rgba(14,165,181,.18),rgba(14,165,181,.04) 60%,#f8fafc);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;padding:0;background:radial-gradient(circle at 20% 20%,rgba(14,165,181,.18),rgba(14,165,181,.04) 60%,#f8fafc);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    .auth-layout{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem 3rem;}
     .auth-shell{width:100%;max-width:1100px;background:#fff;border-radius:30px;box-shadow:0 48px 120px -60px rgba(15,23,42,.55);display:flex;overflow:hidden;border:1px solid rgba(148,163,184,.18);}
     .auth-visual{flex:1.05;position:relative;padding:3.2rem;background:linear-gradient(140deg,rgba(15,118,110,.92),rgba(14,165,181,.75)),url('https://images.unsplash.com/photo-1530023367847-a683933f4177?auto=format&fit=crop&w=1200&q=80') center/cover;color:#fff;display:flex;flex-direction:column;justify-content:space-between;}
     .auth-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(155deg,rgba(12,74,110,.25),rgba(15,23,42,.45));mix-blend-mode:soft-light;}
@@ -67,6 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </style>
 </head>
 <body>
+  <?php render_login_header('dealer'); ?>
+  <main class="auth-layout">
   <div class="auth-shell">
     <aside class="auth-visual">
       <div>
@@ -113,5 +118,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
     </section>
   </div>
+  </main>
 </body>
 </html>

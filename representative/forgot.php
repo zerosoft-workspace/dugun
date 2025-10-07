@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/representative_auth.php';
+require_once __DIR__.'/../includes/login_header.php';
 
 install_schema();
 
@@ -32,7 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <title>Şifremi Unuttum — <?=h(APP_NAME)?> Temsilci Paneli</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem;background:linear-gradient(160deg,rgba(14,165,181,.15),#f8fafc);font-family:'Inter','Segoe UI',system-ui,sans-serif;color:#0f172a;}
+    <?=login_header_styles()?>
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(160deg,rgba(14,165,181,.15),#f8fafc);font-family:'Inter','Segoe UI',system-ui,sans-serif;color:#0f172a;}
+    .auth-layout{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem 3rem;}
     .card{width:100%;max-width:420px;background:#fff;border-radius:24px;box-shadow:0 40px 110px -60px rgba(15,23,42,.45);padding:2.4rem;border:1px solid rgba(148,163,184,.16);}
     .brand{display:flex;align-items:center;gap:.6rem;margin-bottom:1.5rem;}
     .brand span{display:inline-flex;width:40px;height:40px;border-radius:12px;background:rgba(14,165,181,.12);align-items:center;justify-content:center;font-weight:700;color:#0ea5b5;}
@@ -43,6 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </style>
 </head>
 <body>
+  <?php render_login_header('representative'); ?>
+  <main class="auth-layout">
   <div class="card">
     <div class="brand">
       <span><?=h(mb_strtoupper(mb_substr(APP_NAME, 0, 2, 'UTF-8')))?></span>
@@ -68,5 +73,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
     <div class="mt-3"><a href="login.php">← Giriş ekranına dön</a></div>
   </div>
+  </main>
 </body>
 </html>

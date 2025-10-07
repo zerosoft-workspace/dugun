@@ -3,6 +3,7 @@ require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../includes/login_header.php';
 
 // Çıkış
 if (isset($_GET['logout'])) {
@@ -80,9 +81,11 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
   <title><?= $mode === 'setup' ? 'İlk Yönetici Kurulumu' : 'Yönetici Girişi' ?> — <?=h(APP_NAME)?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    <?=login_header_styles()?>
     :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#64748b; }
     *{box-sizing:border-box;}
-    body{min-height:100vh;margin:0;display:flex;align-items:center;justify-content:center;padding:2.5rem;background:radial-gradient(circle at top,#ecfeff 0%,#f8fafc 55%,#eef2ff 100%);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    body{min-height:100vh;margin:0;display:flex;flex-direction:column;background:radial-gradient(circle at top,#ecfeff 0%,#f8fafc 55%,#eef2ff 100%);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    .auth-layout{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem 3rem;}
     .auth-shell{width:100%;max-width:1040px;background:#fff;border-radius:28px;box-shadow:0 40px 120px -45px rgba(15,23,42,.45);display:flex;overflow:hidden;border:1px solid rgba(148,163,184,.18);}
     .auth-visual{flex:1;position:relative;padding:3rem 3.2rem;background:linear-gradient(135deg,rgba(14,165,181,.92),rgba(14,165,181,.72)),url('https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=format&fit=crop&w=1200&q=80') center/cover;color:#fff;display:flex;flex-direction:column;justify-content:space-between;min-height:100%;}
     .auth-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(15,23,42,.05),rgba(15,23,42,.35));mix-blend-mode:multiply;}
@@ -112,6 +115,8 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
   </style>
 </head>
 <body>
+  <?php render_login_header(null); ?>
+  <main class="auth-layout">
   <div class="auth-shell">
     <aside class="auth-visual">
       <div>
@@ -192,5 +197,6 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
       </div>
     </section>
   </div>
+  </main>
 </body>
 </html>

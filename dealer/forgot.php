@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealer_auth.php';
+require_once __DIR__.'/../includes/login_header.php';
 
 install_schema();
 
@@ -32,7 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <title>Şifremi Unuttum — <?=h(APP_NAME)?> Bayi Paneli</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2.5rem;background:radial-gradient(circle at 20% 20%,rgba(14,165,181,.18),rgba(14,165,181,.04) 60%,#f8fafc);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:#0f172a;}
+    <?=login_header_styles()?>
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:radial-gradient(circle at 20% 20%,rgba(14,165,181,.18),rgba(14,165,181,.04) 60%,#f8fafc);font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:#0f172a;}
+    .auth-layout{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem 3rem;}
     .card{width:100%;max-width:440px;border-radius:24px;border:1px solid rgba(148,163,184,.18);box-shadow:0 40px 110px -60px rgba(15,23,42,.5);padding:2.6rem;background:#fff;}
     .brand{font-weight:800;font-size:1.5rem;margin-bottom:.5rem;letter-spacing:.18rem;}
     .brand span{display:block;font-weight:600;font-size:.95rem;color:#5f6c7b;letter-spacing:0;}
@@ -43,6 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </style>
 </head>
 <body>
+  <?php render_login_header('dealer'); ?>
+  <main class="auth-layout">
   <div class="card">
     <div class="brand">BİKARE <span>Bayi Paneli</span></div>
     <h1 class="h4 mb-3">Şifremi Unuttum</h1>
@@ -62,5 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
     <div class="mt-3"><a href="login.php">← Giriş ekranına dön</a></div>
   </div>
+  </main>
 </body>
 </html>

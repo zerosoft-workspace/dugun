@@ -4,6 +4,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/representatives.php';
 require_once __DIR__.'/../includes/representative_auth.php';
+require_once __DIR__.'/../includes/login_header.php';
 
 install_schema();
 
@@ -35,8 +36,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <title><?=h(APP_NAME)?> — Temsilci Girişi</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    <?=login_header_styles()?>
     :root{--brand:#0ea5b5;--brand-dark:#0b8b98;--ink:#0f172a;--muted:#5f6c7b;}
-    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2rem;background:linear-gradient(160deg,rgba(14,165,181,.15),#f8fafc);font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--ink);}
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(160deg,rgba(14,165,181,.15),#f8fafc);font-family:'Inter','Segoe UI',system-ui,sans-serif;color:var(--ink);}
+    .auth-layout{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem 3rem;}
     .auth-card{width:100%;max-width:480px;background:#fff;border-radius:24px;box-shadow:0 48px 120px -60px rgba(15,23,42,.45);padding:2.5rem;border:1px solid rgba(148,163,184,.16);}
     .form-control{border-radius:14px;border:1px solid rgba(148,163,184,.3);padding:.75rem 1rem;}
     .form-control:focus{border-color:var(--brand);box-shadow:0 0 0 .2rem rgba(14,165,181,.15);}
@@ -48,6 +51,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </style>
 </head>
 <body>
+  <?php render_login_header('representative'); ?>
+  <main class="auth-layout">
   <div class="auth-card">
     <div class="brand">
       <span><?=h(mb_strtoupper(mb_substr(APP_NAME, 0, 2, 'UTF-8')))?></span>
@@ -75,5 +80,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <a class="text-decoration-none fw-semibold" style="color: var(--brand);" href="https://drive.demozerosoft.com.tr/">← drive.demozerosoft.com.tr ana sayfasına dön</a>
     </div>
   </div>
+  </main>
 </body>
 </html>

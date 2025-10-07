@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/guests.php';
+require_once __DIR__.'/../includes/login_header.php';
 
 install_schema();
 
@@ -96,9 +97,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <title>Misafir Girişi — <?=h(APP_NAME)?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    <?=login_header_styles()?>
     :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#526070; }
     *{box-sizing:border-box;}
-    body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:2.5rem;background:linear-gradient(135deg,rgba(14,165,181,.12),rgba(148,163,184,.08));font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(135deg,rgba(14,165,181,.12),rgba(148,163,184,.08));font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    .auth-layout{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem 3rem;}
     .auth-shell{width:100%;max-width:1080px;background:#fff;border-radius:30px;box-shadow:0 40px 120px -55px rgba(15,23,42,.5);display:flex;overflow:hidden;border:1px solid rgba(148,163,184,.18);}
     .auth-visual{flex:1.05;position:relative;padding:3.1rem;background:linear-gradient(150deg,rgba(14,165,181,.88),rgba(99,102,241,.7)),url('https://images.unsplash.com/photo-1519744346363-69e9faebabd1?auto=format&fit=crop&w=1200&q=80') center/cover;color:#fff;display:flex;flex-direction:column;justify-content:space-between;}
     .auth-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(15,23,42,.15),rgba(15,23,42,.45));}
@@ -134,6 +137,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   </style>
 </head>
 <body>
+  <?php render_login_header('guest'); ?>
+  <main class="auth-layout">
   <div class="auth-shell">
     <aside class="auth-visual">
       <div>
@@ -211,5 +216,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
     </section>
   </div>
+  </main>
 </body>
 </html>
