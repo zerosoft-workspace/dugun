@@ -30,10 +30,17 @@ function h(?string $value): string
     return htmlspecialchars((string)$value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+$detectedBase = 'http://localhost';
+if (!empty($_SERVER['HTTP_HOST'])) {
+    $scheme = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') ? 'https' : 'http';
+    $detectedBase = $scheme.'://'.$_SERVER['HTTP_HOST'];
+}
+
 $defaults = [
     'db_host' => $existingConfig['APP_DB_HOST'] ?? '127.0.0.1',
     'db_name' => $existingConfig['APP_DB_NAME'] ?? 'dugun',
     'db_user' => $existingConfig['APP_DB_USER'] ?? 'dugun',
+    'base_url' => $existingConfig['APP_BASE_URL'] ?? $detectedBase,
 ];
 
 $errors = [];
@@ -43,6 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $host = trim($_POST['db_host'] ?? '');
     $name = trim($_POST['db_name'] ?? '');
     $user = trim($_POST['db_user'] ?? '');
+    $baseUrlInput = $_POST['base_url'] ?? '';
+    $baseUrl = is_string($baseUrlInput) ? trim($baseUrlInput) : '';
     $passInput = $_POST['db_pass'] ?? '';
     $pass = is_string($passInput) ? trim($passInput) : '';
 
@@ -64,6 +73,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $errors[] = 'Veritabanı şifresi zorunludur.';
         }
+    }
+
+    if ($baseUrl === '') {
+        $errors[] = 'Site adresi (base URL) zorunludur.';
+    } elseif (!filter_var($baseUrl, FILTER_VALIDATE_URL)) {
+        $errors[] = 'Geçerli bir site adresi girin. Örn: https://alanadiniz.com';
     }
 
     if (!$errors) {
@@ -96,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'APP_DB_NAME' => $name,
                 'APP_DB_USER' => $user,
                 'APP_DB_PASS' => $pass,
+                'APP_BASE_URL' => rtrim($baseUrl, '/'),
             ];
 
             $json = json_encode($configData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
@@ -109,6 +125,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'db_host' => $host,
                     'db_name' => $name,
                     'db_user' => $user,
+                    'base_url' => rtrim($baseUrl, '/'),
                 ];
             }
         }
@@ -145,7 +162,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <div class="container">
     <h1>Sistem Kurulumu</h1>
     <?php if ($success): ?>
-        <div class="alert success">Kurulum tamamlandı. Şimdi <a href="admin/login.php">yönetim paneline giriş yapabilirsiniz</a>.</div>
+        <div class="alert success">Kurulum tamamlandı. Şimdi <a href="<?= h(($defaults['base_url'] ?? $detectedBase).'/admin/login.php') ?>">yönetim paneline giriş yapabilirsiniz</a>.</div>
     <?php else: ?>
         <p class="muted">Lütfen veritabanı bağlantı bilgilerini girin. Bu bilgiler <code>storage/setup.json</code> dosyasında saklanacaktır.</p>
         <?php if ($errors): ?>
@@ -171,6 +188,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <label>
                 Veritabanı Kullanıcısı
                 <input type="text" name="db_user" value="<?= h($defaults['db_user']) ?>" required>
+            </label>
+            <label>
+                Site Adresi (Base URL)
+                <input type="text" name="base_url" value="<?= h($defaults['base_url']) ?>" placeholder="https://alanadiniz.com" required>
+                <span class="input-help">Sitenizin dışarıdan erişilen adresi. Örn: https://drive.demozerosoft.com.tr</span>
             </label>
             <label>
                 Veritabanı Şifresi

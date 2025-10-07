@@ -45,7 +45,7 @@ define('DB_NAME', config_value('APP_DB_NAME', 'dugun'));
 define('DB_USER', config_value('APP_DB_USER', 'dugun'));
 define('DB_PASS', config_value('APP_DB_PASS', 'secret'));
 
-$baseUrl = (string)config_env('APP_BASE_URL', 'http://localhost');
+$baseUrl = (string)config_value('APP_BASE_URL', 'http://localhost');
 $baseUrl = $baseUrl !== '' ? rtrim($baseUrl, '/') : 'http://localhost';
 define('BASE_URL', $baseUrl); // kök URL (sonda / yok)
 
