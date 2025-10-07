@@ -94,7 +94,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Misafir Girişi — <?=h(APP_NAME)?></title>
+  <title>Misafir &amp; Davetli Girişi — <?=h(APP_NAME)?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     <?=login_header_styles()?>
@@ -142,7 +142,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="auth-shell">
     <aside class="auth-visual">
       <div>
-        <span class="badge">Misafir Paneli</span>
+        <span class="badge">Misafir &amp; Davetli Paneli</span>
         <h1 class="visual-title">Etkinliğe ait fotoğraf ve videolar burada buluşuyor.</h1>
         <p class="visual-text">BİKARE misafir paneli, etkinlik sahipleriyle anılarınızı kolayca paylaşmanızı, diğer davetlilerle sohbet etmenizi ve özel içeriklere erişmenizi sağlar.</p>
         <ul class="feature-list">
@@ -155,8 +155,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </aside>
     <section class="auth-form">
       <div>
-        <div class="brand">BİKARE <span>Misafir Girişi</span></div>
-        <p class="form-note">E-posta adresinizi doğruladıktan sonra belirlediğiniz şifre ile etkinlik paneline ulaşabilirsiniz.</p>
+        <div class="brand">BİKARE <span>Misafir &amp; Davetli Girişi</span></div>
+        <p class="form-note">Davetli veya misafir olarak tanımlandığınız etkinlik için e-posta adresinizi doğruladıktan sonra belirlediğiniz şifre ile panelinize ulaşabilirsiniz.</p>
       </div>
       <?php if ($stage === 'form'): ?>
         <?php flash_box(); ?>

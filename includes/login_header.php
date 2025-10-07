@@ -44,12 +44,20 @@ if (!function_exists('render_login_header')) {
         ];
 
         $ctaLinks = [
-            'dealer' => ['label' => 'Bayi Girişi', 'href' => $baseUrl . '/dealer/login.php'],
-            'guest' => ['label' => 'Düğün Girişi', 'href' => $baseUrl . '/public/guest_login.php'],
-            'representative' => ['label' => 'Etkinlik Girişi', 'href' => $baseUrl . '/representative/login.php'],
+            'portal' => ['label' => 'Giriş Yap', 'href' => $baseUrl . '/portal/login.php'],
         ];
 
-        $activeKey = array_key_exists((string) $active, $ctaLinks) ? $active : null;
+        $activeAlias = [
+            'dealer' => 'portal',
+            'representative' => 'portal',
+            'guest' => 'portal',
+            'portal' => 'portal',
+        ];
+
+        $activeKey = null;
+        if ($active !== null && isset($activeAlias[$active])) {
+            $activeKey = $activeAlias[$active];
+        }
 
         echo '<header class="site-header"><div class="site-header__inner">';
         echo '<a class="site-header__brand" href="' . htmlspecialchars($baseUrl . '/', ENT_QUOTES, 'UTF-8') . '">BİKARE<span>STUDIO</span></a>';
