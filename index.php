@@ -44,101 +44,418 @@ unset($_SESSION['lead_success']);
 <?=theme_head_assets()?>
 <style>
   :root {
+    --bg:#eef3ff;
+    --surface:#ffffff;
+    --surface-alt:#f7f9ff;
     --ink:#0f172a;
-    --muted:#6b7280;
-    --brand:#0ea5b5;
-    --brand-dark:#0c8d9a;
-    --card:#ffffff;
-    --bg:#f4f7fb;
+    --muted:#64748b;
+    --brand:#2563eb;
+    --brand-soft:#60a5fa;
+    --accent:#0ea5e9;
+    --radius-lg:32px;
+    --shadow-soft:0 24px 60px rgba(15,23,42,0.12);
+    --shadow-hero:0 40px 120px rgba(37,99,235,0.35);
   }
-  body{background:linear-gradient(180deg,var(--bg),#fff);font-family:'Inter',sans-serif;color:var(--ink);}
-  .hero{position:relative;overflow:hidden;border-radius:36px;padding:96px 48px;background:linear-gradient(140deg,rgba(14,165,181,0.92),rgba(59,130,246,0.88));color:#fff;}
-  .hero::after{content:"";position:absolute;inset:-120px -60px auto 40%;width:420px;height:420px;background:rgba(255,255,255,0.12);filter:blur(0);border-radius:50%;}
-  .hero-visual{position:relative;z-index:1;}
-  .hero-visual img{border-radius:24px;box-shadow:0 30px 90px rgba(15,118,110,0.35);}
-  .hero-visual img:nth-child(2){position:absolute;top:40%;left:50%;width:220px;border:6px solid rgba(255,255,255,0.8);transform:translate(-30%, -10%);}
-  .metrics-card{border-radius:24px;background:rgba(255,255,255,0.16);padding:28px;backdrop-filter:blur(8px);}
-  .feature-card{border-radius:24px;background:#fff;box-shadow:0 24px 60px rgba(148,163,184,0.18);padding:32px;transition:transform .25s ease,box-shadow .25s ease;}
-  .feature-card:hover{transform:translateY(-6px);box-shadow:0 36px 80px rgba(148,163,184,0.25);}
-  .feature-icon{width:56px;height:56px;border-radius:18px;background:rgba(14,165,181,0.12);display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--brand);}
-  .timeline-step{display:flex;gap:16px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 16px 40px rgba(15,118,110,0.12);}
-  .timeline-step span{width:44px;height:44px;border-radius:14px;background:rgba(14,165,181,0.12);color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:700;}
-  .package-card{border-radius:24px;border:1px solid rgba(14,165,181,0.12);background:#fff;height:100%;padding:32px;transition:transform .2s ease,box-shadow .2s ease;}
-  .package-card:hover{transform:translateY(-6px);box-shadow:0 28px 70px rgba(15,118,110,0.18);}
-  .package-price{font-size:1.9rem;font-weight:800;color:var(--brand);}
-  .gallery-grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
-  .gallery-grid img{width:100%;height:220px;object-fit:cover;border-radius:24px;box-shadow:0 18px 50px rgba(15,118,110,0.18);}
-  .testimonial{border-radius:24px;background:#fff;padding:32px;box-shadow:0 22px 60px rgba(15,118,110,0.16);position:relative;}
-  .testimonial::before{content:'“';position:absolute;top:-16px;left:24px;font-size:5rem;color:rgba(14,165,181,0.2);}
-  .cta-section{border-radius:32px;background:linear-gradient(135deg,#0ea5b5,#6366f1);color:#fff;padding:48px;}
-  .form-section{border-radius:28px;background:#fff;box-shadow:0 32px 90px rgba(15,118,110,0.2);padding:48px;}
-  .input-rounded{border-radius:16px;border:1px solid #d7e4eb;padding:12px 16px;}
-  .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:18px;padding:14px 32px;font-weight:700;}
-  .btn-brand:hover{background:var(--brand-dark);color:#fff;}
-  .btn-guest{border-radius:999px;border:1px solid rgba(14,165,181,0.3);color:var(--brand);font-weight:600;padding:10px 22px;background:rgba(14,165,181,0.08);}
-  .btn-guest:hover{color:#fff;background:var(--brand);border-color:var(--brand);}
-  .muted{color:var(--muted);}
-  .nav-link{font-weight:600;color:var(--muted)!important;}
-  .nav-link:hover,.nav-link:focus,.nav-link.active{color:var(--brand)!important;}
-  .site-navbar{backdrop-filter:blur(10px);}
-  .contact-card{border-radius:24px;background:#fff;box-shadow:0 24px 60px rgba(15,118,110,0.18);padding:32px;}
-  .contact-card ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;}
-  .contact-card ul li strong{color:var(--ink);min-width:84px;display:inline-block;}
-  .contact-card ul li a{color:var(--brand);font-weight:600;text-decoration:none;}
-  .contact-card ul li a:hover{color:var(--brand-dark);text-decoration:underline;}
-  .contact-card .btn-outline-secondary{border-color:rgba(14,165,181,0.35);color:var(--brand);background:rgba(14,165,181,0.08);}
-  .contact-card .btn-outline-secondary:hover{background:var(--brand);color:#fff;border-color:var(--brand);}
-  .cta-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
-  .navbar-toggler{border:none;box-shadow:none;}
-  footer{background:var(--brand);color:#f0fdfa;padding:48px 0 40px;margin-top:48px;}
-  footer h5, footer h6{color:#fff;}
-  footer a{color:rgba(255,255,255,0.9);font-weight:600;text-decoration:none;}
-  footer a:hover{color:#0f172a;text-decoration:underline;}
-  .footer-payment-logo{height:28px;filter:brightness(0) invert(1);opacity:0.85;transition:opacity .2s ease;}
-  .footer-payment-logo:hover{opacity:1;}
-  .footer-nav a{color:#fdfdfd;display:inline-block;margin-bottom:8px;}
-  .footer-nav a:hover{color:#0f172a;}
-  @media(max-width:992px){.hero{padding:72px 28px;}.hero-visual img:nth-child(2){display:none;}}
-  @media(max-width:768px){.form-section{padding:32px;}}
+
+  body {
+    background:radial-gradient(circle at top right, rgba(96,165,250,0.35), transparent 55%) var(--bg);
+    font-family:'Inter', 'Poppins', sans-serif;
+    color:var(--ink);
+  }
+
+  .page-shell {
+    position:relative;
+    padding-top:72px;
+  }
+
+  .page-shell::before {
+    content:"";
+    position:fixed;
+    inset:auto -120px -160px auto;
+    width:480px;
+    height:480px;
+    background:radial-gradient(circle, rgba(14,165,233,0.18), transparent 60%);
+    filter:blur(12px);
+    z-index:-1;
+  }
+
+  .hero {
+    border-radius:var(--radius-lg);
+    background:linear-gradient(135deg, rgba(37,99,235,0.95), rgba(14,165,233,0.92));
+    color:#fff;
+    padding:96px 72px;
+    position:relative;
+    overflow:hidden;
+    box-shadow:var(--shadow-hero);
+  }
+
+  .hero::after {
+    content:"";
+    position:absolute;
+    inset:-140px auto auto 55%;
+    width:420px;
+    height:420px;
+    background:radial-gradient(circle, rgba(255,255,255,0.18), transparent 70%);
+    filter:blur(0);
+    border-radius:50%;
+  }
+
+  .hero-heading {
+    font-size:clamp(2.4rem, 4vw, 3.6rem);
+    font-weight:800;
+    letter-spacing:-0.02em;
+  }
+
+  .hero-summary {
+    color:rgba(255,255,255,0.92);
+    font-size:1.1rem;
+  }
+
+  .hero-visual {
+    position:relative;
+  }
+
+  .hero-visual .floating-card {
+    border-radius:28px;
+    background:rgba(15,23,42,0.15);
+    backdrop-filter:blur(16px);
+    padding:24px;
+    box-shadow:0 30px 80px rgba(15,23,42,0.35);
+  }
+
+  .hero-visual img {
+    border-radius:24px;
+    box-shadow:0 32px 90px rgba(15,23,42,0.55);
+  }
+
+  .hero-visual .floating-card-small {
+    position:absolute;
+    bottom:-32px;
+    left:16%;
+    border-radius:20px;
+    background:#fff;
+    color:var(--ink);
+    padding:18px 22px;
+    box-shadow:0 20px 60px rgba(14,165,233,0.35);
+    min-width:220px;
+  }
+
+  .metrics-grid {
+    display:grid;
+    gap:18px;
+    grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+    margin-top:48px;
+  }
+
+  .metric-card {
+    border-radius:24px;
+    background:rgba(255,255,255,0.16);
+    backdrop-filter:blur(18px);
+    padding:28px 32px;
+  }
+
+  .metric-value {
+    font-size:2.3rem;
+    font-weight:700;
+  }
+
+  .section-heading {
+    font-weight:700;
+    font-size:2.2rem;
+    letter-spacing:-0.01em;
+  }
+
+  .section-subtitle {
+    color:var(--muted);
+    max-width:620px;
+  }
+
+  .feature-card {
+    border-radius:28px;
+    background:var(--surface);
+    box-shadow:var(--shadow-soft);
+    padding:32px;
+    transition:transform .25s ease, box-shadow .25s ease;
+  }
+
+  .feature-card:hover {
+    transform:translateY(-6px);
+    box-shadow:0 40px 90px rgba(15,23,42,0.18);
+  }
+
+  .feature-icon {
+    width:60px;
+    height:60px;
+    border-radius:18px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:1.6rem;
+    background:rgba(96,165,250,0.18);
+    color:var(--brand);
+  }
+
+  .timeline-step {
+    display:flex;
+    gap:18px;
+    padding:20px;
+    border-radius:22px;
+    background:var(--surface);
+    box-shadow:0 18px 60px rgba(15,23,42,0.1);
+  }
+
+  .timeline-step span {
+    width:48px;
+    height:48px;
+    border-radius:16px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    background:rgba(37,99,235,0.12);
+    color:var(--brand);
+  }
+
+  .package-card {
+    border-radius:28px;
+    background:var(--surface);
+    padding:36px;
+    height:100%;
+    box-shadow:var(--shadow-soft);
+    transition:transform .2s ease, box-shadow .2s ease;
+  }
+
+  .package-card:hover {
+    transform:translateY(-8px);
+    box-shadow:0 44px 110px rgba(15,23,42,0.18);
+  }
+
+  .package-price {
+    font-size:2rem;
+    font-weight:800;
+    color:var(--brand);
+  }
+
+  .gallery-grid {
+    display:grid;
+    gap:20px;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+  }
+
+  .gallery-grid img {
+    border-radius:24px;
+    width:100%;
+    height:230px;
+    object-fit:cover;
+    box-shadow:0 26px 80px rgba(15,23,42,0.2);
+  }
+
+  .testimonial {
+    border-radius:28px;
+    background:var(--surface);
+    padding:34px;
+    box-shadow:var(--shadow-soft);
+    position:relative;
+  }
+
+  .testimonial::before {
+    content:'“';
+    position:absolute;
+    top:-22px;
+    left:22px;
+    font-size:6rem;
+    color:rgba(37,99,235,0.14);
+  }
+
+  .cta-section {
+    border-radius:var(--radius-lg);
+    background:linear-gradient(130deg, rgba(37,99,235,1), rgba(14,165,233,0.95));
+    color:#fff;
+    padding:48px 56px;
+    box-shadow:var(--shadow-hero);
+  }
+
+  .form-section {
+    border-radius:var(--radius-lg);
+    background:var(--surface);
+    box-shadow:0 40px 120px rgba(15,23,42,0.16);
+    padding:56px;
+  }
+
+  .input-rounded {
+    border-radius:16px;
+    border:1px solid rgba(148,163,184,0.4);
+    padding:12px 16px;
+  }
+
+  .btn-brand {
+    border-radius:18px;
+    padding:14px 32px;
+    border:none;
+    font-weight:700;
+    background:var(--brand);
+    color:#fff;
+    box-shadow:0 16px 40px rgba(37,99,235,0.25);
+  }
+
+  .btn-brand:hover {
+    background:var(--accent);
+    color:#fff;
+  }
+
+  .muted {
+    color:var(--muted);
+  }
+
+  .contact-card {
+    border-radius:28px;
+    background:var(--surface);
+    box-shadow:var(--shadow-soft);
+    padding:36px;
+  }
+
+  .contact-card ul {
+    list-style:none;
+    margin:0;
+    padding:0;
+    display:flex;
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .contact-card ul li strong {
+    min-width:92px;
+    display:inline-block;
+    color:var(--ink);
+  }
+
+  .contact-card ul li a {
+    color:var(--brand);
+    font-weight:600;
+    text-decoration:none;
+  }
+
+  .contact-card ul li a:hover {
+    color:var(--accent);
+  }
+
+  footer {
+    background:#0f172a;
+    color:#e2e8f0;
+    padding:56px 0 48px;
+    margin-top:72px;
+  }
+
+  footer a {
+    color:rgba(255,255,255,0.9);
+    font-weight:600;
+    text-decoration:none;
+  }
+
+  footer a:hover {
+    color:#60a5fa;
+  }
+
+  .footer-payment-logo {
+    height:28px;
+    filter:brightness(0) invert(1);
+    opacity:0.85;
+    transition:opacity .2s ease;
+  }
+
+  .footer-payment-logo:hover {
+    opacity:1;
+  }
+
+  .footer-nav a {
+    display:inline-block;
+    margin-bottom:10px;
+  }
+
+  @media (max-width:1200px) {
+    .hero {
+      padding:80px 48px;
+    }
+  }
+
+  @media (max-width:992px) {
+    .hero {
+      padding:64px 36px;
+    }
+
+    .hero::after {
+      inset:auto auto -120px 50%;
+      transform:translateX(-50%);
+    }
+
+    .hero-visual .floating-card-small {
+      position:relative;
+      inset:auto;
+      margin-top:24px;
+    }
+  }
+
+  @media (max-width:768px) {
+    .form-section {
+      padding:36px;
+    }
+
+    .hero {
+      border-radius:28px;
+    }
+  }
 </style>
 </head><body>
 <?php site_public_header('home'); ?>
 
-<main class="container py-5">
+<main class="container page-shell pb-5">
   <section class="hero mb-5">
     <div class="row align-items-center g-5 position-relative" style="z-index:2;">
       <div class="col-lg-6">
         <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Yeni nesil misafir paylaşımı</span>
-        <h1 class="fw-bold display-5 mt-4 mb-3">Tek QR kodla tüm fotoğraf ve videoları toplayın</h1>
-        <p class="lead mb-4">BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak çift panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
+        <h1 class="hero-heading mt-4 mb-3">Tek QR kodla tüm fotoğraf ve videoları saniyeler içinde toplayın</h1>
+        <p class="hero-summary mb-4">BİKARE, davetlilerinizin paylaştığı anıları tek bir galeride buluşturur, çift panelinizi otomatik kurar ve PayTR destekli güvenli tahsilatı tek adımda tamamlar.</p>
         <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-light text-dark fw-semibold" href="#paketler">Paketleri İncele</a>
-          <a class="btn btn-outline-light fw-semibold" href="#lead-form">Hemen Başlayın</a>
+          <a class="btn btn-light text-dark fw-semibold px-4 py-3" href="#paketler">Paketleri İncele</a>
+          <a class="btn btn-outline-light fw-semibold px-4 py-3" href="#lead-form">Hemen Başlayın</a>
+        </div>
+        <div class="d-flex gap-4 align-items-center mt-4 small text-white-50">
+          <div>PayTR ile %100 güvenli ödeme</div>
+          <div>Kurulum desteği &amp; canlı takip</div>
         </div>
       </div>
       <div class="col-lg-6 hero-visual">
-        <img src="https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80" alt="Düğün kutlaması" class="img-fluid">
-        <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80" alt="Etkinlikten kare" class="img-fluid">
+        <div class="floating-card text-white">
+          <div class="d-flex flex-column gap-3">
+            <div class="d-flex justify-content-between align-items-center">
+              <span class="fw-semibold">Aktif Etkinlikler</span>
+              <span class="badge bg-light text-dark">36 canlı</span>
+            </div>
+            <img src="https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80" alt="Düğün kutlaması" class="img-fluid">
+            <div class="d-flex justify-content-between align-items-center small text-white-75">
+              <span>Gerçek zamanlı yükleme</span>
+              <span>+428 medya</span>
+            </div>
+          </div>
+        </div>
+        <div class="floating-card-small">
+          <div class="fw-semibold">5 dk içinde panel hazır</div>
+          <div class="small text-muted mt-1">Ödeme tamamlanır tamamlanmaz giriş bilgileriniz e-postanıza düşer.</div>
+        </div>
       </div>
     </div>
-    <div class="row mt-5 g-4 position-relative" style="z-index:2;">
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">12.500+</div>
-          <div class="small">Toplanan fotoğraf ve videolar</div>
-        </div>
+    <div class="metrics-grid position-relative" style="z-index:2;">
+      <div class="metric-card">
+        <div class="metric-value">12.500+</div>
+        <div class="small">Toplanan fotoğraf ve videolar</div>
       </div>
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">%98</div>
-          <div class="small">Misafir memnuniyeti</div>
-        </div>
+      <div class="metric-card">
+        <div class="metric-value">%98</div>
+        <div class="small">Misafir memnuniyeti</div>
       </div>
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">5 dk</div>
-          <div class="small">Ödeme sonrası panel hazır olma süresi</div>
-        </div>
+      <div class="metric-card">
+        <div class="metric-value">5 dk</div>
+        <div class="small">Ödeme sonrası aktivasyon süresi</div>
       </div>
     </div>
   </section>
@@ -151,26 +468,28 @@ unset($_SESSION['lead_success']);
   <section id="hakkimizda" class="mb-5">
     <div class="row align-items-center g-5">
       <div class="col-lg-6">
-        <img class="img-fluid rounded-4 shadow-lg" src="https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80" alt="Mutlu çift">
-      </div>
-      <div class="col-lg-6">
-        <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">BİKARE Hakkında</span>
-        <h2 class="fw-bold mt-3">Her anınızı dijital sahneye taşıyan çözüm ortağınız</h2>
-        <p class="muted">Zerosoft olarak düğün, nişan, kurumsal davet ve tüm özel etkinliklerinizde misafirlerinizle aynı anda nefes alan bir platform geliştirdik. BİKARE; yüksek yükleme kapasitesi, güçlü misafir etkileşim araçları ve otomatik QR kod altyapısıyla sizi teknik detaylardan kurtarır.</p>
-        <div class="row g-3">
+        <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold">BİKARE Hakkında</span>
+        <h2 class="section-heading mt-3">Her anınızı dijital sahneye taşıyan çözüm ortağınız</h2>
+        <p class="muted section-subtitle">Düğün, nişan, kurumsal davet veya marka lansmanı… BİKARE misafirlerinizle aynı anda nefes alan dijital deneyimi saniyeler içinde kurar. Sınırsız yükleme kapasitesi, güçlü moderasyon araçları ve otomatik QR kod altyapısı tek pakette.</p>
+        <div class="row g-3 mt-4">
           <div class="col-sm-6">
             <div class="feature-card h-100">
+              <div class="feature-icon mb-3">🤝</div>
               <h5 class="fw-semibold">Profesyonel destek</h5>
-              <p class="muted small mb-0">Kurulumdan canlı yayına kadar deneyimli ekibimizle yanınızdayız.</p>
+              <p class="muted small mb-0">Kurulumdan canlı yayına kadar deneyimli ekibimiz her adımda yanınızda.</p>
             </div>
           </div>
           <div class="col-sm-6">
             <div class="feature-card h-100">
+              <div class="feature-icon mb-3">🛡️</div>
               <h5 class="fw-semibold">Tamamen yerli altyapı</h5>
-              <p class="muted small mb-0">Verileriniz Türkiye lokasyonlu sunucularda güvenle saklanır.</p>
+              <p class="muted small mb-0">Verileriniz Türkiye lokasyonlu sunucularda mevzuata uygun biçimde saklanır.</p>
             </div>
           </div>
         </div>
+      </div>
+      <div class="col-lg-6">
+        <img class="img-fluid rounded-4 shadow-lg" src="https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80" alt="Mutlu çift">
       </div>
     </div>
   </section>
@@ -187,14 +506,14 @@ unset($_SESSION['lead_success']);
       <div class="col-md-4">
         <div class="feature-card h-100">
           <div class="feature-icon mb-3">✨</div>
-          <h4 class="fw-semibold mb-2">Sosyal Galeri Deneyimi</h4>
-          <p class="muted mb-0">Beğeniler, yıldızlar ve yorumlarla misafir galerisi sosyal medya tadında. Albümünüzü dilediğiniz gibi düzenleyin.</p>
+          <h4 class="fw-semibold mb-2">Sosyal galeri deneyimi</h4>
+          <p class="muted mb-0">Beğeniler, yıldızlar ve yorumlarla misafir galeriniz sosyal medya tadında etkileşim sunar.</p>
         </div>
       </div>
       <div class="col-md-4">
         <div class="feature-card h-100">
           <div class="feature-icon mb-3">🔒</div>
-          <h4 class="fw-semibold mb-2">Güvenli Online Ödeme</h4>
+          <h4 class="fw-semibold mb-2">Güvenli online ödeme</h4>
           <p class="muted mb-0">PayTR altyapısıyla kart bilgileriniz güvende. Ödeme tamamlandığında paneliniz ve QR kodlarınız otomatik hazırlanır.</p>
         </div>
       </div>
@@ -203,14 +522,14 @@ unset($_SESSION['lead_success']);
 
   <section id="nasil" class="mb-5">
     <div class="row g-4 align-items-center">
-      <div class="col-lg-6">
-        <h2 class="fw-bold mb-3">BİKARE nasıl çalışır?</h2>
-        <p class="muted">Basit 3 adımda etkinliğinizi dijitalleştiriyoruz. Kurulum ve teknik detaylarla vakit kaybetmenize gerek yok.</p>
+      <div class="col-lg-5">
+        <h2 class="section-heading mb-3">BİKARE nasıl çalışır?</h2>
+        <p class="muted">Basit üç adımda etkinliğinizi dijitalleştiriyoruz. Kurulum ve teknik detaylarla vakit kaybetmeyin; panelinizi biz hazırlayalım.</p>
       </div>
-      <div class="col-lg-6 d-flex flex-column gap-3">
-        <div class="timeline-step"><span>1</span><div><strong>Paketi seçin & ödeme yapın</strong><br><small class="text-muted">Formu doldurup güvenli ödeme adımında işlemi tamamlayın.</small></div></div>
+      <div class="col-lg-7 d-flex flex-column gap-3">
+        <div class="timeline-step"><span>1</span><div><strong>Paketi seçin &amp; ödeme yapın</strong><br><small class="text-muted">Formu doldurup PayTR güvencesiyle ödemenizi tamamlayın.</small></div></div>
         <div class="timeline-step"><span>2</span><div><strong>Panel otomatik kurulsun</strong><br><small class="text-muted">Çift paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.</small></div></div>
-        <div class="timeline-step"><span>3</span><div><strong>Misafirlerinizi davet edin</strong><br><small class="text-muted">QR kodu paylaşın, fotoğraflar ve videolar gerçek zamanlı olarak panelinize düşsün.</small></div></div>
+        <div class="timeline-step"><span>3</span><div><strong>Misafirlerinizi davet edin</strong><br><small class="text-muted">QR kodunu paylaşın, fotoğraf ve videolar gerçek zamanlı olarak panelinize düşsün.</small></div></div>
       </div>
     </div>
   </section>
@@ -260,8 +579,8 @@ unset($_SESSION['lead_success']);
     <div class="row g-4 align-items-center">
       <div class="col-lg-6">
         <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold">Bayi Ağı</span>
-        <h2 class="fw-bold mt-3">Etkinlik sektöründeki iş ortaklarımız için kazandıran sistem</h2>
-        <p class="muted">Bayi panelinizden bakiye yönetebilir, PayTR entegrasyonlu paketler satın alabilir, etkinliklerinizi tek ekrandan yönetebilirsiniz. Referans kodu ile gerçekleştirdiğiniz satışlardan onay sonrası cashback kazanırsınız.</p>
+        <h2 class="section-heading mt-3">Etkinlik sektöründeki iş ortaklarımız için kazandıran sistem</h2>
+        <p class="muted">Bayi panelinizden bakiye yönetebilir, PayTR entegrasyonlu paketler satın alabilir ve etkinliklerinizi tek ekrandan yönetebilirsiniz. Referans kodu ile gerçekleştirdiğiniz satışlardan cashback kazanırsınız.</p>
         <ul class="muted">
           <li>Salon bazlı etkinlik yönetimi ve QR kod üretimi</li>
           <li>Detaylı raporlama, bakiye ve cashback geçmişi</li>
