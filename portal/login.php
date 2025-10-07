@@ -19,20 +19,12 @@ $portalParam = $_GET['portal'] ?? $_POST['portal'] ?? $defaultPortal;
 $portal = in_array($portalParam, $allowedPortals, true) ? $portalParam : $defaultPortal;
 
 $tabParam = $_GET['tab'] ?? $_POST['tab'] ?? null;
-$tab = $portal === 'representative' ? 'representative' : 'dealer';
-if ($portal === 'dealer') {
-    if ($tabParam === 'dealer-apply') {
-        $tab = 'dealer-apply';
-    } elseif ($tabParam === 'dealer') {
-        $tab = 'dealer';
-    }
-} elseif ($tabParam === 'representative') {
-    $tab = 'representative';
-}
-
-if ($tab === 'dealer-apply') {
+if ($tabParam === 'representative') {
+    $portal = 'representative';
+} elseif ($tabParam === 'dealer') {
     $portal = 'dealer';
 }
+$tab = $portal === 'representative' ? 'representative' : 'dealer';
 
 if (isset($_GET['logout'])) {
     dealer_logout();
@@ -77,14 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = (string) ($_POST['password'] ?? '');
     $portal = in_array($_POST['portal'] ?? '', $allowedPortals, true) ? $_POST['portal'] : $defaultPortal;
-    $tab = $_POST['tab'] ?? $portal;
-    if ($portal !== 'representative' && $tab === 'dealer-apply') {
-        $tab = 'dealer-apply';
-    } elseif ($portal === 'representative') {
-        $tab = 'representative';
-    } else {
-        $tab = 'dealer';
-    }
+    $tab = $portal === 'representative' ? 'representative' : 'dealer';
     $rawNext = trim($_POST['next'] ?? '');
 
     if ($portal === 'representative') {
@@ -102,12 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect(resolve_next_redirect($rawNext, 'dealer'));
         }
         flash('err', 'Giriş başarısız. Bilgilerinizi kontrol edin.');
-        $params = ['portal' => 'dealer'];
-        if ($tab === 'dealer-apply') {
-            $params['tab'] = 'dealer-apply';
-        } else {
-            $params['tab'] = 'dealer';
-        }
+        $params = ['portal' => 'dealer', 'tab' => 'dealer'];
         if ($rawNext !== '') {
             $params['next'] = $rawNext;
         }
@@ -148,7 +128,6 @@ $content = $portalContent[$portal];
 $selfPath = strtok($_SERVER['REQUEST_URI'] ?? '', '?') ?: $_SERVER['PHP_SELF'];
 $nextQuery = $rawNext !== '' ? ['next' => $rawNext] : [];
 $dealerTabUrl = $selfPath . '?' . http_build_query(array_merge($nextQuery, ['portal' => 'dealer', 'tab' => 'dealer']));
-$dealerApplyUrl = $selfPath . '?' . http_build_query(array_merge($nextQuery, ['portal' => 'dealer', 'tab' => 'dealer-apply']));
 $repTabUrl = $selfPath . '?' . http_build_query(array_merge($nextQuery, ['portal' => 'representative', 'tab' => 'representative']));
 $formAction = htmlspecialchars($selfPath, ENT_QUOTES, 'UTF-8');
 $nextInput = htmlspecialchars($rawNext, ENT_QUOTES, 'UTF-8');
@@ -230,11 +209,10 @@ $tabInput = htmlspecialchars($tab, ENT_QUOTES, 'UTF-8');
         <div class="entry-hub__row">
           <nav class="switcher">
             <a class="<?= $tab === 'dealer' ? 'is-active' : '' ?>" href="<?=h($dealerTabUrl)?>">Bayi Girişi</a>
-            <a class="<?= $tab === 'dealer-apply' ? 'is-active' : '' ?>" href="<?=h($dealerApplyUrl)?>">Bayi Ol</a>
             <a class="<?= $tab === 'representative' ? 'is-active' : '' ?>" href="<?=h($repTabUrl)?>">Temsilci Girişi</a>
           </nav>
         </div>
-        <p class="form-note mb-0 small">Bayi veya temsilci olarak giriş yapmak için yukarıdaki sekmelerden seçim yapabilirsiniz. Başvuru yapmak isteyen bayiler "Bayi Ol" sekmesinden ilerleyebilir.</p>
+        <p class="form-note mb-0 small">Bayi veya temsilci olarak giriş yapmak için yukarıdaki sekmelerden seçim yapabilirsiniz.</p>
       </div>
       <div>
         <div class="brand">BİKARE <span><?= $portal === 'dealer' ? 'Bayi Paneli' : 'Temsilci Paneli' ?></span></div>
