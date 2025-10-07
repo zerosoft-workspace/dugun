@@ -153,6 +153,7 @@ $portalInput = htmlspecialchars($portal, ENT_QUOTES, 'UTF-8');
     .switcher a{padding:.55rem 1.4rem;border-radius:999px;font-weight:600;color:var(--muted);text-decoration:none;transition:all .2s ease;}
     .switcher a.is-active{background:linear-gradient(135deg,#0ea5b5,#0b8b98);color:#fff;box-shadow:0 18px 32px -20px rgba(14,165,181,.6);}
     .switcher a:hover{color:var(--ink);}
+    .switcher-note{margin-top:.75rem;font-weight:600;color:var(--brand-dark);background:rgba(14,165,181,.08);display:inline-flex;align-items:center;gap:.5rem;padding:.45rem .85rem;border-radius:999px;box-shadow:0 12px 24px -22px rgba(14,165,181,.5);}
     .brand{font-weight:800;font-size:1.7rem;letter-spacing:.18rem;margin-bottom:.2rem;text-transform:uppercase;}
     .brand span{display:block;font-size:.95rem;font-weight:600;color:var(--muted);margin-top:.35rem;letter-spacing:0;text-transform:none;}
     .form-note{color:var(--muted);font-size:.94rem;line-height:1.6;max-width:480px;}
@@ -202,6 +203,9 @@ $portalInput = htmlspecialchars($portal, ENT_QUOTES, 'UTF-8');
         <a class="<?= $portal === 'dealer' ? 'is-active' : '' ?>" href="<?=h($dealerTabUrl)?>">Bayi Girişi</a>
         <a class="<?= $portal === 'representative' ? 'is-active' : '' ?>" href="<?=h($repTabUrl)?>">Temsilci Girişi</a>
       </nav>
+      <?php if ($portal === 'dealer'): ?>
+        <div class="switcher-note">Bayi oldu de</div>
+      <?php endif; ?>
       <div>
         <div class="brand">BİKARE <span><?= $portal === 'dealer' ? 'Bayi Paneli' : 'Temsilci Paneli' ?></span></div>
         <p class="form-note">
