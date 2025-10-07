@@ -108,6 +108,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
         <a class="apply-link" href="apply.php">Başvuru Formu →</a>
       </div>
+      <div class="text-center mt-4">
+        <a class="apply-link" href="https://drive.demozerosoft.com.tr/">← drive.demozerosoft.com.tr ana sayfasına dön</a>
+      </div>
     </section>
   </div>
 </body>

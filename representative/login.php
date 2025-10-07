@@ -71,6 +71,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
       <button class="btn-brand" type="submit">Temsilci Paneline Giriş Yap</button>
     </form>
+    <div class="text-center mt-4">
+      <a class="text-decoration-none fw-semibold" style="color: var(--brand);" href="https://drive.demozerosoft.com.tr/">← drive.demozerosoft.com.tr ana sayfasına dön</a>
+    </div>
   </div>
 </body>
 </html>

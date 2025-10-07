@@ -188,7 +188,7 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
       <?php endif; ?>
 
       <div>
-        <a class="back-link" href="../index.php">← bikare.com.tr ana sayfasına dön</a>
+        <a class="back-link" href="https://drive.demozerosoft.com.tr/">← drive.demozerosoft.com.tr ana sayfasına dön</a>
       </div>
     </section>
   </div>

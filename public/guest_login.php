@@ -204,7 +204,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="muted-tip">Farklı bir e-posta adresiyle giriş yapmak isterseniz aşağıdaki bağlantıyı kullanabilirsiniz.</div>
       <?php endif; ?>
       <div class="footer-links">
-        <a href="<?=BASE_URL?>">← Anasayfaya dön</a>
+        <a href="https://drive.demozerosoft.com.tr/">← drive.demozerosoft.com.tr ana sayfasına dön</a>
         <?php if ($stage !== 'form'): ?>
           <a href="<?=BASE_URL?>/public/guest_login.php?reset=1">Farklı hesapla giriş yap</a>
         <?php endif; ?>
