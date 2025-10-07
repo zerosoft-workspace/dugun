@@ -181,16 +181,11 @@ $tabInput = htmlspecialchars($tab, ENT_QUOTES, 'UTF-8');
     .visual-footer{font-size:.84rem;color:rgba(255,255,255,.75);max-width:360px;margin-top:2.8rem;}
     .auth-form{flex:.95;padding:3.2rem;display:flex;flex-direction:column;gap:2rem;justify-content:center;}
     .entry-hub{display:flex;flex-direction:column;gap:.9rem;background:#f6feff;border-radius:22px;padding:1.1rem 1.2rem;border:1px solid rgba(14,165,181,.18);box-shadow:0 18px 46px -32px rgba(14,165,181,.55);}
-    .entry-hub__row{display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;justify-content:space-between;}
+    .entry-hub__row{display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;}
     .switcher{display:inline-flex;align-items:center;gap:.6rem;background:#ecfbfd;padding:.45rem;border-radius:999px;border:1px solid rgba(14,165,181,.18);box-shadow:0 12px 32px -24px rgba(14,165,181,.45);}
     .switcher a{padding:.55rem 1.4rem;border-radius:999px;font-weight:600;color:var(--muted);text-decoration:none;transition:all .2s ease;white-space:nowrap;}
     .switcher a.is-active{background:linear-gradient(135deg,#0ea5b5,#0b8b98);color:#fff;box-shadow:0 18px 32px -20px rgba(14,165,181,.6);}
     .switcher a:hover{color:var(--ink);}
-    .entry-shortcuts{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;}
-    .entry-shortcuts a{display:inline-flex;align-items:center;gap:.5rem;padding:.55rem 1.3rem;border-radius:999px;font-weight:600;text-decoration:none;transition:all .2s ease;background:linear-gradient(135deg,#0ea5e9,#0b8b98);color:#fff;box-shadow:0 14px 32px -22px rgba(14,165,181,.6);}
-    .entry-shortcuts a:hover{transform:translateY(-1px);color:#fff;box-shadow:0 18px 38px -24px rgba(14,165,181,.65);}
-    .entry-shortcuts a.secondary{background:rgba(14,165,181,.12);color:var(--brand-dark);box-shadow:none;}
-    .entry-shortcuts a.secondary:hover{box-shadow:0 16px 30px -24px rgba(14,165,181,.45);}
     .brand{font-weight:800;font-size:1.7rem;letter-spacing:.18rem;margin-bottom:.2rem;text-transform:uppercase;}
     .brand span{display:block;font-size:.95rem;font-weight:600;color:var(--muted);margin-top:.35rem;letter-spacing:0;text-transform:none;}
     .form-note{color:var(--muted);font-size:.94rem;line-height:1.6;max-width:480px;}
@@ -238,12 +233,8 @@ $tabInput = htmlspecialchars($tab, ENT_QUOTES, 'UTF-8');
             <a class="<?= $tab === 'dealer-apply' ? 'is-active' : '' ?>" href="<?=h($dealerApplyUrl)?>">Bayi Ol</a>
             <a class="<?= $tab === 'representative' ? 'is-active' : '' ?>" href="<?=h($repTabUrl)?>">Temsilci Girişi</a>
           </nav>
-          <div class="entry-shortcuts">
-            <a href="<?=BASE_URL?>/public/guest_login.php">Misafir &amp; Davetli</a>
-            <a class="secondary" href="<?=BASE_URL?>/admin/login.php">Admin</a>
-          </div>
         </div>
-        <p class="form-note mb-0 small">Sistemdeki tüm giriş seçenekleri artık bu merkezden ulaşılabilir. Misafir ve davetliler etkinlik panellerine yönlendirilir, yöneticiler ise admin girişine devam edebilir.</p>
+        <p class="form-note mb-0 small">Bayi veya temsilci olarak giriş yapmak için yukarıdaki sekmelerden seçim yapabilirsiniz. Başvuru yapmak isteyen bayiler "Bayi Ol" sekmesinden ilerleyebilir.</p>
       </div>
       <div>
         <div class="brand">BİKARE <span><?= $portal === 'dealer' ? 'Bayi Paneli' : 'Temsilci Paneli' ?></span></div>
