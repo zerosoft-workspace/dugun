@@ -30,6 +30,68 @@ function dealer_login(string $email, string $password): bool {
   return true;
 }
 
+function dealer_send_password_reset(string $email): void {
+  $email = trim($email);
+  if ($email === '') {
+    return;
+  }
+
+  $st = pdo()->prepare("SELECT id, email, name FROM dealers WHERE email=? AND status=? LIMIT 1");
+  $st->execute([$email, DEALER_STATUS_ACTIVE]);
+  $dealer = $st->fetch();
+  if (!$dealer) {
+    return;
+  }
+
+  $code = strtoupper(bin2hex(random_bytes(4)));
+  $expires = date('Y-m-d H:i:s', time() + 3600);
+
+  pdo()->prepare("UPDATE dealers SET reset_code=?, reset_expires=?, updated_at=? WHERE id=?")
+      ->execute([$code, $expires, now(), (int)$dealer['id']]);
+
+  $resetUrl = rtrim(BASE_URL, '/').'/dealer/reset.php?code='.urlencode($code).'&email='.urlencode($dealer['email']);
+  $html = '<h2>'.h(APP_NAME).' Bayi Şifre Sıfırlama</h2>'
+        . '<p>Merhaba '.h($dealer['name'] ?: $dealer['email']).',</p>'
+        . '<p>Yeni bir bayi paneli şifresi belirlemek için aşağıdaki bağlantıya tıklayın.</p>'
+        . '<p><a href="'.h($resetUrl).'">Şifremi sıfırla</a></p>'
+        . '<p>Bağlantı 1 saat boyunca geçerlidir. Eğer bu isteği siz yapmadıysanız lütfen dikkate almayın.</p>';
+
+  send_mail_simple($dealer['email'], APP_NAME.' Bayi Paneli Şifre Sıfırlama', $html);
+}
+
+function dealer_reset_request_valid(string $email, string $code): bool {
+  $email = trim($email);
+  $code = trim($code);
+  if ($email === '' || $code === '') {
+    return false;
+  }
+
+  $st = pdo()->prepare("SELECT 1 FROM dealers WHERE email=? AND reset_code=? AND reset_expires IS NOT NULL AND reset_expires >= ? LIMIT 1");
+  $st->execute([$email, $code, now()]);
+  return (bool)$st->fetchColumn();
+}
+
+function dealer_complete_password_reset(string $email, string $code, string $newPassword): bool {
+  $email = trim($email);
+  $code = trim($code);
+  if ($email === '' || $code === '' || $newPassword === '') {
+    return false;
+  }
+
+  $st = pdo()->prepare("SELECT id FROM dealers WHERE email=? AND reset_code=? AND reset_expires IS NOT NULL AND reset_expires >= ? LIMIT 1");
+  $st->execute([$email, $code, now()]);
+  $dealer = $st->fetch();
+  if (!$dealer) {
+    return false;
+  }
+
+  $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+  pdo()->prepare("UPDATE dealers SET password_hash=?, reset_code=NULL, reset_expires=NULL, updated_at=? WHERE id=?")
+      ->execute([$hash, now(), (int)$dealer['id']]);
+
+  return true;
+}
+
 function dealer_logout(): void {
   unset($_SESSION['dealer']);
 }

@@ -46,6 +46,68 @@ function admin_login(string $email, string $password): bool {
   return true;
 }
 
+function admin_send_password_reset(string $email): void {
+  $email = trim($email);
+  if ($email === '') {
+    return;
+  }
+
+  $st = pdo()->prepare("SELECT id, email, name FROM users WHERE email=? LIMIT 1");
+  $st->execute([$email]);
+  $user = $st->fetch();
+  if (!$user) {
+    return;
+  }
+
+  $code = strtoupper(bin2hex(random_bytes(4)));
+  $expires = date('Y-m-d H:i:s', time() + 3600);
+
+  pdo()->prepare("UPDATE users SET reset_code=?, reset_expires=?, updated_at=? WHERE id=?")
+      ->execute([$code, $expires, now(), (int)$user['id']]);
+
+  $resetUrl = rtrim(BASE_URL, '/').'/admin/reset.php?code='.urlencode($code).'&email='.urlencode($user['email']);
+  $html = '<h2>'.h(APP_NAME).' Yönetici Şifre Sıfırlama</h2>'
+        . '<p>Merhaba '.h($user['name'] ?: $user['email']).',</p>'
+        . '<p>Yeni bir şifre oluşturmak için aşağıdaki bağlantıyı kullanabilirsiniz.</p>'
+        . '<p><a href="'.h($resetUrl).'">Şifremi sıfırla</a></p>'
+        . '<p>Bağlantı 1 saat boyunca geçerlidir. Eğer bu işlemi siz başlatmadıysanız lütfen bu e-postayı yok sayın.</p>';
+
+  send_mail_simple($user['email'], APP_NAME.' Yönetici Paneli Şifre Sıfırlama', $html);
+}
+
+function admin_reset_request_valid(string $email, string $code): bool {
+  $email = trim($email);
+  $code = trim($code);
+  if ($email === '' || $code === '') {
+    return false;
+  }
+
+  $st = pdo()->prepare("SELECT 1 FROM users WHERE email=? AND reset_code=? AND reset_expires IS NOT NULL AND reset_expires >= ? LIMIT 1");
+  $st->execute([$email, $code, now()]);
+  return (bool)$st->fetchColumn();
+}
+
+function admin_complete_password_reset(string $email, string $code, string $newPassword): bool {
+  $email = trim($email);
+  $code = trim($code);
+  if ($email === '' || $code === '' || $newPassword === '') {
+    return false;
+  }
+
+  $st = pdo()->prepare("SELECT id FROM users WHERE email=? AND reset_code=? AND reset_expires IS NOT NULL AND reset_expires >= ? LIMIT 1");
+  $st->execute([$email, $code, now()]);
+  $user = $st->fetch();
+  if (!$user) {
+    return false;
+  }
+
+  $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+  pdo()->prepare("UPDATE users SET password_hash=?, reset_code=NULL, reset_expires=NULL, updated_at=? WHERE id=?")
+      ->execute([$hash, now(), (int)$user['id']]);
+
+  return true;
+}
+
 /** Çıkış yap. */
 function admin_logout(): void {
   unset($_SESSION['admin']);

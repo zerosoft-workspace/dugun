@@ -70,6 +70,68 @@ function guest_profile_set_password(int $profileId, string $password): void {
       ->execute([$hash, $now, $now, $profileId]);
 }
 
+function guest_send_password_reset(string $email): void {
+  $email = guest_profile_normalize_email($email);
+  if ($email === '') {
+    return;
+  }
+
+  $st = pdo()->prepare('SELECT gp.id, gp.display_name, gp.name, gp.event_id, gp.password_hash, e.title AS event_title, e.event_date
+                         FROM guest_profiles gp
+                         JOIN events e ON e.id = gp.event_id
+                         WHERE gp.email=? AND gp.is_verified=1 AND gp.password_hash IS NOT NULL AND e.is_active=1');
+  $st->execute([$email]);
+  $profiles = $st->fetchAll();
+  if (!$profiles) {
+    return;
+  }
+
+  $items = [];
+  $greetingName = null;
+  foreach ($profiles as $row) {
+    $profileId = (int)$row['id'];
+    if ($profileId <= 0) {
+      continue;
+    }
+
+    if ($greetingName === null) {
+      $greetingName = $row['display_name'] ?: ($row['name'] ?: null);
+    }
+
+    $token = guest_profile_issue_password_token($profileId, 3600);
+    $resetUrl = BASE_URL.'/public/guest_password.php?token='.rawurlencode($token);
+    $eventTitle = $row['event_title'] ?: 'Etkinliğiniz';
+
+    $eventDateLabel = '';
+    if (!empty($row['event_date'])) {
+      $ts = strtotime($row['event_date']);
+      if ($ts) {
+        $eventDateLabel = date('d.m.Y', $ts);
+      }
+    }
+
+    $label = '<strong>'.h($eventTitle).'</strong>';
+    if ($eventDateLabel !== '') {
+      $label .= ' — '.h($eventDateLabel);
+    }
+
+    $items[] = '<li>'.$label.'<br><a href="'.h($resetUrl).'">Şifreyi sıfırla</a></li>';
+  }
+
+  if (!$items) {
+    return;
+  }
+
+  $greetingName = $greetingName ?: 'Misafirimiz';
+  $html  = '<h2>'.h(APP_NAME).' Misafir Paneli Şifre Sıfırlama</h2>';
+  $html .= '<p>Merhaba '.h($greetingName).',</p>';
+  $html .= '<p>Misafir paneli hesabınız için yeni bir şifre belirlemek üzere aşağıdaki bağlantıları kullanabilirsiniz.</p>';
+  $html .= '<ul>'.implode('', $items).'</ul>';
+  $html .= '<p>Bağlantılar 1 saat boyunca geçerlidir. Eğer bu isteği siz göndermediyseniz bu e-postayı yok sayabilirsiniz.</p>';
+
+  send_mail_simple($email, APP_NAME.' Misafir Paneli Şifre Sıfırlama', $html);
+}
+
 function guest_profile_authenticate(string $email, string $password): array {
   $email = guest_profile_normalize_email($email);
   if ($email === '' || trim($password) === '') {

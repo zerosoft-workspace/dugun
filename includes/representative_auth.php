@@ -32,6 +32,68 @@ function representative_login(string $email, string $password): bool {
   return true;
 }
 
+function representative_send_password_reset(string $email): void {
+  $email = trim($email);
+  if ($email === '') {
+    return;
+  }
+
+  $st = pdo()->prepare("SELECT id, email, name FROM dealer_representatives WHERE email=? AND status=? LIMIT 1");
+  $st->execute([$email, REPRESENTATIVE_STATUS_ACTIVE]);
+  $rep = $st->fetch();
+  if (!$rep) {
+    return;
+  }
+
+  $code = strtoupper(bin2hex(random_bytes(4)));
+  $expires = date('Y-m-d H:i:s', time() + 3600);
+
+  pdo()->prepare("UPDATE dealer_representatives SET reset_code=?, reset_expires=?, updated_at=? WHERE id=?")
+      ->execute([$code, $expires, now(), (int)$rep['id']]);
+
+  $resetUrl = rtrim(BASE_URL, '/').'/representative/reset.php?code='.urlencode($code).'&email='.urlencode($rep['email']);
+  $html = '<h2>'.h(APP_NAME).' Temsilci Şifre Sıfırlama</h2>'
+        . '<p>Merhaba '.h($rep['name'] ?: $rep['email']).',</p>'
+        . '<p>Temsilci paneli şifrenizi yenilemek için aşağıdaki bağlantıyı kullanabilirsiniz.</p>'
+        . '<p><a href="'.h($resetUrl).'">Şifremi sıfırla</a></p>'
+        . '<p>Bağlantı 1 saat boyunca geçerlidir. Eğer bu işlemi siz başlatmadıysanız lütfen bu mesajı önemsemeyin.</p>';
+
+  send_mail_simple($rep['email'], APP_NAME.' Temsilci Paneli Şifre Sıfırlama', $html);
+}
+
+function representative_reset_request_valid(string $email, string $code): bool {
+  $email = trim($email);
+  $code = trim($code);
+  if ($email === '' || $code === '') {
+    return false;
+  }
+
+  $st = pdo()->prepare("SELECT 1 FROM dealer_representatives WHERE email=? AND reset_code=? AND reset_expires IS NOT NULL AND reset_expires >= ? LIMIT 1");
+  $st->execute([$email, $code, now()]);
+  return (bool)$st->fetchColumn();
+}
+
+function representative_complete_password_reset(string $email, string $code, string $newPassword): bool {
+  $email = trim($email);
+  $code = trim($code);
+  if ($email === '' || $code === '' || $newPassword === '') {
+    return false;
+  }
+
+  $st = pdo()->prepare("SELECT id FROM dealer_representatives WHERE email=? AND reset_code=? AND reset_expires IS NOT NULL AND reset_expires >= ? LIMIT 1");
+  $st->execute([$email, $code, now()]);
+  $rep = $st->fetch();
+  if (!$rep) {
+    return false;
+  }
+
+  $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+  pdo()->prepare("UPDATE dealer_representatives SET password_hash=?, reset_code=NULL, reset_expires=NULL, updated_at=? WHERE id=?")
+      ->execute([$hash, now(), (int)$rep['id']]);
+
+  return true;
+}
+
 function representative_logout(): void {
   unset($_SESSION['representative']);
 }

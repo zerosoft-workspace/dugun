@@ -96,6 +96,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <label class="form-label">Şifre</label>
           <input type="password" name="password" class="form-control" required placeholder="Şifrenizi yazın">
         </div>
+        <div class="text-end">
+          <a class="small text-decoration-none" href="forgot.php">Şifremi unuttum</a>
+        </div>
         <button class="btn-brand" type="submit">Bayi Paneline Giriş Yap</button>
       </form>
       <div class="apply-box">

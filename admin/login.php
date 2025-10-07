@@ -179,6 +179,9 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
               <label class="form-label">Şifre</label>
               <input class="form-control" type="password" name="password" required placeholder="Şifrenizi yazın">
             </div>
+            <div class="d-flex justify-content-end">
+              <a class="small text-decoration-none" href="forgot.php">Şifremi unuttum</a>
+            </div>
             <button class="btn-brand mt-2 w-100">Giriş Yap</button>
           </form>
         </div>

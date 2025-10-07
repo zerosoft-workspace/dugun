@@ -113,7 +113,7 @@ function install_schema(){
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(190) NOT NULL,
     role ENUM('superadmin','admin') NOT NULL DEFAULT 'admin',
-    reset_code VARCHAR(10) NULL,
+    reset_code VARCHAR(64) NULL,
     reset_expires DATETIME NULL,
     last_login_at DATETIME NULL,
     created_at DATETIME NOT NULL,
@@ -150,9 +150,25 @@ function install_schema(){
     approved_at DATETIME NULL,
     last_login_at DATETIME NULL,
     balance_cents INT NOT NULL DEFAULT 0,
+    reset_code VARCHAR(64) NULL,
+    reset_expires DATETIME NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  try {
+    pdo()->exec("ALTER TABLE users MODIFY reset_code VARCHAR(64) NULL");
+  } catch (Throwable $e) {}
+
+  if (!column_exists('dealers', 'reset_code')) {
+    pdo()->exec("ALTER TABLE dealers ADD reset_code VARCHAR(64) NULL AFTER last_login_at");
+  }
+  if (!column_exists('dealers', 'reset_expires')) {
+    pdo()->exec("ALTER TABLE dealers ADD reset_expires DATETIME NULL AFTER reset_code");
+  }
+  try {
+    pdo()->exec("ALTER TABLE dealers MODIFY reset_code VARCHAR(64) NULL");
+  } catch (Throwable $e) {}
 
   if (!column_exists('dealers', 'code')) {
     pdo()->exec("ALTER TABLE dealers ADD code VARCHAR(16) NULL AFTER id");
@@ -514,6 +530,8 @@ function install_schema(){
     email VARCHAR(190) NOT NULL UNIQUE,
     phone VARCHAR(64) NULL,
     password_hash VARCHAR(255) NOT NULL,
+    reset_code VARCHAR(64) NULL,
+    reset_expires DATETIME NULL,
     commission_rate DECIMAL(5,2) NOT NULL DEFAULT 10.00,
     status VARCHAR(16) NOT NULL DEFAULT 'active',
     last_login_at DATETIME NULL,
@@ -523,6 +541,16 @@ function install_schema(){
     INDEX idx_representative_status (status),
     FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('dealer_representatives', 'reset_code')) {
+    pdo()->exec("ALTER TABLE dealer_representatives ADD reset_code VARCHAR(64) NULL AFTER password_hash");
+  }
+  if (!column_exists('dealer_representatives', 'reset_expires')) {
+    pdo()->exec("ALTER TABLE dealer_representatives ADD reset_expires DATETIME NULL AFTER reset_code");
+  }
+  try {
+    pdo()->exec("ALTER TABLE dealer_representatives MODIFY reset_code VARCHAR(64) NULL");
+  } catch (Throwable $e) {}
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representative_assignments(
     representative_id INT NOT NULL,

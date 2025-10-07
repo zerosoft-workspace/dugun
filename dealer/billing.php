@@ -305,7 +305,7 @@ dealer_layout_start('billing', [
                   <?=$direction?> • <?=$amountLabel?>
                 </span>
               </td>
-              <td><?=h(format_currency($movement['balance_after_cents']))?></td>
+              <td><?=h(format_currency($movement['balance_after']))?></td>
             </tr>
           <?php endforeach; ?>
         <?php endif; ?>

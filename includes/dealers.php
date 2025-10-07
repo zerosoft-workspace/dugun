@@ -697,9 +697,56 @@ function dealer_wallet_transactions(int $dealer_id, int $limit = 20): array {
   foreach ($rows as &$row) {
     $row['amount_cents'] = (int)$row['amount_cents'];
     $row['balance_after'] = (int)$row['balance_after'];
-    $row['meta'] = !empty($row['meta_json']) ? safe_json_decode($row['meta_json']) : null;
+    // Backwards compatibility: expose balance both with and without suffix.
+    $row['balance_after_cents'] = $row['balance_after'];
+    $meta = !empty($row['meta_json']) ? safe_json_decode($row['meta_json']) : null;
+    $row['meta'] = is_array($meta) ? $meta : null;
   }
   return $rows;
+}
+
+function dealer_wallet_description(array $movement): string {
+  $description = trim((string)($movement['description'] ?? ''));
+  if ($description !== '') {
+    return $description;
+  }
+
+  $type = $movement['type'] ?? '';
+  $meta = $movement['meta'] ?? null;
+  $label = dealer_wallet_type_label(is_string($type) ? $type : '');
+
+  if (is_array($meta)) {
+    switch ($type) {
+      case DEALER_WALLET_TYPE_TOPUP:
+        if (!empty($meta['reference'])) {
+          return $label.' • Ref: '.$meta['reference'];
+        }
+        if (!empty($meta['topup_id'])) {
+          return $label.' #'.$meta['topup_id'];
+        }
+        break;
+      case DEALER_WALLET_TYPE_CASHBACK:
+        if (!empty($meta['event_id'])) {
+          return $label.' • Etkinlik #'.$meta['event_id'];
+        }
+        if (!empty($meta['purchase_id'])) {
+          return $label.' • Satın alma #'.$meta['purchase_id'];
+        }
+        break;
+      case DEALER_WALLET_TYPE_PURCHASE:
+        if (!empty($meta['package_id'])) {
+          return 'Paket satın alımı #'.$meta['package_id'];
+        }
+        break;
+      case DEALER_WALLET_TYPE_ADJUSTMENT:
+        if (!empty($meta['reason'])) {
+          return 'Düzenleme — '.$meta['reason'];
+        }
+        break;
+    }
+  }
+
+  return $label;
 }
 
 function dealer_total_cashback(int $dealer_id): int {

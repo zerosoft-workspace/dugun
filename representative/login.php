@@ -66,6 +66,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label class="form-label">Şifre</label>
         <input type="password" class="form-control" name="password" required>
       </div>
+      <div class="text-end">
+        <a class="small text-decoration-none" href="forgot.php">Şifremi unuttum</a>
+      </div>
       <button class="btn-brand" type="submit">Temsilci Paneline Giriş Yap</button>
     </form>
   </div>

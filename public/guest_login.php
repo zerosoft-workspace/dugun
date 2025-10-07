@@ -166,6 +166,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <label class="form-label fw-semibold">Şifre</label>
             <input type="password" name="password" class="form-control" placeholder="Şifrenizi yazın" required>
           </div>
+          <div class="text-end">
+            <a class="small text-decoration-none" href="guest_forgot.php">Şifremi unuttum</a>
+          </div>
           <button type="submit" class="btn btn-brand mt-2">Misafir Paneline Gir</button>
         </form>
         <div class="muted-tip">Doğrulama bağlantısındaki şifre oluşturma adımını tamamladıktan sonra panel erişiminiz aktifleşir.</div>
