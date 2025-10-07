@@ -4,6 +4,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/dealers.php';
 require_once __DIR__.'/../includes/public_header.php';
+require_once __DIR__.'/../includes/login_header.php';
 
 install_schema();
 
@@ -74,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title><?=h(APP_NAME)?> — Bayi Başvurusu</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <?=login_header_styles()?>
   <style>
     :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#5b6678; }
     *{box-sizing:border-box;}
