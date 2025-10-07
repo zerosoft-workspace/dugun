@@ -18,6 +18,22 @@ $rawNext = trim($_GET['next'] ?? $_POST['next'] ?? '');
 $portalParam = $_GET['portal'] ?? $_POST['portal'] ?? $defaultPortal;
 $portal = in_array($portalParam, $allowedPortals, true) ? $portalParam : $defaultPortal;
 
+$tabParam = $_GET['tab'] ?? $_POST['tab'] ?? null;
+$tab = $portal === 'representative' ? 'representative' : 'dealer';
+if ($portal === 'dealer') {
+    if ($tabParam === 'dealer-apply') {
+        $tab = 'dealer-apply';
+    } elseif ($tabParam === 'dealer') {
+        $tab = 'dealer';
+    }
+} elseif ($tabParam === 'representative') {
+    $tab = 'representative';
+}
+
+if ($tab === 'dealer-apply') {
+    $portal = 'dealer';
+}
+
 if (isset($_GET['logout'])) {
     dealer_logout();
     representative_logout();
@@ -61,6 +77,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email'] ?? '');
     $password = (string) ($_POST['password'] ?? '');
     $portal = in_array($_POST['portal'] ?? '', $allowedPortals, true) ? $_POST['portal'] : $defaultPortal;
+    $tab = $_POST['tab'] ?? $portal;
+    if ($portal !== 'representative' && $tab === 'dealer-apply') {
+        $tab = 'dealer-apply';
+    } elseif ($portal === 'representative') {
+        $tab = 'representative';
+    } else {
+        $tab = 'dealer';
+    }
     $rawNext = trim($_POST['next'] ?? '');
 
     if ($portal === 'representative') {
@@ -68,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect(resolve_next_redirect($rawNext, 'representative'));
         }
         flash('err', 'Giriş başarısız. Bilgilerinizi kontrol edin.');
-        $params = ['portal' => 'representative'];
+        $params = ['portal' => 'representative', 'tab' => 'representative'];
         if ($rawNext !== '') {
             $params['next'] = $rawNext;
         }
@@ -78,7 +102,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             redirect(resolve_next_redirect($rawNext, 'dealer'));
         }
         flash('err', 'Giriş başarısız. Bilgilerinizi kontrol edin.');
-        $params = [];
+        $params = ['portal' => 'dealer'];
+        if ($tab === 'dealer-apply') {
+            $params['tab'] = 'dealer-apply';
+        } else {
+            $params['tab'] = 'dealer';
+        }
         if ($rawNext !== '') {
             $params['next'] = $rawNext;
         }
@@ -118,11 +147,13 @@ $portalContent = [
 $content = $portalContent[$portal];
 $selfPath = strtok($_SERVER['REQUEST_URI'] ?? '', '?') ?: $_SERVER['PHP_SELF'];
 $nextQuery = $rawNext !== '' ? ['next' => $rawNext] : [];
-$dealerTabUrl = $selfPath . '?' . http_build_query(array_merge($nextQuery, ['portal' => 'dealer']));
-$repTabUrl = $selfPath . '?' . http_build_query(array_merge($nextQuery, ['portal' => 'representative']));
+$dealerTabUrl = $selfPath . '?' . http_build_query(array_merge($nextQuery, ['portal' => 'dealer', 'tab' => 'dealer']));
+$dealerApplyUrl = $selfPath . '?' . http_build_query(array_merge($nextQuery, ['portal' => 'dealer', 'tab' => 'dealer-apply']));
+$repTabUrl = $selfPath . '?' . http_build_query(array_merge($nextQuery, ['portal' => 'representative', 'tab' => 'representative']));
 $formAction = htmlspecialchars($selfPath, ENT_QUOTES, 'UTF-8');
 $nextInput = htmlspecialchars($rawNext, ENT_QUOTES, 'UTF-8');
 $portalInput = htmlspecialchars($portal, ENT_QUOTES, 'UTF-8');
+$tabInput = htmlspecialchars($tab, ENT_QUOTES, 'UTF-8');
 ?>
 <!doctype html>
 <html lang="tr">
@@ -150,10 +181,9 @@ $portalInput = htmlspecialchars($portal, ENT_QUOTES, 'UTF-8');
     .visual-footer{font-size:.84rem;color:rgba(255,255,255,.75);max-width:360px;margin-top:2.8rem;}
     .auth-form{flex:.95;padding:3.2rem;display:flex;flex-direction:column;gap:2rem;justify-content:center;}
     .switcher{display:inline-flex;align-items:center;gap:.6rem;background:#f1fbfc;padding:.45rem;border-radius:999px;border:1px solid rgba(14,165,181,.18);box-shadow:0 12px 32px -24px rgba(14,165,181,.45);}
-    .switcher a{padding:.55rem 1.4rem;border-radius:999px;font-weight:600;color:var(--muted);text-decoration:none;transition:all .2s ease;}
+    .switcher a{padding:.55rem 1.4rem;border-radius:999px;font-weight:600;color:var(--muted);text-decoration:none;transition:all .2s ease;white-space:nowrap;}
     .switcher a.is-active{background:linear-gradient(135deg,#0ea5b5,#0b8b98);color:#fff;box-shadow:0 18px 32px -20px rgba(14,165,181,.6);}
     .switcher a:hover{color:var(--ink);}
-    .switcher-note{margin-top:.75rem;font-weight:600;color:var(--brand-dark);background:rgba(14,165,181,.08);display:inline-flex;align-items:center;gap:.5rem;padding:.45rem .85rem;border-radius:999px;box-shadow:0 12px 24px -22px rgba(14,165,181,.5);}
     .brand{font-weight:800;font-size:1.7rem;letter-spacing:.18rem;margin-bottom:.2rem;text-transform:uppercase;}
     .brand span{display:block;font-size:.95rem;font-weight:600;color:var(--muted);margin-top:.35rem;letter-spacing:0;text-transform:none;}
     .form-note{color:var(--muted);font-size:.94rem;line-height:1.6;max-width:480px;}
@@ -200,12 +230,10 @@ $portalInput = htmlspecialchars($portal, ENT_QUOTES, 'UTF-8');
     </aside>
     <section class="auth-form">
       <nav class="switcher">
-        <a class="<?= $portal === 'dealer' ? 'is-active' : '' ?>" href="<?=h($dealerTabUrl)?>">Bayi Girişi</a>
-        <a class="<?= $portal === 'representative' ? 'is-active' : '' ?>" href="<?=h($repTabUrl)?>">Temsilci Girişi</a>
+        <a class="<?= $tab === 'dealer' ? 'is-active' : '' ?>" href="<?=h($dealerTabUrl)?>">Bayi Girişi</a>
+        <a class="<?= $tab === 'dealer-apply' ? 'is-active' : '' ?>" href="<?=h($dealerApplyUrl)?>">Bayi Ol</a>
+        <a class="<?= $tab === 'representative' ? 'is-active' : '' ?>" href="<?=h($repTabUrl)?>">Temsilci Girişi</a>
       </nav>
-      <?php if ($portal === 'dealer'): ?>
-        <div class="switcher-note">Bayi oldu de</div>
-      <?php endif; ?>
       <div>
         <div class="brand">BİKARE <span><?= $portal === 'dealer' ? 'Bayi Paneli' : 'Temsilci Paneli' ?></span></div>
         <p class="form-note">
@@ -219,6 +247,7 @@ $portalInput = htmlspecialchars($portal, ENT_QUOTES, 'UTF-8');
       <?php flash_box(); ?>
       <form method="post" action="<?=$formAction?>" class="vstack gap-3">
         <input type="hidden" name="portal" value="<?=$portalInput?>">
+        <input type="hidden" name="tab" value="<?=$tabInput?>">
         <input type="hidden" name="next" value="<?=$nextInput?>">
         <div>
           <label class="form-label">E-posta</label>
