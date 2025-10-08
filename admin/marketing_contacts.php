@@ -4,6 +4,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/auth.php';
+require_once __DIR__.'/../includes/sms.php';
 require_once __DIR__.'/partials/ui.php';
 
 require_admin();
@@ -60,6 +61,35 @@ function unique_values(array $values, bool $numeric = false): array {
     $unique[] = $trimmed;
   }
   return $unique;
+}
+
+function parse_list_input(string $raw, bool $numeric = false): array {
+  if ($raw === '') {
+    return [];
+  }
+  $parts = preg_split('/[\s,;]+/u', $raw);
+  if ($parts === false) {
+    return [];
+  }
+  return unique_values($parts, $numeric);
+}
+
+function build_email_html(string $body): string {
+  $content = nl2br(h($body));
+  $footer = '<p style="margin-top:24px;font-size:13px;color:#64748b;">'.h(APP_NAME).' Pazarlama Ekibi</p>';
+  return '<div style="font-family:Inter,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.6;color:#0f172a;">'.$content.$footer.'</div>';
+}
+
+function summarize_list(array $items, int $limit = 5): string {
+  if ($items === []) {
+    return '';
+  }
+  $slice = array_slice($items, 0, $limit);
+  $text = implode(', ', $slice);
+  if (count($items) > $limit) {
+    $text .= '…';
+  }
+  return $text;
 }
 
 function fetch_marketing_contacts(string $category): array {
@@ -411,6 +441,107 @@ $phones = unique_values(array_map(function ($contact) {
   return $contact['phone'] ?? '';
 }, $activeContacts), true);
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+  csrf_or_die();
+  $action = $_POST['action'] ?? '';
+
+  if ($action === 'send_email') {
+    $subject = trim((string)($_POST['email_subject'] ?? ''));
+    $body = trim((string)($_POST['email_body'] ?? ''));
+    $rawTargets = trim((string)($_POST['email_targets'] ?? implode("\n", $emails)));
+    $targets = $rawTargets === '' ? [] : parse_list_input($rawTargets, false);
+    $valid = [];
+    $invalid = [];
+    foreach ($targets as $email) {
+      if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $valid[] = $email;
+      } else {
+        $invalid[] = $email;
+      }
+    }
+
+    if ($subject === '' || $body === '') {
+      flash('err', 'E-posta başlığı ve mesajı boş bırakılamaz.');
+    } elseif ($valid === []) {
+      $message = 'Gönderilecek geçerli e-posta adresi bulunamadı.';
+      if ($invalid !== []) {
+        $message .= ' Geçersiz: '.summarize_list($invalid).'.';
+      }
+      flash('err', $message);
+    } else {
+      $htmlBody = build_email_html($body);
+      $sent = 0;
+      $failed = [];
+      foreach ($valid as $email) {
+        if (send_mail_simple($email, $subject, $htmlBody)) {
+          $sent++;
+        } else {
+          $failed[] = $email;
+        }
+      }
+      $parts = [];
+      $parts[] = $sent.' kişiye e-posta gönderildi.';
+      if ($failed !== []) {
+        $parts[] = count($failed).' adres için gönderim başarısız: '.summarize_list($failed).'.';
+      }
+      if ($invalid !== []) {
+        $parts[] = count($invalid).' adres geçersiz olduğu için atlandı.';
+      }
+      $summary = implode(' ', $parts);
+      if ($sent > 0) {
+        flash('ok', 'Toplu e-posta işlemi tamamlandı. '.$summary);
+      } else {
+        flash('err', 'Hiçbir e-posta gönderilemedi. '.$summary);
+      }
+    }
+  } elseif ($action === 'send_sms') {
+    $message = trim((string)($_POST['sms_message'] ?? ''));
+    $rawTargets = trim((string)($_POST['sms_targets'] ?? implode("\n", $phones)));
+    $targets = $rawTargets === '' ? [] : parse_list_input($rawTargets, true);
+
+    if ($message === '') {
+      flash('err', 'SMS mesajı boş bırakılamaz.');
+    } elseif (mb_strlen($message, 'UTF-8') > 918) {
+      flash('err', 'SMS metni 918 karakteri aşamaz.');
+    } elseif ($targets === []) {
+      flash('err', 'Gönderilecek geçerli telefon numarası bulunamadı.');
+    } else {
+      $result = sms_send_bulk($targets, $message);
+      $sent = (int)($result['sent'] ?? 0);
+      $failed = is_array($result['failed'] ?? null) ? $result['failed'] : [];
+      $error = isset($result['error']) && is_string($result['error']) ? trim($result['error']) : '';
+
+      $parts = [];
+      if ($sent > 0) {
+        $parts[] = $sent.' numaraya SMS gönderildi.';
+      }
+      if ($failed !== []) {
+        $failedNumbers = array_map(function ($row) {
+          if (is_array($row) && isset($row['number'])) {
+            return (string)$row['number'];
+          }
+          return is_string($row) ? $row : '';
+        }, $failed);
+        $failedNumbers = array_values(array_filter($failedNumbers, function ($value) {
+          return $value !== '';
+        }));
+        $parts[] = count($failedNumbers).' numaraya gönderilemedi: '.summarize_list($failedNumbers).'.';
+      }
+      if ($error !== '') {
+        $parts[] = 'Servis mesajı: '.$error;
+      }
+      $summary = implode(' ', $parts);
+      if ($sent > 0) {
+        flash('ok', 'Toplu SMS işlemi tamamlandı. '.$summary);
+      } else {
+        flash('err', 'SMS gönderimi başarısız. '.$summary);
+      }
+    }
+  }
+
+  redirect(filter_url($selected, $search));
+}
+
 if (($activeContacts !== []) && isset($_GET['export']) && $_GET['export'] === 'csv') {
   $filename = 'marketing-'.preg_replace('~[^a-z0-9]+~i', '-', $selected).'-'.date('Ymd_His').'.csv';
   header('Content-Type: text/csv; charset=utf-8');
@@ -628,7 +759,7 @@ function filter_url(string $category, string $search): string {
 
   <div class="row g-3">
     <div class="col-lg-6">
-      <div class="card-lite p-3 h-100">
+      <div class="card-lite p-3 mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h5 class="m-0">E-posta listesi</h5>
           <button class="btn btn-sm btn-light" type="button" data-copy="emails"><i class="bi bi-clipboard"></i> Kopyala</button>
@@ -636,15 +767,79 @@ function filter_url(string $category, string $search): string {
         <textarea id="emails" class="form-control copy-field" readonly><?=h(implode("\n", $emails))?></textarea>
         <div class="small text-muted mt-2">Liste virgül veya satır sonu ile ayrılmıştır; e-posta gönderim aracınıza doğrudan yapıştırabilirsiniz.</div>
       </div>
+      <div class="card-lite p-3">
+        <form method="post" class="marketing-form">
+          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+          <input type="hidden" name="action" value="send_email">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="m-0">Toplu e-posta gönder</h5>
+            <span class="badge-soft"><?=number_format($emailCount, 0, ',', '.') ?> alıcı</span>
+          </div>
+          <?php if ($emailCount === 0): ?>
+            <div class="alert alert-warning small" role="alert">
+              Bu kategori için hazır e-posta bulunamadı; formu kullanarak yeni bir liste oluşturabilir veya dışarıdan yapıştırabilirsiniz.
+            </div>
+          <?php endif; ?>
+          <div class="mb-3">
+            <label class="form-label">Alıcı listesi</label>
+            <textarea name="email_targets" class="form-control" rows="4" placeholder="ornek@firma.com"><?=h(implode("\n", $emails))?></textarea>
+            <div class="form-text">Adresleri satır satır ya da virgülle ayırarak düzenleyebilirsiniz; geçersiz adresler otomatik olarak atlanır.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Konu</label>
+            <input type="text" name="email_subject" class="form-control" placeholder="Örn. Yeni sezon kampanyamız" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Mesaj</label>
+            <textarea name="email_body" class="form-control" rows="6" placeholder="Merhaba..." required></textarea>
+            <div class="form-text">Satır sonları korunarak HTML formatında gönderilir; dilerseniz ek olarak imza bilgisi de ekleyebilirsiniz.</div>
+          </div>
+          <button class="btn btn-zs" type="submit"><i class="bi bi-send me-1"></i>Toplu e-posta gönder</button>
+        </form>
+      </div>
     </div>
     <div class="col-lg-6">
-      <div class="card-lite p-3 h-100">
+      <div class="card-lite p-3 mb-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h5 class="m-0">SMS / Telefon listesi</h5>
           <button class="btn btn-sm btn-light" type="button" data-copy="phones"><i class="bi bi-clipboard"></i> Kopyala</button>
         </div>
         <textarea id="phones" class="form-control copy-field" readonly><?=h(implode("\n", $phones))?></textarea>
         <div class="small text-muted mt-2">Telefon numaraları düz metin olarak listelenir; toplu SMS araçlarına aktarmadan önce doğrulama yapmayı unutmayın.</div>
+      </div>
+      <div class="card-lite p-3">
+        <form method="post" class="marketing-form">
+          <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
+          <input type="hidden" name="action" value="send_sms">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="m-0">Toplu SMS gönder</h5>
+            <span class="badge-soft"><?=number_format($phoneCount, 0, ',', '.') ?> numara</span>
+          </div>
+          <?php
+            $smsUrlMissing = SMS_API_URL === '';
+            $smsCredsMissing = !$smsUrlMissing && (SMS_API_KEY === '' && SMS_API_SECRET === '');
+          ?>
+          <?php if ($smsUrlMissing || $smsCredsMissing): ?>
+            <div class="alert alert-warning small" role="alert">
+              <?php if ($smsUrlMissing): ?>
+                SMS API adresi tanımlanmadı. <code>SMS_API_URL</code> değerini <code>config.php</code> veya ortam değişkeni üzerinden belirleyin.
+              <?php else: ?>
+                SMS API erişimi için kullanıcı adı/şifre ya da anahtar bilgisi ekleyin. <code>SMS_API_KEY</code> ve <code>SMS_API_SECRET</code> değerlerini girerek isteğin yetkilendirilmesini sağlayın.
+              <?php endif; ?>
+            </div>
+          <?php endif; ?>
+          <div class="mb-3">
+            <label class="form-label">Numara listesi</label>
+            <textarea name="sms_targets" class="form-control" rows="4" placeholder="905XXXXXXXXX"><?=h(implode("\n", $phones))?></textarea>
+            <div class="form-text">Numaralar otomatik olarak 90 ile başlayan uluslararası formata dönüştürülür ve tekrar edenler temizlenir.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Mesaj</label>
+            <textarea name="sms_message" class="form-control" rows="6" placeholder="Kampanyamız başladı..." data-sms-length data-counter="sms-length" required></textarea>
+            <div class="form-text"><span id="sms-length">0 karakter, 0 SMS</span> — Türkçe karakter içeren mesajlarda segment başına 70 karakter sınırı uygulanabilir.</div>
+          </div>
+          <button class="btn btn-zs" type="submit"><i class="bi bi-chat-dots me-1"></i>Toplu SMS gönder</button>
+        </form>
       </div>
     </div>
   </div>
@@ -720,6 +915,24 @@ document.querySelectorAll('[data-copy]').forEach(function(button){
       setTimeout(function(){ button.innerHTML = original; }, 2000);
     });
   });
+});
+
+document.querySelectorAll('[data-sms-length]').forEach(function(field){
+  var counterId = field.getAttribute('data-counter');
+  var counter = counterId ? document.getElementById(counterId) : null;
+  if (!counter) {
+    return;
+  }
+  var update = function(){
+    var text = field.value || '';
+    var length = text.length;
+    var unicode = /[^\u0000-\u007f]/.test(text);
+    var segmentSize = unicode ? 70 : 160;
+    var segments = length === 0 ? 0 : Math.ceil(length / segmentSize);
+    counter.textContent = length + ' karakter, ' + segments + ' SMS';
+  };
+  field.addEventListener('input', update);
+  update();
 });
 </script>
 </body>
