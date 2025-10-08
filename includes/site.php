@@ -612,7 +612,7 @@ function site_ensure_order_paytr_token(int $order_id): array {
   if ($campaigns) {
     foreach ($campaigns as $campaignLine) {
       $basket[] = [
-        'Hayır Kampanyası: '.$campaignLine['campaign_name'],
+        'Sosyal Sorumluluk Kampanyası: '.$campaignLine['campaign_name'],
         number_format($campaignLine['price_cents'] / 100, 2, '.', ''),
         max(1, (int)$campaignLine['quantity']),
       ];
@@ -1040,7 +1040,7 @@ function site_send_customer_order_mail(array $result): void {
     .'<p>Seçtiğiniz paket: <strong>'.h($package['name']).'</strong> — '.h(format_currency((int)$package['price_cents'])).'</p>';
   $campaigns = $result['campaigns'] ?? [];
   if ($campaigns) {
-    $body .= '<p style="margin-top:18px;">Desteklediğiniz hayır kampanyaları:</p>'
+    $body .= '<p style="margin-top:18px;">Desteklediğiniz sosyal sorumluluk kampanyaları:</p>'
       .'<ul style="padding-left:20px;margin:12px 0;">';
     foreach ($campaigns as $campaign) {
       $body .= '<li>'.h($campaign['campaign_name']).' — '.h(format_currency((int)$campaign['total_cents'])).'</li>';
@@ -1094,7 +1094,7 @@ function site_send_dealer_order_mail(array $result): void {
     .'<p><strong>BİKARE Bayi Destek</strong></p>';
   $campaigns = $result['campaigns'] ?? [];
   if ($campaigns) {
-    $body .= '<p style="margin-top:16px;">Müşterinizin desteklediği hayır kampanyaları:</p>'
+    $body .= '<p style="margin-top:16px;">Müşterinizin desteklediği sosyal sorumluluk kampanyaları:</p>'
       .'<ul style="padding-left:20px;margin:10px 0;">';
     foreach ($campaigns as $campaign) {
       $body .= '<li>'.h($campaign['campaign_name']).' — '.h(format_currency((int)$campaign['total_cents'])).'</li>';

@@ -111,7 +111,7 @@ foreach ($campaigns as $campaign) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?=h(APP_NAME)?> — Hayır Kampanyaları</title>
+<title><?=h(APP_NAME)?> — Sosyal Sorumluluk Kampanyaları</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <?=admin_base_styles()?>
 <style>
@@ -129,7 +129,7 @@ foreach ($campaigns as $campaign) {
 </style>
 </head>
 <body class="admin-body">
-<?php admin_layout_start('order_campaigns', 'Hayır Kampanyaları', 'Sipariş sonrası bağışlanabilecek kampanyaları yönetin, görseller ve açıklamalar ekleyin.', 'bi-heart-fill'); ?>
+<?php admin_layout_start('order_campaigns', 'Sosyal Sorumluluk Kampanyaları', 'Sipariş sonrası bağışlanabilecek kampanyaları yönetin, görseller ve açıklamalar ekleyin.', 'bi-heart-fill'); ?>
   <?php flash_box(); ?>
 
   <div class="stats-grid">
@@ -225,7 +225,7 @@ foreach ($campaigns as $campaign) {
             <tbody>
               <?php if (!$campaigns): ?>
                 <tr>
-                  <td colspan="4" class="text-center text-muted py-4">Henüz hayır kampanyası oluşturulmadı.</td>
+                  <td colspan="4" class="text-center text-muted py-4">Henüz sosyal sorumluluk kampanyası oluşturulmadı.</td>
                 </tr>
               <?php else: ?>
                 <?php foreach ($campaigns as $campaign): ?>

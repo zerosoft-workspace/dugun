@@ -103,7 +103,7 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
           <div class="text-muted small">Ek Hizmetler: <?=count($order['addons'])?> adet</div>
         <?php endif; ?>
         <?php if (!empty($order['campaigns'])): ?>
-          <div class="text-muted small">Hayır Kampanyaları: <?=count($order['campaigns'])?> adet</div>
+          <div class="text-muted small">Sosyal Sorumluluk Kampanyaları: <?=count($order['campaigns'])?> adet</div>
         <?php endif; ?>
       </div>
     </div>
@@ -158,7 +158,7 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
               </ul>
             <?php endif; ?>
             <?php if ($hasCampaigns): ?>
-              <li class="<?= $hasAddons ? 'mt-2' : 'mt-3'?>"><strong>Desteklenen Hayır Kampanyaları</strong></li>
+              <li class="<?= $hasAddons ? 'mt-2' : 'mt-3'?>"><strong>Desteklenen Sosyal Sorumluluk Kampanyaları</strong></li>
               <ul class="small ps-3 mb-2">
                 <?php foreach ($order['campaigns'] as $campaignLine): ?>
                   <li class="d-flex justify-content-between">
@@ -172,7 +172,7 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
               <li><strong>Ek Hizmet Toplamı:</strong> <?=h(format_currency((int)$order['addons_total_cents']))?></li>
             <?php endif; ?>
             <?php if ($hasCampaigns): ?>
-              <li><strong>Hayır Kampanyası Toplamı:</strong> <?=h(format_currency((int)$order['campaigns_total_cents']))?></li>
+              <li><strong>Sosyal Sorumluluk Kampanyası Toplamı:</strong> <?=h(format_currency((int)$order['campaigns_total_cents']))?></li>
             <?php endif; ?>
             <li class="fw-semibold"><strong>Genel Toplam:</strong> <?=h(format_currency((int)$order['price_cents']))?></li>
           </ul>

@@ -63,8 +63,8 @@ unset($_SESSION['lead_success'], $_SESSION['order_summary']);
               <?php endforeach; ?>
             </ul>
           <?php endif; ?>
-          <?php if ($hasCampaigns): ?>
-            <li class="<?= $hasAddons ? 'mt-2' : 'mt-3'?>"><strong>Desteklediğiniz Hayır Kampanyaları</strong></li>
+            <?php if ($hasCampaigns): ?>
+              <li class="<?= $hasAddons ? 'mt-2' : 'mt-3'?>"><strong>Desteklediğiniz Sosyal Sorumluluk Kampanyaları</strong></li>
             <ul class="small ps-3 mb-2">
               <?php foreach ($summary['campaigns'] as $campaign): ?>
                 <li class="d-flex justify-content-between">
@@ -77,8 +77,8 @@ unset($_SESSION['lead_success'], $_SESSION['order_summary']);
           <?php if ($hasAddons): ?>
             <li><strong>Ek Hizmet Toplamı:</strong> <?=h(format_currency((int)$summary['addons_total']))?></li>
           <?php endif; ?>
-          <?php if ($hasCampaigns): ?>
-            <li><strong>Hayır Kampanyası Toplamı:</strong> <?=h(format_currency((int)($summary['campaigns_total'] ?? 0)))?></li>
+            <?php if ($hasCampaigns): ?>
+              <li><strong>Sosyal Sorumluluk Kampanyası Toplamı:</strong> <?=h(format_currency((int)($summary['campaigns_total'] ?? 0)))?></li>
           <?php endif; ?>
           <li><strong>Genel Toplam:</strong> <?=h(format_currency((int)$summary['order_total']))?></li>
         </ul>

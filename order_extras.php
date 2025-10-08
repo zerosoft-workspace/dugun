@@ -797,7 +797,7 @@ body.extras-body {
   <div class="container">
     <div class="extras-hero shadow-sm">
       <span class="extras-badge"><i class="bi bi-magic"></i> Ek Hizmetler &amp; Kampanyalar</span>
-      <h1 class="extras-title">Davetiye Tasarımından Hayır Kampanyasına, Her Detayı Seçin</h1>
+      <h1 class="extras-title">Davetiye Tasarımından Sosyal Sorumluluk Kampanyasına, Her Detayı Seçin</h1>
       <p class="extras-subtitle">Siparişinizi tamamlamadan önce davetiye varyantlarını, QR kod çözümlerini ve sosyal sorumluluk kampanyalarını tek ekrandan belirleyin.</p>
       <div class="extras-progress">
         <div><span>1</span>Paket</div>
@@ -836,7 +836,7 @@ body.extras-body {
       </div>
       <div class="col-lg-8">
         <?php if (!$addons && !$campaigns): ?>
-          <div class="alert alert-info shadow-sm rounded-4">Şu anda ek hizmet veya hayır kampanyası sunulmuyor. <a class="fw-semibold" href="order_paytr.php?order_id=<?=(int)$order['id']?>">Doğrudan ödeme adımına geçebilirsiniz.</a></div>
+          <div class="alert alert-info shadow-sm rounded-4">Şu anda ek hizmet veya sosyal sorumluluk kampanyası sunulmuyor. <a class="fw-semibold" href="order_paytr.php?order_id=<?=(int)$order['id']?>">Doğrudan ödeme adımına geçebilirsiniz.</a></div>
         <?php else: ?>
           <div class="flash-messages"><?=flash_messages()?></div>
           <form method="post" class="extras-form d-grid gap-4">
@@ -983,7 +983,7 @@ body.extras-body {
             <?php if ($campaigns): ?>
               <section class="campaign-section">
                 <div class="section-head">
-                  <span class="section-chip"><i class="bi bi-heart-fill"></i> Hayır Kampanyaları</span>
+                  <span class="section-chip"><i class="bi bi-heart-fill"></i> Sosyal Sorumluluk Kampanyaları</span>
                   <div class="section-copy">
                     <h3>Etkinliğiniz Adına Destek Olun</h3>
                     <p>Sosyal sorumluluk projelerini siparişinizle birlikte destekleyip bağış ödemesini aynı adımda tamamlayabilirsiniz.</p>
@@ -1061,7 +1061,7 @@ body.extras-body {
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content border-0 rounded-4 shadow-lg">
       <div class="modal-header border-0 pb-0">
-        <h5 class="modal-title fw-semibold" data-campaign-modal-title>Hayır Kampanyası</h5>
+        <h5 class="modal-title fw-semibold" data-campaign-modal-title>Sosyal Sorumluluk Kampanyası</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
       </div>
       <div class="modal-body">

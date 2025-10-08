@@ -960,7 +960,7 @@ function install_schema(){
     pdo()->exec('ALTER TABLE site_addon_variants ADD UNIQUE KEY uniq_addon_variant_slug (addon_id, slug)');
   } catch (Throwable $e) {}
 
-  /* hayır kampanyası kataloğu */
+  /* sosyal sorumluluk kampanyası kataloğu */
   pdo()->exec("CREATE TABLE IF NOT EXISTS site_campaigns(
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(190) NOT NULL,
