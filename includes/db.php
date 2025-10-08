@@ -480,23 +480,6 @@ function install_schema(){
     FOREIGN KEY (question_id) REFERENCES event_quiz_questions(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-  pdo()->exec("CREATE TABLE IF NOT EXISTS event_quiz_attempts(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    question_id INT NOT NULL,
-    answer_id INT NULL,
-    profile_id INT NULL,
-    guest_name VARCHAR(190) NULL,
-    is_correct TINYINT(1) NOT NULL DEFAULT 0,
-    points INT NOT NULL DEFAULT 0,
-    answered_at DATETIME NOT NULL,
-    INDEX idx_quiz_attempt_question (question_id, profile_id),
-    INDEX idx_quiz_attempt_profile (profile_id),
-    UNIQUE KEY uniq_quiz_attempt (question_id, profile_id),
-    FOREIGN KEY (question_id) REFERENCES event_quiz_questions(id) ON DELETE CASCADE,
-    FOREIGN KEY (answer_id) REFERENCES event_quiz_answers(id) ON DELETE SET NULL,
-    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_topups(
     id INT AUTO_INCREMENT PRIMARY KEY,
     dealer_id INT NOT NULL,
@@ -1077,6 +1060,23 @@ function install_schema(){
     INDEX idx_guest_verify (verify_token),
     INDEX idx_guest_password_token (password_token),
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_quiz_attempts(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT NOT NULL,
+    answer_id INT NULL,
+    profile_id INT NULL,
+    guest_name VARCHAR(190) NULL,
+    is_correct TINYINT(1) NOT NULL DEFAULT 0,
+    points INT NOT NULL DEFAULT 0,
+    answered_at DATETIME NOT NULL,
+    INDEX idx_quiz_attempt_question (question_id, profile_id),
+    INDEX idx_quiz_attempt_profile (profile_id),
+    UNIQUE KEY uniq_quiz_attempt (question_id, profile_id),
+    FOREIGN KEY (question_id) REFERENCES event_quiz_questions(id) ON DELETE CASCADE,
+    FOREIGN KEY (answer_id) REFERENCES event_quiz_answers(id) ON DELETE SET NULL,
+    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   if (!column_exists('guest_profiles', 'avatar_token')) {
