@@ -7,7 +7,10 @@ require_once __DIR__.'/../includes/theme.php';
 // Aktif etkinlik bilgisi
 $EVENT_ID = couple_current_event_id();
 $ev = couple_event_row_current();
-if (!$ev) { http_response_code(404); exit('Etkinlik bulunamadı'); }
+if (!$ev) {
+  couple_global_logout();
+  redirect(BASE_URL.'/couple/login.php');
+}
 
 // Lisans kur / kontrol et
 license_ensure_active($EVENT_ID);

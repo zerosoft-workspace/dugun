@@ -45,8 +45,14 @@ $requireActive = !COUPLE_ALLOW_INACTIVE; // ödeme sayfaları bunu false yapacak
 $st = pdo()->prepare("SELECT * FROM events WHERE id=? LIMIT 1");
 $st->execute([$EVENT_ID]);
 $ev = $st->fetch();
-if (!$ev) { http_response_code(404); exit('Etkinlik bulunamadı'); }
-if ($requireActive && (int)$ev['is_active']!==1) { http_response_code(403); exit('Erişim yok veya etkinlik pasif'); }
+if (!$ev) {
+  couple_global_logout();
+  redirect(BASE_URL.'/couple/login.php');
+}
+if ($requireActive && (int)$ev['is_active']!==1) {
+  unset($_SESSION[couple_current_event_key()]);
+  redirect(BASE_URL.'/couple/switch_event.php');
+}
 
 // lisans kontrolü varsa yine $requireActive esas alın:
 if ($requireActive) {
