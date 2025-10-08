@@ -596,6 +596,144 @@ function install_schema(){
       WHERE a.commission_rate IS NULL");
   } catch (Throwable $e) {}
 
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_leads(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    representative_id INT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NULL,
+    phone VARCHAR(64) NULL,
+    company VARCHAR(190) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'new',
+    source VARCHAR(64) NULL,
+    notes TEXT NULL,
+    last_contact_at DATETIME NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_leads_dealer_status (dealer_id, status),
+    INDEX idx_leads_rep (representative_id),
+    INDEX idx_leads_next (next_action_at),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_lead_notes(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    representative_id INT NULL,
+    note TEXT NOT NULL,
+    contact_type VARCHAR(32) NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (lead_id) REFERENCES dealer_leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL,
+    INDEX idx_lead_notes_lead (lead_id),
+    INDEX idx_lead_notes_next (next_action_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_leads(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    representative_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NULL,
+    phone VARCHAR(64) NULL,
+    company VARCHAR(190) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'new',
+    source VARCHAR(64) NULL,
+    potential_value_cents INT NULL,
+    notes TEXT NULL,
+    last_contact_at DATETIME NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_rep_leads_rep (representative_id),
+    INDEX idx_rep_leads_status (representative_id, status),
+    INDEX idx_rep_leads_next (representative_id, next_action_at),
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_lead_notes(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    representative_id INT NOT NULL,
+    note TEXT NOT NULL,
+    contact_type VARCHAR(32) NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (lead_id) REFERENCES representative_leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
+    INDEX idx_rep_lead_notes_lead (lead_id),
+    INDEX idx_rep_lead_notes_next (representative_id, next_action_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* müşteri web siparişleri */
+  $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
+  pdo()->exec("CREATE TABLE IF NOT EXISTS site_orders(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    package_id INT NOT NULL,
+    dealer_id INT NULL,
+    event_id INT NULL,
+    customer_name VARCHAR(190) NOT NULL,
+    customer_email VARCHAR(190) NOT NULL,
+    customer_phone VARCHAR(64) NULL,
+    event_title VARCHAR(190) NOT NULL,
+    event_date DATE NULL,
+    referral_code VARCHAR(64) NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'pending_payment',
+    merchant_oid VARCHAR(64) NULL,
+    paytr_token VARCHAR(64) NULL,
+    paytr_reference VARCHAR(64) NULL,
+    price_cents INT NOT NULL DEFAULT 0,
+    base_price_cents INT NOT NULL DEFAULT 0,
+    addons_total_cents INT NOT NULL DEFAULT 0,
+    campaigns_total_cents INT NOT NULL DEFAULT 0,
+    cashback_cents INT NOT NULL DEFAULT 0,
+    paid_at DATETIME NULL,
+    meta_json $jsonMeta NULL,
+    payload_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_site_orders_oid (merchant_oid),
+    FOREIGN KEY (package_id) REFERENCES dealer_packages(id) ON DELETE RESTRICT,
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('site_orders', 'merchant_oid')) {
+    pdo()->exec("ALTER TABLE site_orders ADD merchant_oid VARCHAR(64) NULL AFTER status");
+  }
+  if (!column_exists('site_orders', 'paytr_token')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paytr_token VARCHAR(64) NULL AFTER merchant_oid");
+  }
+  if (!column_exists('site_orders', 'paytr_reference')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paytr_reference VARCHAR(64) NULL AFTER paytr_token");
+  }
+  if (!column_exists('site_orders', 'paid_at')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paid_at DATETIME NULL AFTER cashback_cents");
+  }
+  if (!column_exists('site_orders', 'base_price_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD base_price_cents INT NOT NULL DEFAULT 0 AFTER price_cents");
+    pdo()->exec("UPDATE site_orders SET base_price_cents = price_cents WHERE base_price_cents = 0");
+  }
+  if (!column_exists('site_orders', 'addons_total_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD addons_total_cents INT NOT NULL DEFAULT 0 AFTER base_price_cents");
+  }
+  if (!column_exists('site_orders', 'campaigns_total_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD campaigns_total_cents INT NOT NULL DEFAULT 0 AFTER addons_total_cents");
+  }
+  if (!column_exists('site_orders', 'payload_json')) {
+    pdo()->exec("ALTER TABLE site_orders ADD payload_json $jsonMeta NULL AFTER meta_json");
+  }
+  try {
+    pdo()->exec("ALTER TABLE site_orders MODIFY status VARCHAR(24) NOT NULL DEFAULT 'pending_payment'");
+  } catch (Throwable $e) {}
+  try {
+    pdo()->exec("ALTER TABLE site_orders ADD UNIQUE KEY uniq_site_orders_oid (merchant_oid)");
+  } catch (Throwable $e) {
+    // index already exists
+  }
+
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representative_commissions(
     id INT AUTO_INCREMENT PRIMARY KEY,
     representative_id INT NOT NULL,
@@ -740,144 +878,6 @@ function install_schema(){
     FOREIGN KEY (request_id) REFERENCES representative_payout_requests(id) ON DELETE CASCADE,
     FOREIGN KEY (commission_id) REFERENCES dealer_representative_commissions(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_leads(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    dealer_id INT NOT NULL,
-    representative_id INT NULL,
-    name VARCHAR(190) NOT NULL,
-    email VARCHAR(190) NULL,
-    phone VARCHAR(64) NULL,
-    company VARCHAR(190) NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'new',
-    source VARCHAR(64) NULL,
-    notes TEXT NULL,
-    last_contact_at DATETIME NULL,
-    next_action_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NULL,
-    INDEX idx_leads_dealer_status (dealer_id, status),
-    INDEX idx_leads_rep (representative_id),
-    INDEX idx_leads_next (next_action_at),
-    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
-    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_lead_notes(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    lead_id INT NOT NULL,
-    representative_id INT NULL,
-    note TEXT NOT NULL,
-    contact_type VARCHAR(32) NULL,
-    next_action_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
-    FOREIGN KEY (lead_id) REFERENCES dealer_leads(id) ON DELETE CASCADE,
-    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL,
-    INDEX idx_lead_notes_lead (lead_id),
-    INDEX idx_lead_notes_next (next_action_at)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_leads(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    representative_id INT NOT NULL,
-    name VARCHAR(190) NOT NULL,
-    email VARCHAR(190) NULL,
-    phone VARCHAR(64) NULL,
-    company VARCHAR(190) NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'new',
-    source VARCHAR(64) NULL,
-    potential_value_cents INT NULL,
-    notes TEXT NULL,
-    last_contact_at DATETIME NULL,
-    next_action_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NULL,
-    INDEX idx_rep_leads_rep (representative_id),
-    INDEX idx_rep_leads_status (representative_id, status),
-    INDEX idx_rep_leads_next (representative_id, next_action_at),
-    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_lead_notes(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    lead_id INT NOT NULL,
-    representative_id INT NOT NULL,
-    note TEXT NOT NULL,
-    contact_type VARCHAR(32) NULL,
-    next_action_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
-    FOREIGN KEY (lead_id) REFERENCES representative_leads(id) ON DELETE CASCADE,
-    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
-    INDEX idx_rep_lead_notes_lead (lead_id),
-    INDEX idx_rep_lead_notes_next (representative_id, next_action_at)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  /* müşteri web siparişleri */
-  $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
-  pdo()->exec("CREATE TABLE IF NOT EXISTS site_orders(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    package_id INT NOT NULL,
-    dealer_id INT NULL,
-    event_id INT NULL,
-    customer_name VARCHAR(190) NOT NULL,
-    customer_email VARCHAR(190) NOT NULL,
-    customer_phone VARCHAR(64) NULL,
-    event_title VARCHAR(190) NOT NULL,
-    event_date DATE NULL,
-    referral_code VARCHAR(64) NULL,
-    status VARCHAR(24) NOT NULL DEFAULT 'pending_payment',
-    merchant_oid VARCHAR(64) NULL,
-    paytr_token VARCHAR(64) NULL,
-    paytr_reference VARCHAR(64) NULL,
-    price_cents INT NOT NULL DEFAULT 0,
-    base_price_cents INT NOT NULL DEFAULT 0,
-    addons_total_cents INT NOT NULL DEFAULT 0,
-    campaigns_total_cents INT NOT NULL DEFAULT 0,
-    cashback_cents INT NOT NULL DEFAULT 0,
-    paid_at DATETIME NULL,
-    meta_json $jsonMeta NULL,
-    payload_json $jsonMeta NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NULL,
-    UNIQUE KEY uniq_site_orders_oid (merchant_oid),
-    FOREIGN KEY (package_id) REFERENCES dealer_packages(id) ON DELETE RESTRICT,
-    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL,
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  if (!column_exists('site_orders', 'merchant_oid')) {
-    pdo()->exec("ALTER TABLE site_orders ADD merchant_oid VARCHAR(64) NULL AFTER status");
-  }
-  if (!column_exists('site_orders', 'paytr_token')) {
-    pdo()->exec("ALTER TABLE site_orders ADD paytr_token VARCHAR(64) NULL AFTER merchant_oid");
-  }
-  if (!column_exists('site_orders', 'paytr_reference')) {
-    pdo()->exec("ALTER TABLE site_orders ADD paytr_reference VARCHAR(64) NULL AFTER paytr_token");
-  }
-  if (!column_exists('site_orders', 'paid_at')) {
-    pdo()->exec("ALTER TABLE site_orders ADD paid_at DATETIME NULL AFTER cashback_cents");
-  }
-  if (!column_exists('site_orders', 'base_price_cents')) {
-    pdo()->exec("ALTER TABLE site_orders ADD base_price_cents INT NOT NULL DEFAULT 0 AFTER price_cents");
-    pdo()->exec("UPDATE site_orders SET base_price_cents = price_cents WHERE base_price_cents = 0");
-  }
-  if (!column_exists('site_orders', 'addons_total_cents')) {
-    pdo()->exec("ALTER TABLE site_orders ADD addons_total_cents INT NOT NULL DEFAULT 0 AFTER base_price_cents");
-  }
-  if (!column_exists('site_orders', 'campaigns_total_cents')) {
-    pdo()->exec("ALTER TABLE site_orders ADD campaigns_total_cents INT NOT NULL DEFAULT 0 AFTER addons_total_cents");
-  }
-  if (!column_exists('site_orders', 'payload_json')) {
-    pdo()->exec("ALTER TABLE site_orders ADD payload_json $jsonMeta NULL AFTER meta_json");
-  }
-  try {
-    pdo()->exec("ALTER TABLE site_orders MODIFY status VARCHAR(24) NOT NULL DEFAULT 'pending_payment'");
-  } catch (Throwable $e) {}
-  try {
-    pdo()->exec("ALTER TABLE site_orders ADD UNIQUE KEY uniq_site_orders_oid (merchant_oid)");
-  } catch (Throwable $e) {
-    // index already exists
-  }
 
   /* sipariş ek hizmet kataloğu */
   pdo()->exec("CREATE TABLE IF NOT EXISTS site_addons(
