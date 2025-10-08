@@ -402,6 +402,7 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
         <a class="nav-link active" href="index.php"><i class="bi bi-speedometer2"></i>Kontrol Paneli</a>
         <a class="nav-link" href="list.php"><i class="bi bi-collection"></i>Galeri</a>
         <a class="nav-link" href="engage.php"><i class="bi bi-stars"></i>Etkileşim Araçları</a>
+        <a class="nav-link" href="invitations.php"><i class="bi bi-envelope-open"></i>Davetiye Merkezi</a>
       </div>
       <div class="nav-group">
         <span class="nav-heading">Support & Settings</span>

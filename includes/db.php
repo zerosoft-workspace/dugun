@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240615_01');
+  define('APP_SCHEMA_VERSION', '20240703_01');
 }
 
 function pdo(): PDO {
@@ -114,6 +114,8 @@ function install_schema(){
       'event_quiz_questions',
       'event_quiz_answers',
       'event_quiz_attempts',
+      'event_invitation_templates',
+      'event_invitation_contacts',
     ];
     foreach ($criticalTables as $table) {
       if (!table_exists($table)) {
@@ -1027,6 +1029,43 @@ function install_schema(){
     created_at DATETIME NOT NULL,
     INDEX (venue_id,event_id),
     FOREIGN KEY (venue_id) REFERENCES venues(id) ON DELETE CASCADE,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* event invitation templates */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_invitation_templates(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL UNIQUE,
+    title VARCHAR(190) NOT NULL,
+    subtitle VARCHAR(190) NULL,
+    message TEXT NOT NULL,
+    primary_color VARCHAR(16) NOT NULL DEFAULT '#0ea5b5',
+    accent_color VARCHAR(16) NOT NULL DEFAULT '#f8fafc',
+    button_label VARCHAR(120) NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* event invitation contacts */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_invitation_contacts(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NULL,
+    phone VARCHAR(32) NULL,
+    phone_normalized VARCHAR(32) NULL,
+    invite_token VARCHAR(64) NOT NULL,
+    password_hash VARCHAR(255) NULL,
+    password_set_at DATETIME NULL,
+    last_viewed_at DATETIME NULL,
+    last_sent_at DATETIME NULL,
+    send_count INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_invite_token (invite_token),
+    INDEX idx_invite_event (event_id),
+    INDEX idx_invite_email (event_id, email),
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 

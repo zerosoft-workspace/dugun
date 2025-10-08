@@ -193,6 +193,11 @@ function public_upload_url(int $eventId): string {
   return BASE_URL.'/public/upload.php?event='.$eventId.'&t='.$t;
 }
 
+function public_invitation_url(string $token): string {
+  $token = trim($token);
+  return BASE_URL.'/public/invite.php?code='.rawurlencode($token);
+}
+
 /* -------------------- Dosya sistemi -------------------- */
 function ensure_upload_dir(int $venueId, int $eventId): string {
   $root = __DIR__.'/../uploads';
