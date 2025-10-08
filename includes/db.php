@@ -65,6 +65,14 @@ function ensure_schema_patches(PDO $pdo): void {
       if (!column_exists('event_invitation_templates', 'share_token')) {
         $pdo->exec("ALTER TABLE event_invitation_templates ADD share_token VARCHAR(64) NULL AFTER event_id");
       }
+      if (!column_exists('event_invitation_templates', 'theme')) {
+        $pdo->exec("ALTER TABLE event_invitation_templates ADD theme VARCHAR(32) NOT NULL DEFAULT 'wedding' AFTER share_token");
+        try {
+          $pdo->exec("UPDATE event_invitation_templates SET theme='wedding' WHERE theme='' OR theme IS NULL");
+        } catch (Throwable $e) {
+          // ignore data backfill errors
+        }
+      }
       try {
         $pdo->exec("ALTER TABLE event_invitation_templates ADD UNIQUE KEY uniq_invitation_share (share_token)");
       } catch (Throwable $e) {
@@ -1065,6 +1073,7 @@ function install_schema(){
     id INT AUTO_INCREMENT PRIMARY KEY,
     event_id INT NOT NULL UNIQUE,
     share_token VARCHAR(64) NULL,
+    theme VARCHAR(32) NOT NULL DEFAULT 'wedding',
     title VARCHAR(190) NOT NULL,
     subtitle VARCHAR(190) NULL,
     message TEXT NOT NULL,

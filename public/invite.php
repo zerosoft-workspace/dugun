@@ -31,6 +31,9 @@ if (!$event) {
 }
 
 $template = invitation_template_get($eventId);
+$themes = invitation_theme_options();
+$currentTheme = invitation_template_theme($template);
+$currentThemeLabel = $themes[$currentTheme]['label'] ?? 'Tema';
 $buttonLabel = $template['button_label'] ?: 'Katılımınızı Bildirin';
 $sessionKey = invitation_contact_session_key($contactId);
 $authenticated = !empty($_SESSION[$sessionKey]);
@@ -132,6 +135,7 @@ $cardVersion = substr(md5(json_encode([
   $template['primary_color'],
   $template['accent_color'],
   $template['button_label'],
+  $currentTheme,
 ], JSON_UNESCAPED_UNICODE)), 0, 12);
 $cardPreviewUrl = $cardUrl.($cardVersion ? '&v='.$cardVersion : '');
 $cardSharePreviewUrl = $cardShareUrl.($cardVersion ? '&v='.$cardVersion : '');
@@ -146,13 +150,18 @@ $cardSharePreviewUrl = $cardShareUrl.($cardVersion ? '&v='.$cardVersion : '');
 <?=theme_head_assets()?>
 <style>
 :root{ --primary:<?=$primary?>; --accent:<?=$accent?>; --ink:#0f172a; --muted:#64748b; }
-body{ background:linear-gradient(160deg,rgba(248,250,252,1) 0%,rgba(255,255,255,1) 40%,rgba(14,165,181,.08) 100%); min-height:100vh; font-family:'Inter','Segoe UI','Helvetica Neue',sans-serif; color:var(--ink); display:flex; align-items:center; justify-content:center; padding:32px 16px; }
+body{ background:linear-gradient(160deg,rgba(248,250,252,1) 0%,rgba(255,255,255,1) 40%,rgba(14,165,181,.08) 100%); min-height:100vh; font-family:'Inter','Segoe UI','Helvetica Neue',sans-serif; color:var(--ink); display:flex; align-items:center; justify-content:center; padding:32px 16px; transition:background .4s ease; }
+body.theme-wedding{ background:linear-gradient(140deg,#fdf2f8 0%,#ffffff 45%,rgba(194,120,143,.18) 100%); }
+body.theme-kina{ background:linear-gradient(140deg,#fef3c7 0%,#fff7ed 48%,rgba(180,83,9,.18) 100%); }
+body.theme-engagement{ background:linear-gradient(140deg,#ede9fe 0%,#faf5ff 48%,rgba(124,58,237,.2) 100%); }
+body.theme-celebration{ background:linear-gradient(140deg,#e0f2fe 0%,#f8fafc 50%,rgba(14,165,181,.18) 100%); }
 .invite-shell{ width:100%; max-width:640px; }
 .invite-card{ border-radius:28px; overflow:hidden; background:#fff; box-shadow:0 45px 90px -60px rgba(14,165,181,.55); border:1px solid rgba(148,163,184,.18); }
-.invite-head{ background:var(--accent); padding:32px 36px 24px 36px; }
-.invite-head h1{ margin:0; font-size:2rem; font-weight:800; }
-.invite-head .subtitle{ margin:8px 0 0; color:var(--muted); font-size:1.05rem; }
-.invite-head .meta{ margin-top:16px; display:flex; flex-wrap:wrap; gap:12px; color:#475569; font-weight:600; }
+.invite-head{ background:linear-gradient(135deg,var(--primary),var(--accent)); padding:32px 36px 26px 36px; color:#fff; }
+.invite-head h1{ margin:0; font-size:2rem; font-weight:800; color:#fff; }
+.invite-head .subtitle{ margin:8px 0 0; color:rgba(255,255,255,.85); font-size:1.05rem; }
+.invite-head .meta{ margin-top:16px; display:flex; flex-wrap:wrap; gap:12px; color:rgba(255,255,255,.75); font-weight:600; }
+.invite-theme-badge{ display:inline-flex; align-items:center; gap:6px; text-transform:uppercase; letter-spacing:.24em; font-size:.76rem; color:rgba(255,255,255,.78); margin-bottom:18px; }
 .invite-body{ padding:32px 36px; font-size:1.05rem; line-height:1.7; color:#1f2937; }
 .invite-footer{ padding:0 36px 32px; text-align:center; }
 .invite-footer .cta{ display:inline-block; padding:14px 34px; border-radius:999px; background:var(--primary); color:#fff; text-decoration:none; font-weight:700; box-shadow:0 18px 36px -22px rgba(14,165,181,.65); }
@@ -168,7 +177,7 @@ body{ background:linear-gradient(160deg,rgba(248,250,252,1) 0%,rgba(255,255,255,
 .share-card .form-text{ font-size:.85rem; }
 </style>
 </head>
-<body>
+<body class="theme-<?=h($currentTheme)?>">
 <div class="invite-shell">
   <?php flash_box(); ?>
 
@@ -220,6 +229,7 @@ body{ background:linear-gradient(160deg,rgba(248,250,252,1) 0%,rgba(255,255,255,
   <?php else: ?>
     <div class="invite-card mb-4">
       <div class="invite-head">
+        <div class="invite-theme-badge"><i class="bi bi-stars"></i><?=h($currentThemeLabel)?> Teması</div>
         <h1><?=h($template['title'])?></h1>
         <?php if (!empty($template['subtitle'])): ?>
           <div class="subtitle"><?=h($template['subtitle'])?></div>
