@@ -21,6 +21,7 @@ try {
     $name = trim($_POST['name'] ?? '');
     $priceInput = $_POST['price'] ?? '';
     $description = trim($_POST['description'] ?? '');
+    $detail = trim($_POST['detail'] ?? '');
     $category = trim($_POST['category'] ?? '');
     $displayOrder = isset($_POST['display_order']) ? (int)$_POST['display_order'] : 0;
     $isActive = isset($_POST['is_active']);
@@ -58,6 +59,7 @@ try {
       'name' => $name,
       'price_cents' => $priceCents,
       'description' => $description,
+      'detail' => $detail,
       'category' => $category,
       'display_order' => $displayOrder,
       'is_active' => $isActive,
@@ -190,6 +192,11 @@ foreach ($addons as $addon) {
             <textarea class="form-control" name="description" rows="3" placeholder="Hizmet detayları..."><?=h($editAddon['description'] ?? '')?></textarea>
           </div>
           <div class="col-12">
+            <label class="form-label">Detay</label>
+            <textarea class="form-control" name="detail" rows="4" placeholder="Müşteriye gösterilecek ek bilgiler, içerik adımları..."><?=h($editAddon['detail'] ?? '')?></textarea>
+            <div class="form-text">Bu alan uzun açıklamalar, teslimat içeriği veya teknik detaylar için kullanılabilir.</div>
+          </div>
+          <div class="col-12">
             <label class="form-label">Görsel</label>
             <input type="file" class="form-control" name="image" accept="image/*">
             <?php if (!empty($editAddon['image_url'])): ?>
@@ -258,6 +265,9 @@ foreach ($addons as $addon) {
                           <?php if (!empty($addon['description'])): ?>
                             <div class="small text-muted"><?=nl2br(h($addon['description']))?></div>
                           <?php endif; ?>
+                          <?php if (!empty($addon['detail'])): ?>
+                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2" data-addon-detail-admin data-name="<?=h($addon['name'])?>" data-description="<?=h($addon['description'] ?? '')?>" data-detail="<?=h($addon['detail'])?>" data-image="<?=h($addon['image_url'] ?? '')?>"><i class="bi bi-info-circle"></i> Detayı Gör</button>
+                          <?php endif; ?>
                           <?php if (!empty($addon['category'])): ?>
                             <span class="badge bg-light text-secondary mt-1"><?=h($addon['category'])?></span>
                           <?php endif; ?>
@@ -298,7 +308,94 @@ foreach ($addons as $addon) {
       </div>
     </div>
   </div>
+  <div class="modal fade" id="addonDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content border-0 rounded-4 shadow-lg">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-semibold" data-addon-modal-title>Ek Hizmet Detayı</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3 d-none" data-addon-modal-image></div>
+          <p class="text-muted" data-addon-modal-description></p>
+          <div data-addon-modal-detail class="small text-muted"></div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+        </div>
+      </div>
+    </div>
+  </div>
 <?php admin_layout_end(); ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    var modalEl = document.getElementById('addonDetailModal');
+    if (!modalEl) {
+      return;
+    }
+    var modal = new bootstrap.Modal(modalEl);
+    var titleEl = modalEl.querySelector('[data-addon-modal-title]');
+    var descEl = modalEl.querySelector('[data-addon-modal-description]');
+    var detailEl = modalEl.querySelector('[data-addon-modal-detail]');
+    var imageEl = modalEl.querySelector('[data-addon-modal-image]');
+
+    var escapeHtml = function (str) {
+      var map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      };
+      return (str || '').replace(/[&<>"']/g, function (ch) {
+        return map[ch] || ch;
+      });
+    };
+
+    document.querySelectorAll('[data-addon-detail-admin]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var name = btn.getAttribute('data-name') || '';
+        var description = btn.getAttribute('data-description') || '';
+        var detail = btn.getAttribute('data-detail') || '';
+        var image = btn.getAttribute('data-image') || '';
+
+        if (titleEl) {
+          titleEl.textContent = name;
+        }
+        if (descEl) {
+          if (description.trim() !== '') {
+            descEl.textContent = description;
+            descEl.classList.remove('d-none');
+          } else {
+            descEl.textContent = '';
+            descEl.classList.add('d-none');
+          }
+        }
+        if (detailEl) {
+          if (detail.trim() !== '') {
+            var html = detail.split(/\r?\n/).map(function (line) {
+              return escapeHtml(line);
+            }).join('<br>');
+            detailEl.innerHTML = html;
+            detailEl.classList.remove('text-muted');
+          } else {
+            detailEl.innerHTML = '<span class="text-muted">Ek detay eklenmemiş.</span>';
+          }
+        }
+        if (imageEl) {
+          if (image) {
+            imageEl.innerHTML = '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(name) + '" class="img-fluid rounded-4 shadow-sm">';
+            imageEl.classList.remove('d-none');
+          } else {
+            imageEl.innerHTML = '';
+            imageEl.classList.add('d-none');
+          }
+        }
+        modal.show();
+      });
+    });
+  });
+</script>
 </body>
 </html>

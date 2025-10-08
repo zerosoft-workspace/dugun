@@ -116,6 +116,8 @@ foreach ($currentCampaigns as $line) {
   .addon-image img{width:100%;height:100%;object-fit:cover;display:block;}
   .addon-image.placeholder{display:grid;place-items:center;color:#0f172a;font-weight:600;}
   .addon-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+  .addon-footer{display:flex;justify-content:flex-end;}
+  .addon-footer .btn{border-radius:14px;font-weight:600;}
   .btn-continue{border-radius:18px;padding:14px 22px;font-weight:600;}
   .package-summary{border-radius:24px;background:rgba(14,165,181,.08);padding:24px;margin-bottom:32px;}
   .package-summary h2{font-size:1.35rem;font-weight:700;margin-bottom:8px;}
@@ -172,6 +174,7 @@ foreach ($currentCampaigns as $line) {
               <?php foreach ($addons as $addon):
                 $isChecked = array_key_exists((int)$addon['id'], $addonQty);
                 $qtyValue = $addonQty[$addon['id']] ?? 1;
+                $hasDetail = !empty($addon['detail']);
               ?>
                 <label class="addon-card <?= $isChecked ? 'active' : '' ?>">
                   <div class="d-flex align-items-start justify-content-between gap-3">
@@ -196,6 +199,11 @@ foreach ($currentCampaigns as $line) {
                       <input class="form-control" style="width:90px;" type="number" min="1" name="qty[<?= (int)$addon['id'] ?>]" id="qty-<?= (int)$addon['id'] ?>" value="<?= (int)max(1, $qtyValue) ?>">
                     </div>
                   </div>
+                  <?php if ($hasDetail || !empty($addon['description'])): ?>
+                    <div class="addon-footer">
+                      <button type="button" class="btn btn-outline-secondary btn-sm" data-addon-detail data-name="<?=h($addon['name'])?>" data-description="<?=h($addon['description'] ?? '')?>" data-detail="<?=h($addon['detail'] ?? '')?>" data-image="<?=h($addon['image_url'] ?? '')?>"><i class="bi bi-info-circle"></i> Detayları Gör</button>
+                    </div>
+                  <?php endif; ?>
                 </label>
               <?php endforeach; ?>
             </div>
@@ -255,6 +263,24 @@ foreach ($currentCampaigns as $line) {
     <?php endif; ?>
   </div>
 </div>
+<div class="modal fade" id="addonDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 rounded-4">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-semibold" data-addon-modal-title>Ek Hizmet</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3 d-none" data-addon-modal-image></div>
+        <p class="text-muted mb-3 d-none" data-addon-modal-description></p>
+        <div data-addon-modal-body class="text-muted"></div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Kapat</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal fade" id="campaignDetailModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content border-0 rounded-4">
@@ -298,16 +324,6 @@ foreach ($currentCampaigns as $line) {
       toggle();
     });
 
-    const modalEl = document.getElementById('campaignDetailModal');
-    if (!modalEl) {
-      return;
-    }
-    const modal = new bootstrap.Modal(modalEl);
-    const titleEl = modalEl.querySelector('[data-campaign-modal-title]');
-    const summaryEl = modalEl.querySelector('[data-campaign-modal-summary]');
-    const imageEl = modalEl.querySelector('[data-campaign-modal-image]');
-    const bodyEl = modalEl.querySelector('[data-campaign-modal-body]');
-
     const escapeHtml = function (str) {
       const map = {
         '&': '&amp;',
@@ -320,6 +336,70 @@ foreach ($currentCampaigns as $line) {
         return map[ch] || ch;
       });
     };
+
+    const addonModalEl = document.getElementById('addonDetailModal');
+    if (addonModalEl) {
+      const addonModal = new bootstrap.Modal(addonModalEl);
+      const addonTitleEl = addonModalEl.querySelector('[data-addon-modal-title]');
+      const addonDescEl = addonModalEl.querySelector('[data-addon-modal-description]');
+      const addonBodyEl = addonModalEl.querySelector('[data-addon-modal-body]');
+      const addonImageEl = addonModalEl.querySelector('[data-addon-modal-image]');
+
+      document.querySelectorAll('[data-addon-detail]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const name = btn.getAttribute('data-name') || '';
+          const description = btn.getAttribute('data-description') || '';
+          const detail = btn.getAttribute('data-detail') || '';
+          const image = btn.getAttribute('data-image') || '';
+
+          if (addonTitleEl) {
+            addonTitleEl.textContent = name;
+          }
+          if (addonDescEl) {
+            if (description.trim() !== '') {
+              addonDescEl.textContent = description;
+              addonDescEl.classList.remove('d-none');
+            } else {
+              addonDescEl.textContent = '';
+              addonDescEl.classList.add('d-none');
+            }
+          }
+          if (addonBodyEl) {
+            if (detail.trim() !== '') {
+              const html = detail.split(/\r?\n/).map(function (line) {
+                return escapeHtml(line);
+              }).join('<br>');
+              addonBodyEl.innerHTML = html;
+              addonBodyEl.classList.remove('text-muted');
+            } else {
+              addonBodyEl.innerHTML = '<p class="mb-0 text-muted">Ek detay bilgisi eklenmedi.</p>';
+              addonBodyEl.classList.remove('text-muted');
+            }
+          }
+          if (addonImageEl) {
+            if (image) {
+              addonImageEl.innerHTML = '<img src="' + escapeHtml(image) + '" alt="' + escapeHtml(name) + '" class="img-fluid rounded-4 shadow-sm">';
+              addonImageEl.classList.remove('d-none');
+            } else {
+              addonImageEl.innerHTML = '';
+              addonImageEl.classList.add('d-none');
+            }
+          }
+
+          addonModal.show();
+        });
+      });
+    }
+
+    const campaignModalEl = document.getElementById('campaignDetailModal');
+    if (!campaignModalEl) {
+      return;
+    }
+    const campaignModal = new bootstrap.Modal(campaignModalEl);
+    const titleEl = campaignModalEl.querySelector('[data-campaign-modal-title]');
+    const summaryEl = campaignModalEl.querySelector('[data-campaign-modal-summary]');
+    const imageEl = campaignModalEl.querySelector('[data-campaign-modal-image]');
+    const bodyEl = campaignModalEl.querySelector('[data-campaign-modal-body]');
 
     document.querySelectorAll('[data-campaign-detail]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -361,7 +441,7 @@ foreach ($currentCampaigns as $line) {
             bodyEl.classList.remove('text-muted');
           }
         }
-        modal.show();
+        campaignModal.show();
       });
     });
   });

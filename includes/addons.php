@@ -104,7 +104,41 @@ function site_addon_supports_images(): bool {
   return $supports;
 }
 
+function site_addon_supports_detail(): bool {
+  static $supports = null;
+  if ($supports !== null) {
+    return $supports;
+  }
+
+  try {
+    if (!table_exists('site_addons')) {
+      $supports = false;
+      return $supports;
+    }
+  } catch (Throwable $e) {
+    $supports = false;
+    return $supports;
+  }
+
+  try {
+    if (!column_exists('site_addons', 'detail')) {
+      pdo()->exec('ALTER TABLE site_addons ADD detail LONGTEXT NULL AFTER description');
+    }
+  } catch (Throwable $e) {
+    // ignore - check below
+  }
+
+  try {
+    $supports = column_exists('site_addons', 'detail');
+  } catch (Throwable $e) {
+    $supports = false;
+  }
+
+  return $supports;
+}
+
 function site_addon_normalize(array $row): array {
+  $hasDetail = site_addon_supports_detail();
   $row['id'] = (int)$row['id'];
   $row['price_cents'] = (int)$row['price_cents'];
   $row['is_active'] = (int)$row['is_active'];
@@ -112,6 +146,11 @@ function site_addon_normalize(array $row): array {
   $row['image_path'] = isset($row['image_path']) && $row['image_path'] !== ''
     ? trim((string)$row['image_path'])
     : null;
+  if ($hasDetail && array_key_exists('detail', $row)) {
+    $row['detail'] = $row['detail'] !== null ? (string)$row['detail'] : null;
+  } else {
+    $row['detail'] = null;
+  }
   if (isset($row['meta_json'])) {
     $meta = $row['meta_json'];
     unset($row['meta_json']);
@@ -121,6 +160,9 @@ function site_addon_normalize(array $row): array {
   }
   if (!is_array($row['meta'])) {
     $row['meta'] = [];
+  }
+  if (!$row['detail'] && !empty($row['meta']['detail'])) {
+    $row['detail'] = (string)$row['meta']['detail'];
   }
   if (!$row['image_path'] && !empty($row['meta']['image_path'])) {
     $row['image_path'] = $row['meta']['image_path'];
@@ -183,6 +225,7 @@ function site_addon_save(array $input, ?int $id = null): int {
   }
 
   $description = trim($input['description'] ?? '');
+  $detail = trim($input['detail'] ?? '');
   $category = trim($input['category'] ?? '');
   $isActive = !empty($input['is_active']) ? 1 : 0;
   $displayOrder = isset($input['display_order']) ? (int)$input['display_order'] : 0;
@@ -196,6 +239,7 @@ function site_addon_save(array $input, ?int $id = null): int {
   }
 
   $hasImageColumn = site_addon_supports_images();
+  $hasDetailColumn = site_addon_supports_detail();
 
   if ($imagePath) {
     $meta['image_path'] = $imagePath;
@@ -223,6 +267,10 @@ function site_addon_save(array $input, ?int $id = null): int {
       $description !== '' ? $description : null,
       $category !== '' ? $category : null,
     ];
+    if ($hasDetailColumn) {
+      $sets[] = 'detail=?';
+      $params[] = $detail !== '' ? $detail : null;
+    }
     if ($hasImageColumn) {
       $sets[] = 'image_path=?';
       $params[] = $imagePath ?: null;
@@ -249,14 +297,18 @@ function site_addon_save(array $input, ?int $id = null): int {
     'name',
     'slug',
     'description',
-    'category',
   ];
   $values = [
     $name,
     $slug,
     $description !== '' ? $description : null,
-    $category !== '' ? $category : null,
   ];
+  if ($hasDetailColumn) {
+    $columns[] = 'detail';
+    $values[] = $detail !== '' ? $detail : null;
+  }
+  $columns[] = 'category';
+  $values[] = $category !== '' ? $category : null;
   if ($hasImageColumn) {
     $columns[] = 'image_path';
     $values[] = $imagePath ?: null;
@@ -326,6 +378,9 @@ function site_order_addons_list(int $orderId): array {
       $row['image_path'] = $row['meta']['image_path'];
       $row['image_url'] = BASE_URL.'/'.ltrim($row['image_path'], '/');
     }
+    if (!empty($row['meta']['detail'])) {
+      $row['detail'] = $row['meta']['detail'];
+    }
     return $row;
   }, $rows);
 }
@@ -353,6 +408,9 @@ function site_order_sync_addons(int $orderId, array $selectedAddons): void {
     }
     if (!empty($addon['image_path'])) {
       $meta['image_path'] = $addon['image_path'];
+    }
+    if (!empty($addon['detail'])) {
+      $meta['detail'] = $addon['detail'];
     }
     $pdo->prepare('INSERT INTO site_order_addons (order_id, addon_id, addon_name, addon_description, price_cents, quantity, total_cents, meta_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
         ->execute([

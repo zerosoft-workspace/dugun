@@ -902,6 +902,7 @@ function install_schema(){
     name VARCHAR(190) NOT NULL,
     slug VARCHAR(190) NOT NULL UNIQUE,
     description TEXT NULL,
+    detail LONGTEXT NULL,
     category VARCHAR(120) NULL,
     price_cents INT NOT NULL DEFAULT 0,
     image_path VARCHAR(255) NULL,
@@ -915,6 +916,12 @@ function install_schema(){
   if (!column_exists('site_addons', 'image_path')) {
     try {
       pdo()->exec('ALTER TABLE site_addons ADD image_path VARCHAR(255) NULL AFTER price_cents');
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('site_addons', 'detail')) {
+    try {
+      pdo()->exec('ALTER TABLE site_addons ADD detail LONGTEXT NULL AFTER description');
     } catch (Throwable $e) {}
   }
 
