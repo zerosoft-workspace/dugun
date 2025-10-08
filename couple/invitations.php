@@ -92,6 +92,16 @@ $contacts = invitation_contacts_list($EVENT_ID);
 $invitePreviewUrl = !empty($contacts) ? public_invitation_url((string)$contacts[0]['invite_token']) : '';
 $accent = invitation_color_or_default($template['accent_color'] ?? null, '#f8fafc');
 $primary = invitation_color_or_default($template['primary_color'] ?? null, '#0ea5b5');
+$cardShareUrl = public_invitation_card_share_url((string)$template['share_token']);
+$cardVersion = substr(md5(json_encode([
+  $template['title'],
+  $template['subtitle'],
+  $template['message'],
+  $template['primary_color'],
+  $template['accent_color'],
+  $template['button_label'],
+], JSON_UNESCAPED_UNICODE)), 0, 12);
+$cardPreviewUrl = $cardShareUrl.($cardVersion ? '&v='.$cardVersion : '');
 ?>
 <!doctype html>
 <html lang="tr">
@@ -121,6 +131,8 @@ body{ background:#f8fafc; font-family:'Inter','Segoe UI','Helvetica Neue',sans-s
 .invite-card + .invite-card{ margin-top:18px; }
 .contact-meta{ color:var(--muted); font-size:.9rem; }
 .copy-input{ font-size:.85rem; background:#f8fafc; }
+.card-image-box img{ width:100%; border-radius:18px; border:1px solid rgba(148,163,184,.25); box-shadow:0 22px 45px -25px rgba(15,23,42,.28); }
+.card-image-box .form-text{ font-size:.85rem; }
 .badge-soft{ background:rgba(14,165,181,.12); color:var(--zs); border-radius:999px; padding:.25rem .75rem; font-weight:600; }
 @media (max-width:767px){
   .preview-card{ margin-top:1.5rem; }
@@ -199,6 +211,18 @@ body{ background:#f8fafc; font-family:'Inter','Segoe UI','Helvetica Neue',sans-s
           <div class="brand">bikara.com</div>
         </div>
       </div>
+      <div class="card-lite p-3 mt-3 card-image-box">
+        <h2 class="section-title fs-5">WhatsApp Kartı</h2>
+        <p class="text-muted">Tasarladığınız davetiye otomatik olarak bir kart görseline dönüştürülür. İndirerek WhatsApp veya sosyal medya üzerinden görsel olarak paylaşabilirsiniz.</p>
+        <img src="<?=h($cardPreviewUrl)?>" alt="Davetiye kartı önizlemesi">
+        <div class="d-grid gap-2 mt-3">
+          <a class="btn btn-zs" href="<?=h($cardShareUrl)?>&download=1"><i class="bi bi-download me-1"></i>Kartı indir</a>
+          <a class="btn btn-outline-secondary" href="<?=h($cardPreviewUrl)?>" target="_blank" rel="noopener"><i class="bi bi-image me-1"></i>Kartı yeni sekmede aç</a>
+        </div>
+        <label class="form-label mt-3">Genel kart bağlantısı</label>
+        <input class="form-control copy-input" value="<?=$cardShareUrl?>" readonly>
+        <div class="form-text">Bu bağlantıyı herkese açık paylaşımlarda kullanabilirsiniz. Davetliler için kişiye özel kartlar otomatik hazırlanır.</div>
+      </div>
     </div>
   </div>
 
@@ -239,6 +263,7 @@ body{ background:#f8fafc; font-family:'Inter','Segoe UI','Helvetica Neue',sans-s
         $lastSent = $contact['last_sent_at'] ? (new DateTime($contact['last_sent_at']))->format('d.m.Y H:i') : null;
         $lastView = $contact['last_viewed_at'] ? (new DateTime($contact['last_viewed_at']))->format('d.m.Y H:i') : null;
         $hasEmail = !empty($contact['email']);
+        $cardUrl = public_invitation_card_url((string)$contact['invite_token']);
       ?>
       <div class="col-lg-6">
         <div class="card-lite invite-card h-100 d-flex flex-column">
@@ -270,6 +295,7 @@ body{ background:#f8fafc; font-family:'Inter','Segoe UI','Helvetica Neue',sans-s
               <?php else: ?>
                 <button class="btn btn-outline-success" type="button" disabled><i class="bi bi-whatsapp me-1"></i>Telefon eksik</button>
               <?php endif; ?>
+              <a class="btn btn-outline-secondary" href="<?=h($cardUrl)?>&download=1"><i class="bi bi-card-image me-1"></i>Kartı İndir</a>
               <form method="post" onsubmit="return confirm('Bu davetli silinsin mi?');">
                 <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
                 <input type="hidden" name="do" value="delete_contact">

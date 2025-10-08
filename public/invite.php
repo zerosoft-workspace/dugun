@@ -123,6 +123,18 @@ $venueName = $event['venue_name'] ?? '';
 $inviteMessage = nl2br(h($template['message']));
 $accent = invitation_color_or_default($template['accent_color'] ?? null, '#f8fafc');
 $primary = invitation_color_or_default($template['primary_color'] ?? null, '#0ea5b5');
+$cardUrl = public_invitation_card_url($code);
+$cardShareUrl = public_invitation_card_share_url((string)$template['share_token']);
+$cardVersion = substr(md5(json_encode([
+  $template['title'],
+  $template['subtitle'],
+  $template['message'],
+  $template['primary_color'],
+  $template['accent_color'],
+  $template['button_label'],
+], JSON_UNESCAPED_UNICODE)), 0, 12);
+$cardPreviewUrl = $cardUrl.($cardVersion ? '&v='.$cardVersion : '');
+$cardSharePreviewUrl = $cardShareUrl.($cardVersion ? '&v='.$cardVersion : '');
 ?>
 <!doctype html>
 <html lang="tr">
@@ -151,6 +163,9 @@ body{ background:linear-gradient(160deg,rgba(248,250,252,1) 0%,rgba(255,255,255,
 .btn-primary{ background:var(--primary); border:none; }
 .btn-primary:hover{ background:var(--primary); filter:brightness(.95); }
 .btn-outline-secondary{ border-radius:999px; }
+.share-card{ border-radius:24px; background:#fff; border:1px solid rgba(148,163,184,.16); box-shadow:0 30px 80px -60px rgba(15,23,42,.3); padding:24px 28px; margin-bottom:32px; }
+.share-card img{ width:100%; border-radius:18px; border:1px solid rgba(148,163,184,.2); box-shadow:0 18px 45px -28px rgba(15,23,42,.35); }
+.share-card .form-text{ font-size:.85rem; }
 </style>
 </head>
 <body>
@@ -224,6 +239,17 @@ body{ background:linear-gradient(160deg,rgba(248,250,252,1) 0%,rgba(255,255,255,
         <a class="cta" href="#" onclick="return false;"><?=h($buttonLabel)?></a>
         <div class="brand">bikara.com</div>
       </div>
+    </div>
+
+    <div class="share-card">
+      <h2 class="h5 fw-bold mb-3">Davetiye kartınız</h2>
+      <p class="text-muted mb-3">Kartı indirip WhatsApp veya sosyal medya üzerinden tek dokunuşla paylaşabilirsiniz. Görsel otomatik olarak bikara.com markasıyla hazırlanır.</p>
+      <img src="<?=h($cardPreviewUrl)?>" alt="Davetiye kartı">
+      <div class="d-grid gap-2 mt-3">
+        <a class="btn btn-primary btn-pill" href="<?=h($cardUrl)?>&download=1"><i class="bi bi-download me-1"></i>Kişisel kartı indir</a>
+        <a class="btn btn-outline-secondary btn-pill" href="<?=h($cardPreviewUrl)?>" target="_blank" rel="noopener"><i class="bi bi-image me-1"></i>Kartı yeni sekmede aç</a>
+      </div>
+      <div class="form-text text-muted mt-3">Genel paylaşım yapmak isterseniz çiftinizin kart bağlantısını <a href="<?=h($cardSharePreviewUrl)?>" target="_blank" rel="noopener">buradan</a> görüntüleyebilir veya bağlantıyı paylaşabilirsiniz.</div>
     </div>
 
     <div class="panel-card">

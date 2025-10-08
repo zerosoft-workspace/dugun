@@ -198,6 +198,16 @@ function public_invitation_url(string $token): string {
   return BASE_URL.'/public/invite.php?code='.rawurlencode($token);
 }
 
+function public_invitation_card_url(string $token): string {
+  $token = trim($token);
+  return BASE_URL.'/public/invite_card.php?code='.rawurlencode($token);
+}
+
+function public_invitation_card_share_url(string $shareToken): string {
+  $shareToken = trim($shareToken);
+  return BASE_URL.'/public/invite_card.php?share='.rawurlencode($shareToken);
+}
+
 /* -------------------- Dosya sistemi -------------------- */
 function ensure_upload_dir(int $venueId, int $eventId): string {
   $root = __DIR__.'/../uploads';

@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240703_01');
+  define('APP_SCHEMA_VERSION', '20240705_01');
 }
 
 function pdo(): PDO {
@@ -58,6 +58,34 @@ function ensure_schema_patches(PDO $pdo): void {
     }
   } catch (Throwable $e) {
     // ignore migration errors, column will exist on fresh installs
+  }
+
+  try {
+    if (table_exists('event_invitation_templates')) {
+      if (!column_exists('event_invitation_templates', 'share_token')) {
+        $pdo->exec("ALTER TABLE event_invitation_templates ADD share_token VARCHAR(64) NULL AFTER event_id");
+      }
+      try {
+        $pdo->exec("ALTER TABLE event_invitation_templates ADD UNIQUE KEY uniq_invitation_share (share_token)");
+      } catch (Throwable $e) {
+        // index already exists or cannot be created, ignore
+      }
+      try {
+        $st = $pdo->query("SELECT id, event_id, share_token FROM event_invitation_templates");
+        while ($row = $st->fetch()) {
+          if (!empty($row['share_token'])) {
+            continue;
+          }
+          $token = bin2hex(random_bytes(16));
+          $upd = $pdo->prepare("UPDATE event_invitation_templates SET share_token=:token WHERE id=:id");
+          $upd->execute([':token' => $token, ':id' => $row['id']]);
+        }
+      } catch (Throwable $e) {
+        // ignore population errors; token will be generated lazily when needed
+      }
+    }
+  } catch (Throwable $e) {
+    // ignore migration errors related to invitation share tokens
   }
 }
 
@@ -1036,6 +1064,7 @@ function install_schema(){
   pdo()->exec("CREATE TABLE IF NOT EXISTS event_invitation_templates(
     id INT AUTO_INCREMENT PRIMARY KEY,
     event_id INT NOT NULL UNIQUE,
+    share_token VARCHAR(64) NULL,
     title VARCHAR(190) NOT NULL,
     subtitle VARCHAR(190) NULL,
     message TEXT NOT NULL,
@@ -1044,7 +1073,8 @@ function install_schema(){
     button_label VARCHAR(120) NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_invitation_share (share_token)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   /* event invitation contacts */
