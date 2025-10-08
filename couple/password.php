@@ -2,6 +2,7 @@
 require_once __DIR__.'/_auth.php'; // global login + aktif düğün zorunlu
 require_once __DIR__.'/../includes/couple_auth.php';
 
+$forceReset = couple_current_requires_reset();
 $err = null;
 if ($_SERVER['REQUEST_METHOD']==='POST') {
   csrf_or_die();
@@ -12,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
   elseif (strlen($new1) < 6) $err = 'Yeni şifre en az 6 karakter olmalı.';
   else {
     if (!couple_update_password_current($current, $new1)) {
-      $err = 'Mevcut şifre hatalı.';
+      $err = $forceReset ? 'Şifreniz güncellenemedi. Lütfen tekrar deneyin.' : 'Mevcut şifre hatalı.';
     } else {
       flash('ok','Şifreniz güncellendi.');
       redirect(BASE_URL.'/couple/index.php');
@@ -42,8 +43,14 @@ if ($_SERVER['REQUEST_METHOD']==='POST') {
 
     <form method="post" class="vstack gap-2">
       <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-      <label class="form-label">Mevcut Şifre</label>
-      <input class="form-control" type="password" name="current" required>
+      <?php if (!$forceReset): ?>
+        <label class="form-label">Mevcut Şifre</label>
+        <input class="form-control" type="password" name="current" required>
+      <?php else: ?>
+        <div class="alert alert-info small">
+          <strong>Hoş geldiniz!</strong> Güvenliğiniz için yeni bir şifre belirleyin. Mevcut şifreyi girmeniz gerekmiyor.
+        </div>
+      <?php endif; ?>
       <div class="row g-2">
         <div class="col-md-6">
           <label class="form-label">Yeni Şifre</label>
