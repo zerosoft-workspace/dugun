@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__.'/db.php';
 require_once __DIR__.'/functions.php';
+require_once __DIR__.'/invitation_font_data.php';
 
 function invitation_theme_options(): array {
   return [
@@ -10,7 +11,7 @@ function invitation_theme_options(): array {
       'defaults' => [
         'title' => 'Düğün Davetiyemiz',
         'subtitle' => 'Sevincimizi paylaşmaya davetlisiniz',
-        'message' => "Birlikteliğimizi kutlayacağımız bu özel günde sizleri yanımızda görmek istiyoruz.\n\nbikara.com",
+        'message' => "Çünkü sevgimizi paylaşırken, Şehrin ışıkları altında, Özel günümüzde sizleri aramızda görmek istiyoruz. Aşkımıza, neşemize ve bütün sevdiklerimize İyi ki varsınız diyoruz. Mutluluğumuzu birlikte çoğaltalım.\n\nbikara.com",
         'primary_color' => '#c2788f',
         'accent_color' => '#fdf2f8',
         'button_label' => 'Katılımınızı Bildirin',
@@ -72,7 +73,7 @@ function invitation_template_defaults(?string $theme = null): array {
     'theme' => $themeKey,
     'title' => 'Düğün Davetiyemiz',
     'subtitle' => 'Sevincimizi paylaşmaya davetlisiniz',
-    'message' => "Birlikteliğimizi kutlayacağımız bu özel günde sizleri yanımızda görmek istiyoruz.\n\nbikara.com",
+    'message' => "Çünkü sevgimizi paylaşırken, Şehrin ışıkları altında, Özel günümüzde sizleri aramızda görmek istiyoruz. Aşkımıza, neşemize ve bütün sevdiklerimize İyi ki varsınız diyoruz. Mutluluğumuzu birlikte çoğaltalım.\n\nbikara.com",
     'primary_color' => '#0ea5b5',
     'accent_color' => '#f8fafc',
     'button_label' => 'Katılımınızı Bildirin',
@@ -548,28 +549,83 @@ function invitation_event_row(int $eventId): ?array {
   }
 }
 
-function invitation_card_font_path(string $weight = 'regular'): ?string {
-  static $cache = [];
-  if (array_key_exists($weight, $cache)) {
-    return $cache[$weight];
+function invitation_card_font_bootstrap(): ?string {
+  static $attempted = false;
+  static $directory = null;
+
+  if ($attempted) {
+    return $directory;
   }
 
-  $base = realpath(__DIR__.'/../bin/fonts') ?: null;
-  if (!$base) {
-    $cache[$weight] = null;
-    return null;
+  $attempted = true;
+  $storageBase = realpath(__DIR__.'/../storage') ?: (__DIR__.'/../storage');
+  $targetDir = rtrim($storageBase, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.'invitation-fonts';
+
+  if (!is_dir($targetDir)) {
+    @mkdir($targetDir, 0755, true);
   }
 
-  $map = [
-    'regular' => $base.'/Inter-Regular.ttf',
-    'semibold' => $base.'/Inter-SemiBold.ttf',
+  if (!is_dir($targetDir) || !is_writable($targetDir)) {
+    return $directory = null;
+  }
+
+  $fonts = [
+    'inter-regular' => 'Inter-Regular.ttf',
+    'inter-semibold' => 'Inter-SemiBold.ttf',
   ];
 
-  $candidates = [];
-  if (isset($map[$weight])) {
-    $candidates[] = $map[$weight];
+  foreach ($fonts as $variant => $filename) {
+    $path = $targetDir.DIRECTORY_SEPARATOR.$filename;
+    $existingSize = is_file($path) ? filesize($path) : 0;
+    if ($existingSize > 1024) {
+      continue;
+    }
+    $payload = invitation_font_payload($variant);
+    if ($payload === null) {
+      continue;
+    }
+    @file_put_contents($path, $payload, LOCK_EX);
   }
-  foreach ($map as $path) {
+
+  foreach ($fonts as $filename) {
+    $path = $targetDir.DIRECTORY_SEPARATOR.$filename;
+    if (!is_file($path) || filesize($path) <= 1024) {
+      return $directory = null;
+    }
+  }
+
+  return $directory = (realpath($targetDir) ?: $targetDir);
+}
+
+function invitation_card_font_path(string $weight = 'regular'): ?string {
+  static $cache = [];
+  $weightKey = strtolower($weight);
+  if (array_key_exists($weightKey, $cache)) {
+    return $cache[$weightKey];
+  }
+
+  $filenameMap = [
+    'regular' => 'Inter-Regular.ttf',
+    'semibold' => 'Inter-SemiBold.ttf',
+    'bold' => 'Inter-SemiBold.ttf',
+  ];
+
+  $filename = $filenameMap[$weightKey] ?? $filenameMap['regular'];
+  $candidates = [];
+
+  $base = realpath(__DIR__.'/../bin/fonts') ?: null;
+  if ($base) {
+    $candidates[] = $base.DIRECTORY_SEPARATOR.$filename;
+  }
+
+  $storageFonts = realpath(__DIR__.'/../storage/invitation-fonts') ?: null;
+  if ($storageFonts) {
+    $candidates[] = $storageFonts.DIRECTORY_SEPARATOR.$filename;
+  }
+
+  $bootstrapped = invitation_card_font_bootstrap();
+  if ($bootstrapped) {
+    $path = rtrim($bootstrapped, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$filename;
     if (!in_array($path, $candidates, true)) {
       $candidates[] = $path;
     }
@@ -582,12 +638,10 @@ function invitation_card_font_path(string $weight = 'regular'): ?string {
     if (!invitation_card_font_is_usable($path)) {
       continue;
     }
-    $cache[$weight] = $path;
-    return $path;
+    return $cache[$weightKey] = $path;
   }
 
-  $cache[$weight] = null;
-  return null;
+  return $cache[$weightKey] = null;
 }
 
 function invitation_card_font_is_usable(?string $fontPath): bool {
@@ -720,8 +774,8 @@ function invitation_card_theme_style(array $template): array {
   $accent = invitation_card_hex_to_rgb($template['accent_color'] ?? '#f8fafc', [248, 250, 252]);
   $white = [255, 255, 255];
 
-  $panelRadius = 56;
-  $panelMargin = [72, 470, 72, 190];
+  $panelRadius = 64;
+  $panelMargin = [64, 360, 64, 160];
   $panel = [255, 255, 255];
   $panelBorder = invitation_card_lighten($primary, 0.55);
   $background = invitation_card_lighten($accent, 0.45);
@@ -870,9 +924,9 @@ function invitation_card_draw_backdrop(GdImage $img, array $style, int $width, i
     $shadow = $style['panel_shadow'];
     $shadowRgb = $shadow['rgb'] ?? [0, 0, 0];
     $shadowAlpha = max(0, min(127, (int)($shadow['alpha'] ?? 100)));
-    $shadowWidth = (int)($shadow['width'] ?? (($panelRight - $panelLeft) + 160));
-    $shadowHeight = (int)($shadow['height'] ?? 220);
-    $shadowOffsetY = (int)($shadow['offset_y'] ?? 44);
+    $shadowWidth = (int)($shadow['width'] ?? (($panelRight - $panelLeft) + 220));
+    $shadowHeight = (int)($shadow['height'] ?? 260);
+    $shadowOffsetY = (int)($shadow['offset_y'] ?? 52);
     $shadowColor = imagecolorallocatealpha($img, $shadowRgb[0], $shadowRgb[1], $shadowRgb[2], $shadowAlpha);
     imagefilledellipse($img, (int)round($width / 2), $panelBottom + $shadowOffsetY, $shadowWidth, $shadowHeight, $shadowColor);
   }
@@ -1007,9 +1061,9 @@ function invitation_card_render(array $template, array $event, ?array $contact =
     if ($title === '') {
       $title = 'Düğün Davetiyemiz';
     }
-    $titleSize = 60;
-    $maxTitleWidth = 840;
-    while ($titleSize > 36) {
+    $titleSize = 74;
+    $maxTitleWidth = 900;
+    while ($titleSize > 42) {
       $widthText = invitation_card_text_metrics($titleSize, $fontSemi, $title)['width'];
       if ($widthText <= $maxTitleWidth) {
         break;
@@ -1018,7 +1072,7 @@ function invitation_card_render(array $template, array $event, ?array $contact =
     }
     $titleWidth = invitation_card_text_metrics($titleSize, $fontSemi, $title)['width'];
     $titleX = (int)round(($width - $titleWidth) / 2);
-    $titleY = 210;
+    $titleY = 230;
     invitation_card_draw_text($img, $titleSize, $titleX, $titleY, $headlineColor, $fontSemi, $title);
 
     $subtitle = trim((string)($template['subtitle'] ?? ''));
@@ -1032,9 +1086,9 @@ function invitation_card_render(array $template, array $event, ?array $contact =
     }
     if ($subtitleLines) {
       $subtitleText = implode(' • ', $subtitleLines);
-      $subtitleSize = 30;
-      $maxSubtitleWidth = 900;
-      while ($subtitleSize > 22) {
+      $subtitleSize = 36;
+      $maxSubtitleWidth = 920;
+      while ($subtitleSize > 24) {
         $subtitleWidth = invitation_card_text_metrics($subtitleSize, $fontRegular, $subtitleText)['width'];
         if ($subtitleWidth <= $maxSubtitleWidth) {
           break;
@@ -1043,21 +1097,21 @@ function invitation_card_render(array $template, array $event, ?array $contact =
       }
       $subtitleWidth = invitation_card_text_metrics($subtitleSize, $fontRegular, $subtitleText)['width'];
       $subtitleX = (int)round(($width - $subtitleWidth) / 2);
-      $subtitleY = $titleY + 60;
+      $subtitleY = $titleY + 70;
       invitation_card_draw_text($img, $subtitleSize, $subtitleX, $subtitleY, $subtitleColor, $fontRegular, $subtitleText);
     }
 
-    $cursorY = $panelTop + 120;
+    $cursorY = $panelTop + 150;
     $centerX = (int)round($width / 2);
 
     if ($contact && !empty($contact['name'])) {
       $recipient = trim((string)$contact['name']);
       if ($recipient !== '') {
         $recipientText = 'Sevgili '.$recipient;
-        $recipientSize = 34;
+        $recipientSize = 38;
         $recipientWidth = invitation_card_text_metrics($recipientSize, $fontSemi, $recipientText)['width'];
         if ($recipientWidth > 780) {
-          $recipientSize = 30;
+          $recipientSize = 32;
           $recipientWidth = invitation_card_text_metrics($recipientSize, $fontSemi, $recipientText)['width'];
         }
         $recipientX = (int)round($centerX - ($recipientWidth / 2));
@@ -1070,10 +1124,10 @@ function invitation_card_render(array $template, array $event, ?array $contact =
     if (stripos($message, 'bikara.com') === false) {
       $message = invitation_require_branding($message);
     }
-    $messageFontSize = 36;
-    $maxMessageWidth = 760;
+    $messageFontSize = 40;
+    $maxMessageWidth = 780;
     $messageLines = invitation_card_wrap_text($message, $fontRegular, $messageFontSize, $maxMessageWidth);
-    while (count($messageLines) > 9 && $messageFontSize > 26) {
+    while (count($messageLines) > 8 && $messageFontSize > 28) {
       $messageFontSize -= 2;
       $messageLines = invitation_card_wrap_text($message, $fontRegular, $messageFontSize, $maxMessageWidth);
     }
@@ -1081,16 +1135,16 @@ function invitation_card_render(array $template, array $event, ?array $contact =
       $cursorY = invitation_card_draw_lines($img, $messageLines, $fontRegular, $messageFontSize, $muted, $centerX, $cursorY, 1.4);
     }
 
-    $cursorY += 40;
+    $cursorY += 56;
     $buttonLabel = trim((string)($template['button_label'] ?? ''));
     if ($buttonLabel === '') {
       $buttonLabel = 'Katılımınızı Bildirin';
     }
-    $buttonFontSize = 30;
+    $buttonFontSize = 34;
     $buttonTextWidth = invitation_card_text_metrics($buttonFontSize, $fontSemi, $buttonLabel)['width'];
-    $buttonPadding = 140;
-    $buttonWidth = min(760, $buttonTextWidth + $buttonPadding);
-    $buttonHeight = 94;
+    $buttonPadding = 160;
+    $buttonWidth = min(780, $buttonTextWidth + $buttonPadding);
+    $buttonHeight = 102;
     $buttonX1 = (int)round($centerX - ($buttonWidth / 2));
     $buttonY1 = $cursorY;
     $buttonX2 = $buttonX1 + $buttonWidth;
@@ -1101,9 +1155,9 @@ function invitation_card_render(array $template, array $event, ?array $contact =
     invitation_card_draw_text($img, $buttonFontSize, $buttonTextX, $buttonBaseline, $buttonTextColor, $fontSemi, $buttonLabel);
 
     $brandY = $panelBottom - 60;
-    $brandTextWidth = invitation_card_text_metrics(26, $fontSemi, 'bikara.com')['width'];
+    $brandTextWidth = invitation_card_text_metrics(28, $fontSemi, 'bikara.com')['width'];
     $brandX = (int)round($centerX - ($brandTextWidth / 2));
-    invitation_card_draw_text($img, 26, $brandX, $brandY, $brand, $fontSemi, 'bikara.com');
+    invitation_card_draw_text($img, 28, $brandX, $brandY, $brand, $fontSemi, 'bikara.com');
 
     return $img;
   } catch (RuntimeException $e) {
