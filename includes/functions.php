@@ -119,6 +119,14 @@ function send_mail_simple(string $to, string $subject, string $html){
   $fromAddr = defined('MAIL_FROM') && MAIL_FROM ? MAIL_FROM : 'no-reply@'.$fromHost;
   require_once __DIR__.'/mailer.php';
 
+  $overrides = mailer_settings_overrides();
+  if (!empty($overrides['from_email'])) {
+    $fromAddr = $overrides['from_email'];
+  }
+  if (!empty($overrides['from_name'])) {
+    $fromName = $overrides['from_name'];
+  }
+
   $sent = send_smtp_mail($to, $subject, $html, $fromAddr, $fromName);
 
   if ($sent) {

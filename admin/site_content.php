@@ -12,7 +12,6 @@ install_schema();
 
 $defaults = site_content_defaults();
 $content = site_settings_all();
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   csrf_or_die();
 
@@ -38,6 +37,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     'footer_disclaimer_left' => trim($_POST['footer_disclaimer_left'] ?? ''),
     'footer_disclaimer_right' => trim($_POST['footer_disclaimer_right'] ?? ''),
   ];
+
+  $smtpPort = trim($_POST['smtp_port'] ?? '');
+  if ($smtpPort !== '' && !ctype_digit($smtpPort)) {
+    $smtpPort = '';
+  }
+  $smtpSecure = strtolower(trim($_POST['smtp_secure'] ?? ''));
+  if (!in_array($smtpSecure, ['tls', 'ssl', ''], true)) {
+    $smtpSecure = 'tls';
+  }
+
+  $payload['smtp_host'] = trim($_POST['smtp_host'] ?? '');
+  $payload['smtp_port'] = $smtpPort;
+  $payload['smtp_user'] = trim($_POST['smtp_user'] ?? '');
+  $payload['smtp_pass'] = trim($_POST['smtp_pass'] ?? '');
+  $payload['smtp_secure'] = $smtpSecure;
+  $payload['smtp_from_email'] = trim($_POST['smtp_from_email'] ?? '');
+  $payload['smtp_from_name'] = trim($_POST['smtp_from_name'] ?? '');
 
   $faqItems = [];
   $faqQuestions = $_POST['faq_question'] ?? [];
@@ -131,6 +147,7 @@ while (count($navItems) < 5) {
             <h6>İçerik Başlıkları</h6>
             <button type="button" class="pane-button active" data-pane-target="contact"><i class="bi bi-person-rolodex"></i>İletişim Bilgileri</button>
             <button type="button" class="pane-button" data-pane-target="cta"><i class="bi bi-bullseye"></i>Çağrı Alanı</button>
+            <button type="button" class="pane-button" data-pane-target="smtp"><i class="bi bi-envelope-paper"></i>SMTP Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="faq"><i class="bi bi-chat-dots"></i>Sıkça Sorulanlar</button>
             <button type="button" class="pane-button" data-pane-target="footer"><i class="bi bi-columns-gap"></i>Footer İçeriği</button>
           </div>
@@ -223,6 +240,88 @@ while (count($navItems) < 5) {
                 <div class="col-12">
                   <label class="form-label">CTA Buton URL</label>
                   <input type="text" name="contact_cta_button_url" class="form-control" value="<?=h($content['contact_cta_button_url'] ?? '')?>">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="smtp">
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">SMTP Ayarları</h5>
+                  <p class="text-muted mb-0">Gönderici bilgilerini ve SMTP sunucunuzu tanımlayın. Boş alanlar mevcut sunucu yapılandırmasına göre çalışır.</p>
+                </div>
+                <i class="bi bi-gear-wide-connected" style="font-size:1.6rem;color:var(--admin-brand);"></i>
+              </div>
+              <?php
+                $smtpHostValue = $content['smtp_host'] ?? '';
+                if ($smtpHostValue === '' && defined('SMTP_HOST')) {
+                  $smtpHostValue = (string)SMTP_HOST;
+                }
+                $smtpPortValue = $content['smtp_port'] ?? '';
+                if ($smtpPortValue === '' && defined('SMTP_PORT')) {
+                  $smtpPortValue = (string)SMTP_PORT;
+                }
+                $smtpUserValue = $content['smtp_user'] ?? '';
+                if ($smtpUserValue === '' && defined('SMTP_USER')) {
+                  $smtpUserValue = (string)SMTP_USER;
+                }
+                $smtpPassValue = $content['smtp_pass'] ?? '';
+                if ($smtpPassValue === '' && defined('SMTP_PASS')) {
+                  $smtpPassValue = (string)SMTP_PASS;
+                }
+                $smtpSecureValue = strtolower(trim((string)($content['smtp_secure'] ?? '')));
+                if (!in_array($smtpSecureValue, ['tls', 'ssl', ''], true)) {
+                  $smtpSecureValue = defined('SMTP_SECURE') ? strtolower((string)SMTP_SECURE) : '';
+                  if (!in_array($smtpSecureValue, ['tls', 'ssl', ''], true)) {
+                    $smtpSecureValue = '';
+                  }
+                }
+                $smtpFromEmail = $content['smtp_from_email'] ?? '';
+                if ($smtpFromEmail === '' && defined('MAIL_FROM')) {
+                  $smtpFromEmail = (string)MAIL_FROM;
+                }
+                $smtpFromName = $content['smtp_from_name'] ?? '';
+                if ($smtpFromName === '' && defined('MAIL_FROM_NAME')) {
+                  $smtpFromName = (string)MAIL_FROM_NAME;
+                }
+              ?>
+              <div class="row g-3">
+                <div class="col-md-8">
+                  <label class="form-label">SMTP Sunucusu</label>
+                  <input type="text" name="smtp_host" class="form-control" value="<?=h($smtpHostValue)?>" placeholder="smtp.ornek.com">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Port</label>
+                  <input type="text" name="smtp_port" class="form-control" value="<?=h($smtpPortValue)?>" placeholder="587">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Kullanıcı Adı</label>
+                  <input type="text" name="smtp_user" class="form-control" value="<?=h($smtpUserValue)?>" placeholder="smtp@ornek.com">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Şifre</label>
+                  <input type="password" name="smtp_pass" class="form-control" value="<?=h($smtpPassValue)?>" autocomplete="new-password">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Bağlantı Türü</label>
+                  <select name="smtp_secure" class="form-select">
+                    <option value="" <?=$smtpSecureValue === '' ? 'selected' : ''?>>Güvenliksiz</option>
+                    <option value="tls" <?=$smtpSecureValue === 'tls' ? 'selected' : ''?>>TLS (587)</option>
+                    <option value="ssl" <?=$smtpSecureValue === 'ssl' ? 'selected' : ''?>>SSL (465)</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Gönderici E-posta</label>
+                  <input type="email" name="smtp_from_email" class="form-control" value="<?=h($smtpFromEmail)?>" placeholder="no-reply@ornek.com">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Gönderici Adı</label>
+                  <input type="text" name="smtp_from_name" class="form-control" value="<?=h($smtpFromName)?>" placeholder="BİKARE">
+                </div>
+                <div class="col-12">
+                  <div class="alert alert-info small mb-0">SMTP alanlarını boş bırakırsanız sistem <code>config.php</code> veya ortam değişkenlerindeki değerleri kullanmaya devam eder.</div>
                 </div>
               </div>
             </div>

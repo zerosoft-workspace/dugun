@@ -98,6 +98,13 @@ function site_content_defaults(): array {
     'footer_company' => 'Zerosoft Teknoloji',
     'footer_disclaimer_left' => '© '.$year.' Zerosoft Teknoloji',
     'footer_disclaimer_right' => 'Developed by Zerosoft — BİKARE Dijital Etkinlik Platformu',
+    'smtp_host' => '',
+    'smtp_port' => '',
+    'smtp_user' => '',
+    'smtp_pass' => '',
+    'smtp_secure' => 'tls',
+    'smtp_from_email' => '',
+    'smtp_from_name' => '',
     'footer_nav_links' => [
       ['label' => 'Hakkımızda', 'url' => '#hakkimizda'],
       ['label' => 'Nasıl Çalışıyoruz', 'url' => '#nasil'],
@@ -168,6 +175,12 @@ function site_settings_update(array $data): void {
 
 function site_public_content(): array {
   $content = site_settings_all();
+
+  foreach (array_keys($content) as $key) {
+    if (strpos($key, 'smtp_') === 0) {
+      unset($content[$key]);
+    }
+  }
 
   if (empty($content['contact_website_label']) && !empty($content['contact_website'])) {
     $content['contact_website_label'] = preg_replace('~^https?://~i', '', $content['contact_website']);
