@@ -112,6 +112,9 @@ foreach ($currentCampaigns as $line) {
   .addon-card h3{font-size:1.2rem;font-weight:700;margin:0;}
   .addon-price{font-size:1.1rem;font-weight:700;color:#0ea5b5;}
   .addon-desc{color:#64748b;font-size:.92rem;}
+  .addon-image{border-radius:18px;overflow:hidden;min-height:160px;background:linear-gradient(135deg,rgba(14,165,181,.12),rgba(59,130,246,.1));position:relative;}
+  .addon-image img{width:100%;height:100%;object-fit:cover;display:block;}
+  .addon-image.placeholder{display:grid;place-items:center;color:#0f172a;font-weight:600;}
   .addon-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;}
   .btn-continue{border-radius:18px;padding:14px 22px;font-weight:600;}
   .package-summary{border-radius:24px;background:rgba(14,165,181,.08);padding:24px;margin-bottom:32px;}
@@ -175,6 +178,11 @@ foreach ($currentCampaigns as $line) {
                     <h3><?=h($addon['name'])?></h3>
                     <span class="addon-price"><?=h(format_currency((int)$addon['price_cents']))?></span>
                   </div>
+                  <?php if (!empty($addon['image_url'])): ?>
+                    <div class="addon-image">
+                      <img src="<?=h($addon['image_url'])?>" alt="<?=h($addon['name'])?>">
+                    </div>
+                  <?php endif; ?>
                   <?php if (!empty($addon['description'])): ?>
                     <p class="addon-desc mb-0"><?=nl2br(h($addon['description']))?></p>
                   <?php endif; ?>

@@ -4,17 +4,131 @@ require_once __DIR__.'/db.php';
 require_once __DIR__.'/functions.php';
 require_once __DIR__.'/order_helpers.php';
 
+function site_addon_upload_dir(): string {
+  $dir = __DIR__.'/../uploads/addons';
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
+  }
+  return $dir;
+}
+
+function site_addon_store_upload(array $file): string {
+  if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+    throw new RuntimeException('Geçerli bir görsel dosyası seçin.');
+  }
+
+  $allowed = [
+    'image/jpeg' => 'jpg',
+    'image/png'  => 'png',
+    'image/webp' => 'webp',
+    'image/gif'  => 'gif',
+  ];
+
+  $mime = $file['type'] ?? '';
+  if (function_exists('mime_content_type')) {
+    $detected = @mime_content_type($file['tmp_name']);
+    if ($detected) {
+      $mime = $detected;
+    }
+  }
+  $mime = strtolower((string)$mime);
+  $ext = $allowed[$mime] ?? null;
+
+  if (!$ext) {
+    $nameExt = strtolower((string)pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+    if (in_array($nameExt, array_values($allowed), true)) {
+      $ext = $nameExt;
+    }
+  }
+
+  if (!$ext) {
+    throw new RuntimeException('Görsel formatı desteklenmiyor. (jpg, png, webp, gif)');
+  }
+
+  $dir = site_addon_upload_dir();
+  $safeName = bin2hex(random_bytes(10)).'.'.$ext;
+  $dest = $dir.'/'.$safeName;
+  if (!@move_uploaded_file($file['tmp_name'], $dest)) {
+    throw new RuntimeException('Görsel kaydedilemedi.');
+  }
+
+  return 'uploads/addons/'.$safeName;
+}
+
+function site_addon_delete_file(?string $path): void {
+  if (!$path) {
+    return;
+  }
+  $relative = ltrim($path, '/');
+  $full = __DIR__.'/../'.$relative;
+  if (!is_file($full)) {
+    return;
+  }
+  $root = realpath(site_addon_upload_dir());
+  $real = realpath($full);
+  if ($root && $real && strpos($real, $root) === 0) {
+    @unlink($real);
+  }
+}
+
+function site_addon_supports_images(): bool {
+  static $supports = null;
+  if ($supports !== null) {
+    return $supports;
+  }
+
+  try {
+    if (!table_exists('site_addons')) {
+      $supports = false;
+      return $supports;
+    }
+  } catch (Throwable $e) {
+    $supports = false;
+    return $supports;
+  }
+
+  try {
+    if (!column_exists('site_addons', 'image_path')) {
+      pdo()->exec('ALTER TABLE site_addons ADD image_path VARCHAR(255) NULL AFTER price_cents');
+    }
+  } catch (Throwable $e) {
+    // ignore - availability checked below
+  }
+
+  try {
+    $supports = column_exists('site_addons', 'image_path');
+  } catch (Throwable $e) {
+    $supports = false;
+  }
+
+  return $supports;
+}
+
 function site_addon_normalize(array $row): array {
   $row['id'] = (int)$row['id'];
   $row['price_cents'] = (int)$row['price_cents'];
   $row['is_active'] = (int)$row['is_active'];
   $row['display_order'] = (int)$row['display_order'];
+  $row['image_path'] = isset($row['image_path']) && $row['image_path'] !== ''
+    ? trim((string)$row['image_path'])
+    : null;
   if (isset($row['meta_json'])) {
     $meta = $row['meta_json'];
     unset($row['meta_json']);
     $row['meta'] = $meta ? (safe_json_decode($meta) ?: []) : [];
   } else {
     $row['meta'] = [];
+  }
+  if (!is_array($row['meta'])) {
+    $row['meta'] = [];
+  }
+  if (!$row['image_path'] && !empty($row['meta']['image_path'])) {
+    $row['image_path'] = $row['meta']['image_path'];
+  }
+  if (!empty($row['image_path'])) {
+    $row['image_url'] = BASE_URL.'/'.ltrim($row['image_path'], '/');
+  } else {
+    $row['image_url'] = null;
   }
   return $row;
 }
@@ -73,6 +187,21 @@ function site_addon_save(array $input, ?int $id = null): int {
   $isActive = !empty($input['is_active']) ? 1 : 0;
   $displayOrder = isset($input['display_order']) ? (int)$input['display_order'] : 0;
   $meta = isset($input['meta']) && is_array($input['meta']) ? $input['meta'] : [];
+  if (!is_array($meta)) {
+    $meta = [];
+  }
+  $imagePath = isset($input['image_path']) ? trim((string)$input['image_path']) : null;
+  if ($imagePath === '') {
+    $imagePath = null;
+  }
+
+  $hasImageColumn = site_addon_supports_images();
+
+  if ($imagePath) {
+    $meta['image_path'] = $imagePath;
+  } else {
+    unset($meta['image_path']);
+  }
 
   $pdo = pdo();
   $now = now();
@@ -82,28 +211,65 @@ function site_addon_save(array $input, ?int $id = null): int {
     if (!$exists) {
       throw new RuntimeException('Ek hizmet kaydı bulunamadı.');
     }
-    $st = $pdo->prepare('UPDATE site_addons SET name=?, slug=?, description=?, category=?, price_cents=?, is_active=?, display_order=?, meta_json=?, updated_at=? WHERE id=?');
-    $st->execute([
+    $sets = [
+      'name=?',
+      'slug=?',
+      'description=?',
+      'category=?',
+    ];
+    $params = [
       $name,
       $slug,
       $description !== '' ? $description : null,
       $category !== '' ? $category : null,
-      $priceCents,
-      $isActive,
-      $displayOrder,
-      $meta ? safe_json_encode($meta) : null,
-      $now,
-      $id,
-    ]);
+    ];
+    if ($hasImageColumn) {
+      $sets[] = 'image_path=?';
+      $params[] = $imagePath ?: null;
+    }
+    $sets[] = 'price_cents=?';
+    $params[] = $priceCents;
+    $sets[] = 'is_active=?';
+    $params[] = $isActive;
+    $sets[] = 'display_order=?';
+    $params[] = $displayOrder;
+    $sets[] = 'meta_json=?';
+    $params[] = $meta ? safe_json_encode($meta) : null;
+    $sets[] = 'updated_at=?';
+    $params[] = $now;
+    $params[] = $id;
+
+    $sql = 'UPDATE site_addons SET '.implode(', ', $sets).' WHERE id=?';
+    $st = $pdo->prepare($sql);
+    $st->execute($params);
     return $id;
   }
 
-  $st = $pdo->prepare('INSERT INTO site_addons (name, slug, description, category, price_cents, is_active, display_order, meta_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)');
-  $st->execute([
+  $columns = [
+    'name',
+    'slug',
+    'description',
+    'category',
+  ];
+  $values = [
     $name,
     $slug,
     $description !== '' ? $description : null,
     $category !== '' ? $category : null,
+  ];
+  if ($hasImageColumn) {
+    $columns[] = 'image_path';
+    $values[] = $imagePath ?: null;
+  }
+  $columns = array_merge($columns, [
+    'price_cents',
+    'is_active',
+    'display_order',
+    'meta_json',
+    'created_at',
+    'updated_at',
+  ]);
+  $values = array_merge($values, [
     $priceCents,
     $isActive,
     $displayOrder,
@@ -111,12 +277,25 @@ function site_addon_save(array $input, ?int $id = null): int {
     $now,
     $now,
   ]);
+
+  $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+  $sql = 'INSERT INTO site_addons ('.implode(', ', $columns).') VALUES ('.$placeholders.')';
+  $st = $pdo->prepare($sql);
+  $st->execute($values);
   return (int)$pdo->lastInsertId();
 }
 
 function site_addon_delete(int $id): void {
+  $addon = site_addon_get($id);
+  if (!$addon) {
+    return;
+  }
   $st = pdo()->prepare('DELETE FROM site_addons WHERE id=?');
   $st->execute([$id]);
+  $imagePath = $addon['image_path'] ?? ($addon['meta']['image_path'] ?? null);
+  if ($imagePath) {
+    site_addon_delete_file($imagePath);
+  }
 }
 
 function site_order_addons_list(int $orderId): array {
@@ -140,6 +319,13 @@ function site_order_addons_list(int $orderId): array {
     } else {
       $row['meta'] = [];
     }
+    if (!is_array($row['meta'])) {
+      $row['meta'] = [];
+    }
+    if (!empty($row['meta']['image_path'])) {
+      $row['image_path'] = $row['meta']['image_path'];
+      $row['image_url'] = BASE_URL.'/'.ltrim($row['image_path'], '/');
+    }
     return $row;
   }, $rows);
 }
@@ -161,6 +347,13 @@ function site_order_sync_addons(int $orderId, array $selectedAddons): void {
     $qty = max(1, (int)$quantity);
     $lineTotal = $addon['price_cents'] * $qty;
     $total += $lineTotal;
+    $meta = $addon['meta'];
+    if (!is_array($meta)) {
+      $meta = [];
+    }
+    if (!empty($addon['image_path'])) {
+      $meta['image_path'] = $addon['image_path'];
+    }
     $pdo->prepare('INSERT INTO site_order_addons (order_id, addon_id, addon_name, addon_description, price_cents, quantity, total_cents, meta_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
         ->execute([
           $orderId,
@@ -170,7 +363,7 @@ function site_order_sync_addons(int $orderId, array $selectedAddons): void {
           $addon['price_cents'],
           $qty,
           $lineTotal,
-          $addon['meta'] ? safe_json_encode($addon['meta']) : null,
+          $meta ? safe_json_encode($meta) : null,
           $now,
         ]);
   }

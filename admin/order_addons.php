@@ -34,6 +34,26 @@ try {
       throw new RuntimeException('Geçerli bir fiyat girin.');
     }
 
+    $existing = $addonId ? site_addon_get($addonId) : null;
+    $meta = $existing['meta'] ?? [];
+    if (!is_array($meta)) {
+      $meta = [];
+    }
+    $imagePath = $existing['image_path'] ?? ($meta['image_path'] ?? null);
+
+    if (!empty($_POST['remove_image']) && $imagePath) {
+      site_addon_delete_file($imagePath);
+      $imagePath = null;
+    }
+
+    if (!empty($_FILES['image']['tmp_name'] ?? null)) {
+      $newPath = site_addon_store_upload($_FILES['image']);
+      if ($imagePath && $imagePath !== $newPath) {
+        site_addon_delete_file($imagePath);
+      }
+      $imagePath = $newPath;
+    }
+
     $data = [
       'name' => $name,
       'price_cents' => $priceCents,
@@ -41,6 +61,8 @@ try {
       'category' => $category,
       'display_order' => $displayOrder,
       'is_active' => $isActive,
+      'image_path' => $imagePath,
+      'meta' => $meta,
     ];
 
     $id = site_addon_save($data, $addonId ?: null);
@@ -115,6 +137,9 @@ foreach ($addons as $addon) {
   .table thead th{font-size:.78rem;text-transform:uppercase;letter-spacing:.08em;color:var(--admin-muted);}
   .badge-active{background:rgba(34,197,94,.18);color:#15803d;border-radius:999px;padding:.35rem .85rem;font-weight:600;}
   .badge-passive{background:rgba(248,113,113,.18);color:#b91c1c;border-radius:999px;padding:.35rem .85rem;font-weight:600;}
+  .addon-thumb{width:72px;height:72px;border-radius:18px;overflow:hidden;background:rgba(14,165,181,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .addon-thumb img{width:100%;height:100%;object-fit:cover;}
+  .addon-thumb__placeholder{color:rgba(14,165,181,.6);font-size:1.4rem;}
 </style>
 </head>
 <body class="admin-body">
@@ -148,7 +173,7 @@ foreach ($addons as $addon) {
             <a class="btn btn-light border btn-sm" href="<?=h($_SERVER['PHP_SELF'])?>"><i class="bi bi-x-lg"></i></a>
           <?php endif; ?>
         </div>
-        <form method="post" class="row g-3">
+        <form method="post" class="row g-3" enctype="multipart/form-data">
           <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
           <input type="hidden" name="do" value="save">
           <input type="hidden" name="addon_id" value="<?= $editAddon ? (int)$editAddon['id'] : 0 ?>">
@@ -163,6 +188,19 @@ foreach ($addons as $addon) {
           <div class="col-12">
             <label class="form-label">Açıklama</label>
             <textarea class="form-control" name="description" rows="3" placeholder="Hizmet detayları..."><?=h($editAddon['description'] ?? '')?></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Görsel</label>
+            <input type="file" class="form-control" name="image" accept="image/*">
+            <?php if (!empty($editAddon['image_url'])): ?>
+              <div class="d-flex align-items-center justify-content-between mt-2">
+                <div class="addon-thumb"><img src="<?=h($editAddon['image_url'])?>" alt="<?=h($editAddon['name'])?>"></div>
+                <div class="form-check ms-3">
+                  <input class="form-check-input" type="checkbox" name="remove_image" id="remove-addon-image">
+                  <label class="form-check-label" for="remove-addon-image">Görseli kaldır</label>
+                </div>
+              </div>
+            <?php endif; ?>
           </div>
           <div class="col-md-6">
             <label class="form-label">Kategori</label>
@@ -207,13 +245,24 @@ foreach ($addons as $addon) {
                 <?php foreach ($addons as $addon): ?>
                   <tr>
                     <td>
-                      <strong><?=h($addon['name'])?></strong>
-                      <?php if (!empty($addon['description'])): ?>
-                        <div class="small text-muted"><?=nl2br(h($addon['description']))?></div>
-                      <?php endif; ?>
-                      <?php if (!empty($addon['category'])): ?>
-                        <span class="badge bg-light text-secondary mt-1"><?=h($addon['category'])?></span>
-                      <?php endif; ?>
+                      <div class="d-flex align-items-start gap-3">
+                        <div class="addon-thumb">
+                          <?php if (!empty($addon['image_url'])): ?>
+                            <img src="<?=h($addon['image_url'])?>" alt="<?=h($addon['name'])?>">
+                          <?php else: ?>
+                            <span class="addon-thumb__placeholder"><i class="bi bi-image"></i></span>
+                          <?php endif; ?>
+                        </div>
+                        <div>
+                          <strong><?=h($addon['name'])?></strong>
+                          <?php if (!empty($addon['description'])): ?>
+                            <div class="small text-muted"><?=nl2br(h($addon['description']))?></div>
+                          <?php endif; ?>
+                          <?php if (!empty($addon['category'])): ?>
+                            <span class="badge bg-light text-secondary mt-1"><?=h($addon['category'])?></span>
+                          <?php endif; ?>
+                        </div>
+                      </div>
                     </td>
                     <td><?=h(format_currency((int)$addon['price_cents']))?></td>
                     <td>

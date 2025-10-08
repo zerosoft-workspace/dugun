@@ -904,12 +904,19 @@ function install_schema(){
     description TEXT NULL,
     category VARCHAR(120) NULL,
     price_cents INT NOT NULL DEFAULT 0,
+    image_path VARCHAR(255) NULL,
     is_active TINYINT(1) NOT NULL DEFAULT 1,
     display_order INT NOT NULL DEFAULT 0,
     meta_json $jsonMeta NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('site_addons', 'image_path')) {
+    try {
+      pdo()->exec('ALTER TABLE site_addons ADD image_path VARCHAR(255) NULL AFTER price_cents');
+    } catch (Throwable $e) {}
+  }
 
   /* hayır kampanyası kataloğu */
   pdo()->exec("CREATE TABLE IF NOT EXISTS site_campaigns(

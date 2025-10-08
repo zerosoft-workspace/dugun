@@ -6,9 +6,92 @@ require_once __DIR__.'/order_helpers.php';
 
 install_schema();
 
+site_campaign_try_create_tables();
+
+function site_campaign_try_create_tables(): void {
+  static $attempted = false;
+  if ($attempted) {
+    return;
+  }
+  $attempted = true;
+
+  try {
+    $pdo = pdo();
+  } catch (Throwable $e) {
+    return;
+  }
+
+  $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
+
+  try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS site_campaigns(
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(190) NOT NULL,
+      slug VARCHAR(190) NOT NULL UNIQUE,
+      summary TEXT NULL,
+      detail LONGTEXT NULL,
+      price_cents INT NOT NULL DEFAULT 0,
+      image_path VARCHAR(255) NULL,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
+      display_order INT NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL,
+      updated_at DATETIME NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  } catch (Throwable $e) {
+    // ignore - existence checks below will handle failures
+  }
+
+  if (table_exists('site_campaigns')) {
+    try {
+      if (!column_exists('site_campaigns', 'detail')) {
+        $pdo->exec('ALTER TABLE site_campaigns ADD detail LONGTEXT NULL AFTER summary');
+      }
+    } catch (Throwable $e) {}
+
+    try {
+      if (!column_exists('site_campaigns', 'image_path')) {
+        $pdo->exec('ALTER TABLE site_campaigns ADD image_path VARCHAR(255) NULL AFTER price_cents');
+      }
+    } catch (Throwable $e) {}
+
+    try {
+      if (!column_exists('site_campaigns', 'display_order')) {
+        $pdo->exec('ALTER TABLE site_campaigns ADD display_order INT NOT NULL DEFAULT 0 AFTER is_active');
+      }
+    } catch (Throwable $e) {}
+  }
+
+  try {
+    $pdo->exec("CREATE TABLE IF NOT EXISTS site_order_campaigns(
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      order_id INT NOT NULL,
+      campaign_id INT NOT NULL,
+      campaign_name VARCHAR(190) NOT NULL,
+      campaign_summary TEXT NULL,
+      price_cents INT NOT NULL DEFAULT 0,
+      quantity INT NOT NULL DEFAULT 1,
+      total_cents INT NOT NULL DEFAULT 0,
+      meta_json $jsonMeta NULL,
+      created_at DATETIME NOT NULL,
+      FOREIGN KEY (order_id) REFERENCES site_orders(id) ON DELETE CASCADE,
+      FOREIGN KEY (campaign_id) REFERENCES site_campaigns(id) ON DELETE RESTRICT,
+      INDEX idx_site_order_campaigns_order (order_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  } catch (Throwable $e) {}
+
+  if (table_exists('site_order_campaigns')) {
+    try {
+      if (!column_exists('site_order_campaigns', 'meta_json')) {
+        $pdo->exec("ALTER TABLE site_order_campaigns ADD meta_json $jsonMeta NULL AFTER total_cents");
+      }
+    } catch (Throwable $e) {}
+  }
+}
+
 function site_campaign_tables_ready(): bool {
   static $catalogReady = null;
   if ($catalogReady === null) {
+    site_campaign_try_create_tables();
     try {
       $catalogReady = table_exists('site_campaigns');
     } catch (Throwable $e) {
@@ -21,6 +104,7 @@ function site_campaign_tables_ready(): bool {
 function site_campaign_order_table_ready(): bool {
   static $orderReady = null;
   if ($orderReady === null) {
+    site_campaign_try_create_tables();
     try {
       $orderReady = table_exists('site_order_campaigns');
     } catch (Throwable $e) {
