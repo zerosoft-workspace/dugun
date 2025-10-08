@@ -200,6 +200,49 @@ function site_addon_variant_get(int $id): ?array {
   return $row ? site_addon_variant_normalize($row) : null;
 }
 
+function site_order_addons_supports_variant_columns(): bool {
+  static $supports = null;
+  if ($supports !== null) {
+    return $supports;
+  }
+
+  try {
+    if (!table_exists('site_order_addons')) {
+      $supports = false;
+      return $supports;
+    }
+
+    $alterStatements = [
+      'variant_id' => 'ALTER TABLE site_order_addons ADD variant_id INT NULL AFTER addon_description',
+      'variant_name' => 'ALTER TABLE site_order_addons ADD variant_name VARCHAR(190) NULL AFTER variant_id',
+      'variant_price_cents' => 'ALTER TABLE site_order_addons ADD variant_price_cents INT NULL DEFAULT 0 AFTER variant_name',
+    ];
+
+    foreach ($alterStatements as $column => $sql) {
+      if (!column_exists('site_order_addons', $column)) {
+        try {
+          pdo()->exec($sql);
+        } catch (Throwable $e) {
+          // ignore and fall back to storing variant data in meta
+        }
+      }
+    }
+
+    foreach (array_keys($alterStatements) as $column) {
+      if (!column_exists('site_order_addons', $column)) {
+        $supports = false;
+        return $supports;
+      }
+    }
+
+    $supports = true;
+  } catch (Throwable $e) {
+    $supports = false;
+  }
+
+  return $supports;
+}
+
 function site_addon_variant_first_active(int $addonId): ?array {
   if (!site_addon_supports_variants()) {
     return null;
@@ -795,7 +838,13 @@ function site_order_addons_recent(int $limit = 25): array {
 }
 
 function site_order_sync_addons(int $orderId, array $selectedAddons): void {
+  if (!table_exists('site_order_addons')) {
+    site_order_recalculate_totals($orderId, 0, null);
+    return;
+  }
+
   $pdo = pdo();
+  $supportsVariantColumns = site_order_addons_supports_variant_columns();
   $pdo->beginTransaction();
 
   $pdo->prepare('DELETE FROM site_order_addons WHERE order_id=?')->execute([$orderId]);
@@ -883,21 +932,38 @@ function site_order_sync_addons(int $orderId, array $selectedAddons): void {
       }
     }
 
-    $pdo->prepare('INSERT INTO site_order_addons (order_id, addon_id, addon_name, addon_description, variant_id, variant_name, variant_price_cents, price_cents, quantity, total_cents, meta_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-        ->execute([
-          $orderId,
-          (int)$addon['id'],
-          $addon['name'],
-          $addon['description'] ?? null,
-          $variant ? $variant['id'] : null,
-          $variant ? $variant['name'] : null,
-          $variant ? (int)$variant['price_cents'] : null,
-          $unitPrice,
-          $qty,
-          $lineTotal,
-          $meta ? safe_json_encode($meta) : null,
-          $now,
-        ]);
+    $columns = [
+      'order_id',
+      'addon_id',
+      'addon_name',
+      'addon_description',
+    ];
+    $values = [
+      $orderId,
+      (int)$addon['id'],
+      $addon['name'],
+      $addon['description'] ?? null,
+    ];
+
+    if ($supportsVariantColumns) {
+      $columns[] = 'variant_id';
+      $values[] = $variant ? $variant['id'] : null;
+      $columns[] = 'variant_name';
+      $values[] = $variant ? $variant['name'] : null;
+      $columns[] = 'variant_price_cents';
+      $values[] = $variant ? (int)$variant['price_cents'] : null;
+    }
+
+    $columns = array_merge($columns, ['price_cents', 'quantity', 'total_cents', 'meta_json', 'created_at']);
+    $values[] = $unitPrice;
+    $values[] = $qty;
+    $values[] = $lineTotal;
+    $values[] = $meta ? safe_json_encode($meta) : null;
+    $values[] = $now;
+
+    $placeholders = implode(', ', array_fill(0, count($columns), '?'));
+    $sql = 'INSERT INTO site_order_addons ('.implode(', ', $columns).') VALUES ('.$placeholders.')';
+    $pdo->prepare($sql)->execute($values);
   }
 
   site_order_recalculate_totals($orderId, $total, null);
