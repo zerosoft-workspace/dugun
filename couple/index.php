@@ -433,6 +433,7 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
             <div class="hero-actions">
               <a class="btn btn-zs" href="list.php"><i class="bi bi-images me-1"></i>Tüm Dosyalar</a>
               <a class="btn btn-zs-outline" href="engage.php"><i class="bi bi-magic me-1"></i>Etkileşim Araçları</a>
+              <a class="btn btn-zs-outline" href="guest_preview.php" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-1"></i>Misafir Panelini Aç (Şifresiz)</a>
             </div>
             <div class="hero-license">
               <span class="hero-badge <?=$licenseStatusTone?>">

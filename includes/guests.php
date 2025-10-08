@@ -34,6 +34,98 @@ function guest_profile_clear_session(int $eventId): void {
   }
 }
 
+function guest_profile_is_host_preview(array $profile): bool {
+  return isset($profile['is_host_preview']) && (int)$profile['is_host_preview'] === 1;
+}
+
+function guest_profile_host_preview(int $eventId): ?array {
+  $eventId = (int)$eventId;
+  if ($eventId <= 0) {
+    return null;
+  }
+
+  $pdo = pdo();
+  $pdo->beginTransaction();
+  try {
+    $existing = $pdo->prepare('SELECT * FROM guest_profiles WHERE event_id=? AND is_host_preview=1 LIMIT 1');
+    $existing->execute([$eventId]);
+    $profile = $existing->fetch();
+    if ($profile) {
+      $pdo->commit();
+      return $profile;
+    }
+
+    $eventStmt = $pdo->prepare('SELECT title, contact_email FROM events WHERE id=? LIMIT 1');
+    $eventStmt->execute([$eventId]);
+    $event = $eventStmt->fetch();
+    if (!$event) {
+      $pdo->rollBack();
+      return null;
+    }
+
+    $eventTitle = trim($event['title'] ?? '');
+    $displayName = $eventTitle !== '' ? $eventTitle.' · Çift' : 'Çift Önizleme';
+    $name = 'Çift Önizleme';
+    $now = now();
+
+    $baseHost = parse_url(BASE_URL, PHP_URL_HOST) ?: 'bikare.local';
+    $safeHost = preg_replace('~[^a-z0-9]+~i', '', $baseHost);
+    if ($safeHost === '') {
+      $safeHost = 'bikare';
+    }
+
+    $candidates = [];
+    $contactEmail = guest_profile_normalize_email($event['contact_email'] ?? '');
+    if ($contactEmail !== '') {
+      $candidates[] = $contactEmail;
+    }
+    $candidates[] = 'onizleme-'.$eventId.'@'.$safeHost.'.local';
+    $candidates[] = 'guest-preview-'.$eventId.'@example.invalid';
+
+    $email = null;
+    $check = $pdo->prepare('SELECT 1 FROM guest_profiles WHERE event_id=? AND email=? LIMIT 1');
+    foreach ($candidates as $candidate) {
+      $candidate = guest_profile_normalize_email($candidate);
+      if ($candidate === '') {
+        continue;
+      }
+      $check->execute([$eventId, $candidate]);
+      if (!$check->fetch()) {
+        $email = $candidate;
+        break;
+      }
+    }
+
+    if ($email === null) {
+      $email = 'guest-preview-'.$eventId.'-'.bin2hex(random_bytes(4)).'@example.invalid';
+    }
+
+    $insert = $pdo->prepare('INSERT INTO guest_profiles (event_id,email,name,display_name,is_verified,verified_at,last_seen_at,last_login_at,created_at,updated_at,is_host_preview) VALUES (?,?,?,?,1,?,?,?,?,?,1)');
+    $insert->execute([$eventId, $email, $name, $displayName, $now, $now, $now, $now, $now]);
+    $profileId = (int)$pdo->lastInsertId();
+    $pdo->commit();
+
+    $created = guest_profile_find_by_id($profileId);
+    if ($created) {
+      return $created;
+    }
+
+    return [
+      'id' => $profileId,
+      'event_id' => $eventId,
+      'email' => $email,
+      'name' => $name,
+      'display_name' => $displayName,
+      'is_host_preview' => 1,
+    ];
+  } catch (Throwable $e) {
+    if ($pdo->inTransaction()) {
+      $pdo->rollBack();
+    }
+    throw $e;
+  }
+}
+
 function guest_profile_record_login(int $profileId): void {
   $now = now();
   pdo()->prepare('UPDATE guest_profiles SET last_login_at=?, updated_at=? WHERE id=?')
@@ -181,7 +273,7 @@ function guest_profile_find_by_id(int $profileId): ?array {
 
 function guest_event_profile_directory(int $eventId, int $excludeProfileId = 0): array {
   $st = pdo()->prepare('SELECT id, event_id, display_name, name, email, avatar_token, is_verified, last_seen_at, last_login_at
-                        FROM guest_profiles WHERE event_id=? ORDER BY display_name ASC, name ASC');
+                        FROM guest_profiles WHERE event_id=? AND is_host_preview=0 ORDER BY display_name ASC, name ASC');
   $st->execute([$eventId]);
   $rows = $st->fetchAll();
   $directory = [];

@@ -1066,12 +1066,14 @@ function install_schema(){
     verified_at DATETIME NULL,
     marketing_opt_in TINYINT(1) NOT NULL DEFAULT 0,
     marketing_opted_at DATETIME NULL,
+    is_host_preview TINYINT(1) NOT NULL DEFAULT 0,
     last_verification_sent_at DATETIME NULL,
     last_seen_at DATETIME NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
     UNIQUE KEY uniq_guest_profile (event_id, email),
     INDEX idx_guest_event (event_id),
+    INDEX idx_guest_host_preview (event_id, is_host_preview),
     INDEX idx_guest_verify (verify_token),
     INDEX idx_guest_password_token (password_token),
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
@@ -1087,6 +1089,14 @@ function install_schema(){
     try {
       pdo()->exec("ALTER TABLE guest_profiles ADD marketing_opt_in TINYINT(1) NOT NULL DEFAULT 0 AFTER verify_token");
       pdo()->exec("ALTER TABLE guest_profiles ADD marketing_opted_at DATETIME NULL AFTER marketing_opt_in");
+    } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'is_host_preview')) {
+    try {
+      pdo()->exec("ALTER TABLE guest_profiles ADD is_host_preview TINYINT(1) NOT NULL DEFAULT 0 AFTER marketing_opted_at");
+    } catch (Throwable $e) {}
+    try {
+      pdo()->exec("CREATE INDEX idx_guest_host_preview ON guest_profiles(event_id, is_host_preview)");
     } catch (Throwable $e) {}
   }
   if (!column_exists('guest_profiles', 'last_verification_sent_at')) {

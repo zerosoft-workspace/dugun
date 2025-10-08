@@ -335,6 +335,7 @@ function fetch_marketing_contacts(string $category): array {
           LEFT JOIN events e ON e.id = gp.event_id
           LEFT JOIN venues v ON v.id = e.venue_id
          WHERE gp.marketing_opt_in = 1
+           AND gp.is_host_preview = 0
          ORDER BY gp.marketing_opted_at DESC, gp.created_at DESC
       ";
       try {
