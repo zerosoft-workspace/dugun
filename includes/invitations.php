@@ -1192,12 +1192,29 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   $fontWidth = imagefontwidth($font);
   $fontHeight = imagefontheight($font);
 
+  $titleScale = 5.2;
+  $subtitleScale = 3.2;
+  $recipientScale = 3.0;
+  $bodyScale = 2.8;
+  $buttonScale = 3.0;
+  $brandScale = 2.4;
+
   $title = trim((string)($template['title'] ?? ''));
   if ($title === '') {
     $title = 'Düğün Davetiyemiz';
   }
-  $cursorY = 110;
-  $cursorY = invitation_card_basic_draw_centered($img, $font, strtoupper($title), $headlineColor, $width, $cursorY, $fontHeight + 10);
+  $titleUpper = function_exists('mb_strtoupper') ? mb_strtoupper($title, 'UTF-8') : strtoupper($title);
+  $cursorY = 120;
+  $cursorY = invitation_card_basic_draw_centered(
+    $img,
+    $font,
+    $titleUpper,
+    $headlineColor,
+    $width,
+    $cursorY,
+    (int)round($fontHeight * $titleScale * 0.45),
+    $titleScale
+  );
 
   $subtitleParts = [];
   $subtitle = trim((string)($template['subtitle'] ?? ''));
@@ -1209,17 +1226,35 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
     $subtitleParts[] = 'Etkinlik Tarihi: '.$eventDate;
   }
   if ($subtitleParts) {
-    $cursorY = invitation_card_basic_draw_centered($img, $font, implode(' • ', $subtitleParts), $subtitleColor, $width, $cursorY, $fontHeight + 6);
+    $cursorY = invitation_card_basic_draw_centered(
+      $img,
+      $font,
+      implode(' • ', $subtitleParts),
+      $subtitleColor,
+      $width,
+      $cursorY,
+      (int)round($fontHeight * $subtitleScale * 0.35),
+      $subtitleScale
+    );
   }
 
   $panelTop = $geometry['panel_top'];
   $panelBottom = $geometry['panel_bottom'];
 
-  $cursorY = $panelTop + 80;
+  $cursorY = $panelTop + 120;
   if ($contact && !empty($contact['name'])) {
     $recipient = trim((string)$contact['name']);
     if ($recipient !== '') {
-      $cursorY = invitation_card_basic_draw_centered($img, $font, 'Sevgili '.$recipient, $textColor, $width, $cursorY, $fontHeight + 10);
+      $cursorY = invitation_card_basic_draw_centered(
+        $img,
+        $font,
+        'Sevgili '.$recipient,
+        $textColor,
+        $width,
+        $cursorY,
+        (int)round($fontHeight * $recipientScale * 0.4),
+        $recipientScale
+      );
     }
   }
 
@@ -1227,7 +1262,7 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   if (stripos($message, 'bikara.com') === false) {
     $message = invitation_require_branding($message);
   }
-  $wrapWidth = max(20, (int)floor(760 / $fontWidth));
+  $wrapWidth = max(18, (int)floor(760 / max(1, $fontWidth * $bodyScale)));
   $messageLines = [];
   foreach (explode("\n", trim(preg_replace(["/\r\n/", "/\r/"], "\n", $message))) as $paragraph) {
     $paragraph = trim($paragraph);
@@ -1243,45 +1278,151 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   if ($messageLines && end($messageLines) === '') {
     array_pop($messageLines);
   }
+  $bodyLineGap = (int)round($fontHeight * $bodyScale * 0.55);
   foreach ($messageLines as $line) {
     if ($line === '') {
-      $cursorY += (int)round($fontHeight * 1.6);
+      $cursorY += $bodyLineGap;
       continue;
     }
-    $cursorY = invitation_card_basic_draw_centered($img, $font, $line, $muted, $width, $cursorY, (int)round($fontHeight * 1.6));
+    $cursorY = invitation_card_basic_draw_centered(
+      $img,
+      $font,
+      $line,
+      $muted,
+      $width,
+      $cursorY,
+      $bodyLineGap,
+      $bodyScale
+    );
   }
 
-  $cursorY += 40;
+  $cursorY += (int)round($fontHeight * $bodyScale * 0.9);
   $buttonLabel = trim((string)($template['button_label'] ?? ''));
   if ($buttonLabel === '') {
     $buttonLabel = 'Katılımınızı Bildirin';
   }
-  $buttonWidth = min(760, $fontWidth * strlen($buttonLabel) + 200);
-  $buttonHeight = 80;
+  $buttonMetrics = invitation_card_basic_measure($font, $buttonLabel, $buttonScale);
+  $buttonWidth = min(820, $buttonMetrics['width'] + 280);
+  $buttonHeight = max(120, (int)round($buttonMetrics['height'] * 1.8));
   $buttonX1 = (int)round(($width - $buttonWidth) / 2);
   $buttonY1 = $cursorY;
   $buttonX2 = $buttonX1 + $buttonWidth;
   $buttonY2 = $buttonY1 + $buttonHeight;
   invitation_card_draw_pill($img, $buttonX1, $buttonY1, $buttonX2, $buttonY2, $primaryColor);
-  $buttonTextWidth = $fontWidth * strlen($buttonLabel);
-  $buttonTextX = (int)round(($width - $buttonTextWidth) / 2);
-  imagestring($img, $font, $buttonTextX, $buttonY1 + (int)round(($buttonHeight - $fontHeight) / 2), $buttonLabel, $buttonTextColor);
+  $buttonTextX = (int)round($buttonX1 + ($buttonWidth - $buttonMetrics['width']) / 2);
+  $buttonTextY = (int)round($buttonY1 + ($buttonHeight - $buttonMetrics['height']) / 2);
+  invitation_card_basic_draw_block($img, $font, $buttonLabel, $buttonTextColor, $buttonTextX, $buttonTextY, $buttonScale);
 
   $brandText = 'bikara.com';
-  $brandWidth = $fontWidth * strlen($brandText);
-  $brandX = (int)round(($width - $brandWidth) / 2);
-  $brandY = $panelBottom - 140;
-  imagestring($img, $font, $brandX, $brandY, $brandText, $brand);
+  $brandMetrics = invitation_card_basic_measure($font, $brandText, $brandScale);
+  $brandX = (int)round(($width - $brandMetrics['width']) / 2);
+  $brandBaseline = max($panelBottom - 140, $buttonY2 + (int)round($fontHeight * $brandScale));
+  $brandY = max(0, min($brandBaseline, $panelBottom - $brandMetrics['height'] - 40));
+  invitation_card_basic_draw_block($img, $font, $brandText, $brand, $brandX, $brandY, $brandScale);
 
   return $img;
 }
 
-function invitation_card_basic_draw_centered(GdImage $img, int $font, string $text, int $color, int $width, int $y, int $lineGap): int {
-  $text = trim($text);
+function invitation_card_basic_measure(int $font, string $text, float $scale = 1.0): array {
+  $text = (string)$text;
+  $scale = max(1.0, $scale);
   $fontWidth = imagefontwidth($font);
   $fontHeight = imagefontheight($font);
-  $textWidth = $fontWidth * strlen($text);
-  $x = (int)max(0, round(($width - $textWidth) / 2));
-  imagestring($img, $font, $x, $y, $text, $color);
-  return $y + $fontHeight + $lineGap;
+  $rawWidth = max(1, $fontWidth * max(1, strlen($text)));
+  $rawHeight = max(1, $fontHeight);
+
+  return [
+    'width' => (int)max(1, round($rawWidth * $scale)),
+    'height' => (int)max(1, round($rawHeight * $scale)),
+    'raw_width' => $rawWidth,
+    'raw_height' => $rawHeight,
+  ];
+}
+
+function invitation_card_basic_draw_centered(
+  GdImage $img,
+  int $font,
+  string $text,
+  int $color,
+  int $width,
+  int $y,
+  int $lineGap,
+  float $scale = 1.0
+): int {
+  $text = trim($text);
+  if ($text === '') {
+    return $y + $lineGap;
+  }
+  $scale = max(1.0, $scale);
+  $metrics = invitation_card_basic_measure($font, $text, $scale);
+  $x = (int)max(0, round(($width - $metrics['width']) / 2));
+  invitation_card_basic_draw_block($img, $font, $text, $color, $x, $y, $scale);
+  return $y + $metrics['height'] + max(0, $lineGap);
+}
+
+function invitation_card_basic_draw_block(
+  GdImage $img,
+  int $font,
+  string $text,
+  int $color,
+  int $x,
+  int $y,
+  float $scale = 1.0
+): array {
+  $text = (string)$text;
+  if ($text === '') {
+    return ['width' => 0, 'height' => 0];
+  }
+  $scale = max(1.0, $scale);
+  $rgba = invitation_card_basic_color_components($img, $color);
+  $block = invitation_card_basic_render_text_block($font, $text, $rgba, $scale);
+  $width = imagesx($block);
+  $height = imagesy($block);
+  imagecopy($img, $block, $x, $y, 0, 0, $width, $height);
+  imagedestroy($block);
+  return ['width' => $width, 'height' => $height];
+}
+
+function invitation_card_basic_color_components(GdImage $img, int $color): array {
+  $components = @imagecolorsforindex($img, $color);
+  if (!is_array($components)) {
+    return ['red' => 0, 'green' => 0, 'blue' => 0, 'alpha' => 0];
+  }
+  return [
+    'red' => (int)($components['red'] ?? 0),
+    'green' => (int)($components['green'] ?? 0),
+    'blue' => (int)($components['blue'] ?? 0),
+    'alpha' => (int)($components['alpha'] ?? 0),
+  ];
+}
+
+function invitation_card_basic_render_text_block(int $font, string $text, array $rgba, float $scale = 1.0): GdImage {
+  $scale = max(1.0, $scale);
+  $fontWidth = imagefontwidth($font);
+  $fontHeight = imagefontheight($font);
+  $rawWidth = max(1, $fontWidth * max(1, strlen($text)));
+  $rawHeight = max(1, $fontHeight);
+
+  $raw = imagecreatetruecolor($rawWidth, $rawHeight);
+  imagealphablending($raw, false);
+  imagesavealpha($raw, true);
+  $transparent = imagecolorallocatealpha($raw, 0, 0, 0, 127);
+  imagefilledrectangle($raw, 0, 0, $rawWidth, $rawHeight, $transparent);
+  $rawColor = imagecolorallocatealpha($raw, $rgba['red'], $rgba['green'], $rgba['blue'], $rgba['alpha']);
+  imagestring($raw, $font, 0, 0, $text, $rawColor);
+
+  if ($scale <= 1.01) {
+    return $raw;
+  }
+
+  $scaledWidth = (int)max(1, round($rawWidth * $scale));
+  $scaledHeight = (int)max(1, round($rawHeight * $scale));
+  $scaled = imagecreatetruecolor($scaledWidth, $scaledHeight);
+  imagealphablending($scaled, false);
+  imagesavealpha($scaled, true);
+  $transparentScaled = imagecolorallocatealpha($scaled, 0, 0, 0, 127);
+  imagefilledrectangle($scaled, 0, 0, $scaledWidth, $scaledHeight, $transparentScaled);
+  imagecopyresampled($scaled, $raw, 0, 0, 0, 0, $scaledWidth, $scaledHeight, $rawWidth, $rawHeight);
+  imagedestroy($raw);
+  return $scaled;
 }
