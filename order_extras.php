@@ -118,6 +118,22 @@ foreach ($addons as $addon) {
   $groupedAddons[$group][] = $addon;
 }
 
+$categorySlugs = [];
+$slugUsage = [];
+foreach ($groupedAddons as $groupName => $_items) {
+  $slug = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $groupName), '-'));
+  if ($slug === '') {
+    $slug = 'kategori';
+  }
+  if (isset($slugUsage[$slug])) {
+    $slugUsage[$slug]++;
+    $slug .= '-'.($slugUsage[$slug]);
+  } else {
+    $slugUsage[$slug] = 0;
+  }
+  $categorySlugs[$groupName] = $slug;
+}
+
 ?>
 <!doctype html>
 <html lang="tr">
@@ -337,9 +353,87 @@ body.extras-body {
   box-shadow: var(--extras-shadow);
 }
 
+.category-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.category-pill {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: rgba(14, 165, 181, 0.12);
+  color: var(--extras-primary-dark);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.category-pill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 18px 40px rgba(14, 165, 181, 0.15);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.category-pill span {
+  pointer-events: none;
+}
+
+.category-pill .category-pill__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(14, 165, 181, 0.18);
+  font-size: 0.8rem;
+  color: var(--extras-primary-dark);
+}
+
+.category-pill:hover,
+.category-pill:focus {
+  background: rgba(14, 165, 181, 0.18);
+  color: var(--extras-primary-dark);
+}
+
+.category-pill.active {
+  background: linear-gradient(135deg, var(--extras-primary), var(--extras-primary-dark));
+  color: #fff;
+}
+
+.category-pill.active .category-pill__count {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
+.category-pill.active::after {
+  opacity: 1;
+}
+
+.category-pill:focus-visible {
+  outline: 3px solid rgba(14, 165, 181, 0.35);
+  outline-offset: 2px;
+}
+
 .addon-section {
-  display: grid;
+  display: none;
   gap: 18px;
+}
+
+.addon-section.is-active {
+  display: grid;
 }
 
 .section-head {
@@ -747,13 +841,29 @@ body.extras-body {
           <div class="flash-messages"><?=flash_messages()?></div>
           <form method="post" class="extras-form d-grid gap-4">
             <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
-            <?php foreach ($groupedAddons as $groupName => $groupItems): ?>
+            <?php if (count($groupedAddons) > 1): ?>
+              <div class="category-switcher" role="tablist" aria-label="Ek hizmet kategorileri" data-category-switcher>
+                <?php $categoryIndex = 0; foreach ($groupedAddons as $groupName => $groupItems):
+                  $slug = $categorySlugs[$groupName] ?? ('kategori-'.$categoryIndex);
+                  $isActive = $categoryIndex === 0;
+                ?>
+                  <button type="button" class="category-pill<?= $isActive ? ' active' : '' ?>" data-category-trigger="<?=h($slug)?>" role="tab" aria-selected="<?= $isActive ? 'true' : 'false' ?>" aria-controls="category-panel-<?=h($slug)?>" tabindex="<?= $isActive ? '0' : '-1' ?>">
+                    <span class="category-pill__name"><?=h($groupName)?></span>
+                    <span class="category-pill__count"><?=count($groupItems)?></span>
+                  </button>
+                <?php $categoryIndex++; endforeach; ?>
+              </div>
+            <?php endif; ?>
+            <?php $sectionIndex = 0; foreach ($groupedAddons as $groupName => $groupItems):
+              $slug = $categorySlugs[$groupName] ?? ('kategori-'.$sectionIndex);
+              $isActive = $sectionIndex === 0;
+            ?>
               <?php
                 $groupDescription = $groupName === 'Diğer Hizmetler'
                   ? 'Etkinliğinizi tamamlayan farklı hizmetleri seçebilirsiniz.'
                   : $groupName.' kategorisindeki hizmetlerle deneyiminizi kişiselleştirin.';
               ?>
-              <section class="addon-section">
+              <section class="addon-section<?= $isActive ? ' is-active' : '' ?>" id="category-panel-<?=h($slug)?>" data-category-section="<?=h($slug)?>" role="tabpanel" aria-expanded="<?= $isActive ? 'true' : 'false' ?>" aria-hidden="<?= $isActive ? 'false' : 'true' ?>"<?= $isActive ? '' : ' hidden' ?>>
                 <div class="section-head">
                   <span class="section-chip"><i class="bi bi-stars"></i><?=h($groupName)?></span>
                   <div class="section-copy">
@@ -869,7 +979,7 @@ body.extras-body {
                   <?php endforeach; ?>
                 </div>
               </section>
-            <?php endforeach; ?>
+            <?php $sectionIndex++; endforeach; ?>
             <?php if ($campaigns): ?>
               <section class="campaign-section">
                 <div class="section-head">
@@ -974,6 +1084,61 @@ body.extras-body {
         return ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'})[ch] || ch;
       });
     };
+
+    var categoryButtons = Array.prototype.slice.call(document.querySelectorAll('[data-category-trigger]'));
+    var categorySections = Array.prototype.slice.call(document.querySelectorAll('[data-category-section]'));
+    if (categoryButtons.length && categorySections.length) {
+      var activateCategory = function (slug) {
+        var found = false;
+        categorySections.forEach(function (section, index) {
+          var matches = section.getAttribute('data-category-section') === slug;
+          section.classList.toggle('is-active', matches);
+          section.setAttribute('aria-expanded', matches ? 'true' : 'false');
+          section.setAttribute('aria-hidden', matches ? 'false' : 'true');
+          if (matches) {
+            section.removeAttribute('hidden');
+          } else {
+            section.setAttribute('hidden', '');
+          }
+          if (matches) {
+            found = true;
+          }
+        });
+        categoryButtons.forEach(function (button, index) {
+          var matches = button.getAttribute('data-category-trigger') === slug;
+          button.classList.toggle('active', matches);
+          button.setAttribute('aria-selected', matches ? 'true' : 'false');
+          button.setAttribute('tabindex', matches ? '0' : '-1');
+          if (matches) {
+            button.focus();
+          }
+        });
+        if (!found && categorySections[0]) {
+          var fallbackSlug = categorySections[0].getAttribute('data-category-section');
+          if (fallbackSlug && fallbackSlug !== slug) {
+            activateCategory(fallbackSlug);
+          }
+        }
+      };
+
+      categoryButtons.forEach(function (button, index) {
+        button.addEventListener('click', function () {
+          activateCategory(button.getAttribute('data-category-trigger'));
+        });
+        button.addEventListener('keydown', function (event) {
+          if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') {
+            return;
+          }
+          event.preventDefault();
+          var delta = event.key === 'ArrowRight' ? 1 : -1;
+          var nextIndex = (index + delta + categoryButtons.length) % categoryButtons.length;
+          var nextButton = categoryButtons[nextIndex];
+          if (nextButton) {
+            activateCategory(nextButton.getAttribute('data-category-trigger'));
+          }
+        });
+      });
+    }
 
     document.querySelectorAll('[data-addon-card]').forEach(function (card) {
       var checkbox = card.querySelector('[data-addon-toggle]');
