@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/addons.php';
+require_once __DIR__.'/../includes/site.php';
 require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/partials/ui.php';
 
@@ -193,6 +194,14 @@ try {
 }
 
 $addons = site_addon_all(false);
+$recentSelections = site_order_addons_recent(30);
+$orderStatusMap = [
+  SITE_ORDER_STATUS_PENDING   => ['label' => 'Ödeme Bekleniyor',    'class' => 'status-chip pending'],
+  SITE_ORDER_STATUS_AWAITING  => ['label' => 'Onay Sürecinde',      'class' => 'status-chip awaiting'],
+  SITE_ORDER_STATUS_PAID      => ['label' => 'Ödeme Alındı',        'class' => 'status-chip paid'],
+  SITE_ORDER_STATUS_COMPLETED => ['label' => 'Kurulum Tamamlandı',  'class' => 'status-chip completed'],
+  SITE_ORDER_STATUS_FAILED    => ['label' => 'Başarısız',           'class' => 'status-chip failed'],
+];
 $editId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $editAddon = $editId ? site_addon_get($editId) : null;
 
@@ -254,6 +263,17 @@ foreach ($addons as $addon) {
   .addon-thumb{width:72px;height:72px;border-radius:18px;overflow:hidden;background:rgba(14,165,181,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
   .addon-thumb img{width:100%;height:100%;object-fit:cover;}
   .addon-thumb__placeholder{color:rgba(14,165,181,.6);font-size:1.4rem;}
+  .order-tracker-card{border-radius:24px;background:#fff;border:1px solid rgba(148,163,184,.18);box-shadow:0 32px 80px -48px rgba(15,23,42,.35);}
+  .order-tracker-card .table{--bs-table-bg:transparent;}
+  .order-tracker-card .table tbody tr+tr{border-top:1px solid rgba(148,163,184,.12);}
+  .status-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .75rem;border-radius:999px;font-size:.75rem;font-weight:600;}
+  .status-chip.pending{background:rgba(245,158,11,.15);color:#92400e;}
+  .status-chip.awaiting{background:rgba(14,165,233,.15);color:#075985;}
+  .status-chip.paid{background:rgba(16,185,129,.16);color:#0f5132;}
+  .status-chip.completed{background:rgba(59,130,246,.16);color:#1d4ed8;}
+  .status-chip.failed{background:rgba(239,68,68,.16);color:#7f1d1d;}
+  .variant-pill{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .75rem;border-radius:999px;background:rgba(59,130,246,.14);color:#1d4ed8;font-weight:600;font-size:.75rem;}
+  .variant-pill i{font-size:.85rem;}
 </style>
 </head>
 <body class="admin-body">
@@ -562,8 +582,87 @@ foreach ($addons as $addon) {
               </tbody>
             </table>
           </div>
+      </div>
+    <?php endif; ?>
+      <div class="order-tracker-card p-4 mt-4">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <h5 class="mb-1">Son Sipariş Seçimleri</h5>
+            <p class="small text-muted mb-0">Müşterilerin ödeme öncesi hangi ek hizmet ve varyantları tercih ettiğini buradan takip edin.</p>
+          </div>
+          <span class="badge bg-info-subtle text-info-emphasis"><?=count($recentSelections)?> kayıt</span>
         </div>
-      <?php endif; ?>
+        <div class="table-responsive">
+          <table class="table align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Sipariş</th>
+                <th>Müşteri</th>
+                <th>Seçim</th>
+                <th>Tutar</th>
+                <th>Tarih</th>
+              </tr>
+            </thead>
+            <tbody>
+              <?php if (!$recentSelections): ?>
+                <tr>
+                  <td colspan="5" class="text-center text-muted py-4">Henüz ek hizmet seçimi yapılmadı.</td>
+                </tr>
+              <?php else: ?>
+                <?php foreach ($recentSelections as $line): ?>
+                  <?php
+                    $order = $line['order'] ?? [];
+                    $status = $order['status'] ?? null;
+                    $statusMeta = ($status && isset($orderStatusMap[$status])) ? $orderStatusMap[$status] : null;
+                    $createdAt = $line['created_at'] ?? ($order['created_at'] ?? null);
+                    $paidAt = $order['paid_at'] ?? null;
+                    $eventDate = $order['event_date'] ?? null;
+                    $quantity = isset($line['quantity']) ? (int)$line['quantity'] : 0;
+                  ?>
+                  <tr>
+                    <td>
+                      <div class="fw-semibold">Sipariş #<?=h($line['order_id'] ?? '—')?></div>
+                      <?php if (!empty($order['package_name'])): ?>
+                        <div class="small text-muted">Paket: <?=h($order['package_name'])?></div>
+                      <?php endif; ?>
+                      <?php if (!empty($order['event_title'])): ?>
+                        <div class="small text-muted">Etkinlik: <?=h($order['event_title'])?><?php if ($eventDate): ?> • <?=h(date('d.m.Y', strtotime($eventDate)))?><?php endif; ?></div>
+                      <?php endif; ?>
+                      <?php if ($statusMeta): ?>
+                        <div class="mt-2"><span class="<?=$statusMeta['class']?>"><?=$statusMeta['label']?></span></div>
+                      <?php endif; ?>
+                    </td>
+                    <td>
+                      <div class="fw-semibold"><?=h($order['customer_name'] ?? '—')?></div>
+                      <?php if (!empty($order['customer_email'])): ?><div class="small text-muted"><?=h($order['customer_email'])?></div><?php endif; ?>
+                      <?php if (!empty($order['customer_phone'])): ?><div class="small text-muted"><?=h($order['customer_phone'])?></div><?php endif; ?>
+                    </td>
+                    <td>
+                      <div class="fw-semibold mb-1"><?=h($line['addon_name'] ?? '—')?></div>
+                      <?php if (!empty($line['variant_name'])): ?>
+                        <div class="variant-pill"><i class="bi bi-stars"></i> <?=h($line['variant_name'])?></div>
+                      <?php endif; ?>
+                      <?php if (!empty($line['variant_description'])): ?>
+                        <div class="small text-muted mt-1"><?=nl2br(h($line['variant_description']))?></div>
+                      <?php elseif (!empty($line['addon_description'])): ?>
+                        <div class="small text-muted mt-1"><?=nl2br(h($line['addon_description']))?></div>
+                      <?php endif; ?>
+                    </td>
+                    <td>
+                      <div class="fw-semibold"><?=format_currency((int)($line['total_cents'] ?? 0))?></div>
+                      <div class="small text-muted">Adet: <?= (int)($quantity ?: 1) ?></div>
+                    </td>
+                    <td>
+                      <div class="fw-semibold"><?= $createdAt ? h(date('d.m.Y H:i', strtotime($createdAt))) : '—' ?></div>
+                      <?php if ($paidAt): ?><div class="small text-muted">Ödeme: <?=h(date('d.m.Y H:i', strtotime($paidAt)))?></div><?php endif; ?>
+                    </td>
+                  </tr>
+                <?php endforeach; ?>
+              <?php endif; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
   <div class="modal fade" id="addonDetailModal" tabindex="-1" aria-hidden="true">

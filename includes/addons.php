@@ -657,6 +657,66 @@ function site_addon_delete(int $id): void {
   }
 }
 
+function site_order_addon_normalize(array $row): array {
+  if (isset($row['id'])) {
+    $row['id'] = (int)$row['id'];
+  }
+  if (isset($row['order_id'])) {
+    $row['order_id'] = (int)$row['order_id'];
+  }
+  if (isset($row['addon_id'])) {
+    $row['addon_id'] = (int)$row['addon_id'];
+  }
+  if (isset($row['variant_id'])) {
+    $row['variant_id'] = (int)$row['variant_id'];
+    if ($row['variant_id'] <= 0) {
+      $row['variant_id'] = null;
+    }
+  } else {
+    $row['variant_id'] = null;
+  }
+  $row['variant_name'] = isset($row['variant_name']) && $row['variant_name'] !== '' ? (string)$row['variant_name'] : null;
+  $row['variant_price_cents'] = isset($row['variant_price_cents']) ? (int)$row['variant_price_cents'] : null;
+  if (isset($row['price_cents'])) {
+    $row['price_cents'] = (int)$row['price_cents'];
+  }
+  if (isset($row['quantity'])) {
+    $row['quantity'] = (int)$row['quantity'];
+  }
+  if (isset($row['total_cents'])) {
+    $row['total_cents'] = (int)$row['total_cents'];
+  }
+  if (isset($row['meta_json'])) {
+    $meta = $row['meta_json'];
+    unset($row['meta_json']);
+    $row['meta'] = $meta ? (safe_json_decode($meta) ?: []) : [];
+  }
+  if (!isset($row['meta']) || !is_array($row['meta'])) {
+    $row['meta'] = [];
+  }
+  if (!empty($row['meta']['image_path'])) {
+    $row['image_path'] = $row['meta']['image_path'];
+    $row['image_url'] = BASE_URL.'/'.ltrim($row['image_path'], '/');
+  }
+  if (!empty($row['meta']['detail'])) {
+    $row['detail'] = $row['meta']['detail'];
+  }
+  if (!empty($row['meta']['variant']) && is_array($row['meta']['variant'])) {
+    $variantMeta = $row['meta']['variant'];
+    if (!empty($variantMeta['image_path']) && empty($row['variant_image_url'])) {
+      $row['variant_image_path'] = $variantMeta['image_path'];
+      $row['variant_image_url'] = BASE_URL.'/'.ltrim($variantMeta['image_path'], '/');
+    }
+    if (!empty($variantMeta['detail'])) {
+      $row['variant_detail'] = $variantMeta['detail'];
+    }
+    if (!empty($variantMeta['description']) && empty($row['variant_description'])) {
+      $row['variant_description'] = $variantMeta['description'];
+    }
+  }
+  return $row;
+}
+
 function site_order_addons_list(int $orderId): array {
   $st = pdo()->prepare('SELECT * FROM site_order_addons WHERE order_id=? ORDER BY id ASC');
   $st->execute([$orderId]);
@@ -665,49 +725,72 @@ function site_order_addons_list(int $orderId): array {
     return [];
   }
   return array_map(static function (array $row): array {
-    $row['id'] = (int)$row['id'];
-    $row['order_id'] = (int)$row['order_id'];
-    $row['addon_id'] = (int)$row['addon_id'];
-    $row['variant_id'] = isset($row['variant_id']) ? (int)$row['variant_id'] : null;
-    if ($row['variant_id'] !== null && $row['variant_id'] <= 0) {
-      $row['variant_id'] = null;
-    }
-    $row['variant_name'] = isset($row['variant_name']) && $row['variant_name'] !== '' ? (string)$row['variant_name'] : null;
-    $row['variant_price_cents'] = isset($row['variant_price_cents']) ? (int)$row['variant_price_cents'] : null;
-    $row['price_cents'] = (int)$row['price_cents'];
-    $row['quantity'] = (int)$row['quantity'];
-    $row['total_cents'] = (int)$row['total_cents'];
-    if (isset($row['meta_json'])) {
-      $meta = $row['meta_json'];
-      unset($row['meta_json']);
-      $row['meta'] = $meta ? (safe_json_decode($meta) ?: []) : [];
-    } else {
-      $row['meta'] = [];
-    }
-    if (!is_array($row['meta'])) {
-      $row['meta'] = [];
-    }
-    if (!empty($row['meta']['image_path'])) {
-      $row['image_path'] = $row['meta']['image_path'];
-      $row['image_url'] = BASE_URL.'/'.ltrim($row['image_path'], '/');
-    }
-    if (!empty($row['meta']['detail'])) {
-      $row['detail'] = $row['meta']['detail'];
-    }
-    if (!empty($row['meta']['variant']) && is_array($row['meta']['variant'])) {
-      $variantMeta = $row['meta']['variant'];
-      if (!empty($variantMeta['image_path']) && empty($row['variant_image_url'])) {
-        $row['variant_image_path'] = $variantMeta['image_path'];
-        $row['variant_image_url'] = BASE_URL.'/'.ltrim($variantMeta['image_path'], '/');
-      }
-      if (!empty($variantMeta['detail'])) {
-        $row['variant_detail'] = $variantMeta['detail'];
-      }
-      if (!empty($variantMeta['description']) && empty($row['variant_description'])) {
-        $row['variant_description'] = $variantMeta['description'];
-      }
-    }
-    return $row;
+    return site_order_addon_normalize($row);
+  }, $rows);
+}
+
+function site_order_addons_recent(int $limit = 25): array {
+  $limit = (int)$limit;
+  if ($limit <= 0) {
+    $limit = 25;
+  }
+  $limit = min($limit, 200);
+  if (!table_exists('site_order_addons') || !table_exists('site_orders')) {
+    return [];
+  }
+  $sql = 'SELECT oa.*, '
+       . 'so.status AS order_status, so.customer_name AS order_customer_name, so.customer_email AS order_customer_email, '
+       . 'so.customer_phone AS order_customer_phone, so.event_title AS order_event_title, so.event_date AS order_event_date, '
+       . 'so.created_at AS order_created_at, so.paid_at AS order_paid_at, so.price_cents AS order_price_cents, '
+       . 'so.base_price_cents AS order_base_price_cents, so.addons_total_cents AS order_addons_total_cents, '
+       . 'so.campaigns_total_cents AS order_campaigns_total_cents, '
+       . 'dp.name AS package_name '
+       . 'FROM site_order_addons oa '
+       . 'LEFT JOIN site_orders so ON so.id = oa.order_id '
+       . 'LEFT JOIN dealer_packages dp ON dp.id = so.package_id '
+       . 'ORDER BY oa.created_at DESC LIMIT ?';
+  $st = pdo()->prepare($sql);
+  $st->bindValue(1, $limit, PDO::PARAM_INT);
+  $st->execute();
+  $rows = $st->fetchAll();
+  if (!$rows) {
+    return [];
+  }
+  return array_map(static function (array $row): array {
+    $normalized = site_order_addon_normalize($row);
+    $orderInfo = [
+      'id' => $normalized['order_id'] ?? null,
+      'status' => $row['order_status'] ?? null,
+      'customer_name' => $row['order_customer_name'] ?? null,
+      'customer_email' => $row['order_customer_email'] ?? null,
+      'customer_phone' => $row['order_customer_phone'] ?? null,
+      'event_title' => $row['order_event_title'] ?? null,
+      'event_date' => $row['order_event_date'] ?? null,
+      'created_at' => $row['order_created_at'] ?? null,
+      'paid_at' => $row['order_paid_at'] ?? null,
+      'price_cents' => isset($row['order_price_cents']) ? (int)$row['order_price_cents'] : null,
+      'base_price_cents' => isset($row['order_base_price_cents']) ? (int)$row['order_base_price_cents'] : null,
+      'addons_total_cents' => isset($row['order_addons_total_cents']) ? (int)$row['order_addons_total_cents'] : null,
+      'campaigns_total_cents' => isset($row['order_campaigns_total_cents']) ? (int)$row['order_campaigns_total_cents'] : null,
+      'package_name' => $row['package_name'] ?? null,
+    ];
+    $normalized['order'] = $orderInfo;
+    unset(
+      $normalized['order_status'],
+      $normalized['order_customer_name'],
+      $normalized['order_customer_email'],
+      $normalized['order_customer_phone'],
+      $normalized['order_event_title'],
+      $normalized['order_event_date'],
+      $normalized['order_created_at'],
+      $normalized['order_paid_at'],
+      $normalized['order_price_cents'],
+      $normalized['order_base_price_cents'],
+      $normalized['order_addons_total_cents'],
+      $normalized['order_campaigns_total_cents'],
+      $normalized['package_name']
+    );
+    return $normalized;
   }, $rows);
 }
 
