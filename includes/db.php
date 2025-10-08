@@ -1349,7 +1349,11 @@ try {
     $st->execute([APP_SCHEMA_VERSION, date('Y-m-d H:i:s')]);
   } catch (Throwable $e) {}
 }
-  if (!column_exists('dealers', 'balance_cents')) {
-    pdo()->exec("ALTER TABLE dealers ADD balance_cents INT NOT NULL DEFAULT 0 AFTER last_login_at");
+  if (table_exists('dealers') && !column_exists('dealers', 'balance_cents')) {
+    try {
+      pdo()->exec("ALTER TABLE dealers ADD balance_cents INT NOT NULL DEFAULT 0 AFTER last_login_at");
+    } catch (Throwable $e) {
+      // ignore migration errors so legacy environments without the table remain operational
+    }
   }
 
