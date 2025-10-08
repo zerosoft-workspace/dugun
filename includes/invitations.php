@@ -1192,19 +1192,68 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   $fontWidth = imagefontwidth($font);
   $fontHeight = imagefontheight($font);
 
-  $titleScale = 5.2;
-  $subtitleScale = 3.2;
-  $recipientScale = 3.0;
-  $bodyScale = 2.8;
-  $buttonScale = 3.0;
-  $brandScale = 2.4;
+  $titleScale = 6.2;
+  $subtitleScale = 3.8;
+  $recipientScale = 3.6;
+  $bodyScale = 3.3;
+  $buttonScale = 3.6;
+  $brandScale = 3.0;
+  $tagScale = 2.6;
+
+  $panelLeft = $geometry['panel_left'];
+  $panelRight = $geometry['panel_right'];
+  $panelTop = $geometry['panel_top'];
+  $panelBottom = $geometry['panel_bottom'];
+  $panelWidth = $panelRight - $panelLeft;
+
+  $themeLabel = '';
+  $themeOptions = invitation_theme_options();
+  $themeKey = $style['theme'] ?? invitation_template_theme($template);
+  if (isset($themeOptions[$themeKey]['label'])) {
+    $themeLabel = (string)$themeOptions[$themeKey]['label'];
+  }
+  if ($themeLabel === '') {
+    $themeLabel = 'Davetiye';
+  }
+  $themeLabelUpper = function_exists('mb_strtoupper') ? mb_strtoupper($themeLabel, 'UTF-8') : strtoupper($themeLabel);
+
+  $contentInsetX = 80;
+  $contentInsetY = 140;
+  $contentLeft = $panelLeft + $contentInsetX;
+  $contentRight = $panelRight - $contentInsetX;
+
+  $contentBackdropRgb = invitation_card_lighten($style['accent'], 0.18);
+  $contentBackdrop = imagecolorallocatealpha($img, $contentBackdropRgb[0], $contentBackdropRgb[1], $contentBackdropRgb[2], 94);
+  imagefilledrectangle(
+    $img,
+    $contentLeft,
+    $panelTop + $contentInsetY,
+    $contentRight,
+    max($panelTop + $contentInsetY + 640, $panelBottom - 160),
+    $contentBackdrop
+  );
+
+  $tagMetrics = invitation_card_basic_measure($font, $themeLabelUpper, $tagScale);
+  $tagPaddingX = 48;
+  $tagPaddingY = 24;
+  $tagWidth = $tagMetrics['width'] + ($tagPaddingX * 2);
+  $tagHeight = $tagMetrics['height'] + ($tagPaddingY * 2);
+  $tagX1 = (int)round(($width - $tagWidth) / 2);
+  $tagY1 = $panelTop + 72;
+  $tagX2 = $tagX1 + $tagWidth;
+  $tagY2 = $tagY1 + $tagHeight;
+  $tagBg = imagecolorallocatealpha($img, $style['primary'][0], $style['primary'][1], $style['primary'][2], 96);
+  imagefilledrectangle($img, $tagX1, $tagY1, $tagX2, $tagY2, $tagBg);
+  $tagTextX = $tagX1 + (int)round(($tagWidth - $tagMetrics['width']) / 2);
+  $tagTextY = $tagY1 + $tagPaddingY;
+  invitation_card_basic_draw_block($img, $font, $themeLabelUpper, $headlineColor, $tagTextX, $tagTextY, $tagScale);
 
   $title = trim((string)($template['title'] ?? ''));
   if ($title === '') {
     $title = 'Düğün Davetiyemiz';
   }
   $titleUpper = function_exists('mb_strtoupper') ? mb_strtoupper($title, 'UTF-8') : strtoupper($title);
-  $cursorY = 120;
+  $cursorY = $tagY2 + 72;
   $cursorY = invitation_card_basic_draw_centered(
     $img,
     $font,
@@ -1233,15 +1282,12 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
       $subtitleColor,
       $width,
       $cursorY,
-      (int)round($fontHeight * $subtitleScale * 0.35),
+      (int)round($fontHeight * $subtitleScale * 0.42),
       $subtitleScale
     );
   }
 
-  $panelTop = $geometry['panel_top'];
-  $panelBottom = $geometry['panel_bottom'];
-
-  $cursorY = $panelTop + 120;
+  $cursorY = max($cursorY, $panelTop + $contentInsetY + 60);
   if ($contact && !empty($contact['name'])) {
     $recipient = trim((string)$contact['name']);
     if ($recipient !== '') {
@@ -1252,7 +1298,7 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
         $textColor,
         $width,
         $cursorY,
-        (int)round($fontHeight * $recipientScale * 0.4),
+        (int)round($fontHeight * $recipientScale * 0.45),
         $recipientScale
       );
     }
@@ -1262,7 +1308,8 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   if (stripos($message, 'bikara.com') === false) {
     $message = invitation_require_branding($message);
   }
-  $wrapWidth = max(18, (int)floor(760 / max(1, $fontWidth * $bodyScale)));
+  $availableWidth = max(600, $contentRight - $contentLeft - 60);
+  $wrapWidth = max(14, (int)floor($availableWidth / max(1, $fontWidth * $bodyScale * 0.9)));
   $messageLines = [];
   foreach (explode("\n", trim(preg_replace(["/\r\n/", "/\r/"], "\n", $message))) as $paragraph) {
     $paragraph = trim($paragraph);
@@ -1278,7 +1325,7 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   if ($messageLines && end($messageLines) === '') {
     array_pop($messageLines);
   }
-  $bodyLineGap = (int)round($fontHeight * $bodyScale * 0.55);
+  $bodyLineGap = (int)round($fontHeight * $bodyScale * 0.68);
   foreach ($messageLines as $line) {
     if ($line === '') {
       $cursorY += $bodyLineGap;
@@ -1296,18 +1343,27 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
     );
   }
 
-  $cursorY += (int)round($fontHeight * $bodyScale * 0.9);
+  $cursorY += (int)round($fontHeight * $bodyScale * 0.95);
   $buttonLabel = trim((string)($template['button_label'] ?? ''));
   if ($buttonLabel === '') {
     $buttonLabel = 'Katılımınızı Bildirin';
   }
   $buttonMetrics = invitation_card_basic_measure($font, $buttonLabel, $buttonScale);
-  $buttonWidth = min(820, $buttonMetrics['width'] + 280);
-  $buttonHeight = max(120, (int)round($buttonMetrics['height'] * 1.8));
+  $buttonWidth = min($panelWidth - 160, $buttonMetrics['width'] + 320);
+  $buttonHeight = max(132, (int)round($buttonMetrics['height'] * 2.0));
   $buttonX1 = (int)round(($width - $buttonWidth) / 2);
   $buttonY1 = $cursorY;
   $buttonX2 = $buttonX1 + $buttonWidth;
   $buttonY2 = $buttonY1 + $buttonHeight;
+  $buttonShadow = imagecolorallocatealpha($img, $style['primary'][0], $style['primary'][1], $style['primary'][2], 100);
+  imagefilledellipse(
+    $img,
+    (int)round($width / 2),
+    $buttonY2 + 36,
+    (int)round($buttonWidth * 0.9),
+    80,
+    $buttonShadow
+  );
   invitation_card_draw_pill($img, $buttonX1, $buttonY1, $buttonX2, $buttonY2, $primaryColor);
   $buttonTextX = (int)round($buttonX1 + ($buttonWidth - $buttonMetrics['width']) / 2);
   $buttonTextY = (int)round($buttonY1 + ($buttonHeight - $buttonMetrics['height']) / 2);
@@ -1316,8 +1372,8 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   $brandText = 'bikara.com';
   $brandMetrics = invitation_card_basic_measure($font, $brandText, $brandScale);
   $brandX = (int)round(($width - $brandMetrics['width']) / 2);
-  $brandBaseline = max($panelBottom - 140, $buttonY2 + (int)round($fontHeight * $brandScale));
-  $brandY = max(0, min($brandBaseline, $panelBottom - $brandMetrics['height'] - 40));
+  $brandBaseline = max($panelBottom - 140, $buttonY2 + (int)round($fontHeight * $brandScale * 1.2));
+  $brandY = max(0, min($brandBaseline, $panelBottom - $brandMetrics['height'] - 48));
   invitation_card_basic_draw_block($img, $font, $brandText, $brand, $brandX, $brandY, $brandScale);
 
   return $img;
