@@ -925,6 +925,41 @@ function install_schema(){
     } catch (Throwable $e) {}
   }
 
+  /* ek hizmet varyantları */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS site_addon_variants(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    addon_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    slug VARCHAR(190) NOT NULL,
+    description TEXT NULL,
+    detail LONGTEXT NULL,
+    price_cents INT NOT NULL DEFAULT 0,
+    image_path VARCHAR(255) NULL,
+    is_active TINYINT(1) NOT NULL DEFAULT 1,
+    display_order INT NOT NULL DEFAULT 0,
+    meta_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_addon_variant_slug (addon_id, slug),
+    FOREIGN KEY (addon_id) REFERENCES site_addons(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('site_addon_variants', 'detail')) {
+    try {
+      pdo()->exec('ALTER TABLE site_addon_variants ADD detail LONGTEXT NULL AFTER description');
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('site_addon_variants', 'image_path')) {
+    try {
+      pdo()->exec('ALTER TABLE site_addon_variants ADD image_path VARCHAR(255) NULL AFTER price_cents');
+    } catch (Throwable $e) {}
+  }
+
+  try {
+    pdo()->exec('ALTER TABLE site_addon_variants ADD UNIQUE KEY uniq_addon_variant_slug (addon_id, slug)');
+  } catch (Throwable $e) {}
+
   /* hayır kampanyası kataloğu */
   pdo()->exec("CREATE TABLE IF NOT EXISTS site_campaigns(
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -947,6 +982,9 @@ function install_schema(){
     addon_id INT NOT NULL,
     addon_name VARCHAR(190) NOT NULL,
     addon_description TEXT NULL,
+    variant_id INT NULL,
+    variant_name VARCHAR(190) NULL,
+    variant_price_cents INT NULL DEFAULT 0,
     price_cents INT NOT NULL DEFAULT 0,
     quantity INT NOT NULL DEFAULT 1,
     total_cents INT NOT NULL DEFAULT 0,
@@ -954,8 +992,27 @@ function install_schema(){
     created_at DATETIME NOT NULL,
     FOREIGN KEY (order_id) REFERENCES site_orders(id) ON DELETE CASCADE,
     FOREIGN KEY (addon_id) REFERENCES site_addons(id) ON DELETE RESTRICT,
+    FOREIGN KEY (variant_id) REFERENCES site_addon_variants(id) ON DELETE SET NULL,
     INDEX idx_site_order_addons_order (order_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('site_order_addons', 'variant_id')) {
+    try {
+      pdo()->exec('ALTER TABLE site_order_addons ADD variant_id INT NULL AFTER addon_description');
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('site_order_addons', 'variant_name')) {
+    try {
+      pdo()->exec('ALTER TABLE site_order_addons ADD variant_name VARCHAR(190) NULL AFTER variant_id');
+    } catch (Throwable $e) {}
+  }
+
+  if (!column_exists('site_order_addons', 'variant_price_cents')) {
+    try {
+      pdo()->exec('ALTER TABLE site_order_addons ADD variant_price_cents INT NULL DEFAULT 0 AFTER variant_name');
+    } catch (Throwable $e) {}
+  }
 
   /* sipariş kampanya seçimleri */
   pdo()->exec("CREATE TABLE IF NOT EXISTS site_order_campaigns(

@@ -71,6 +71,284 @@ function site_addon_delete_file(?string $path): void {
   }
 }
 
+function site_addon_supports_variants(): bool {
+  static $supports = null;
+  if ($supports !== null) {
+    return $supports;
+  }
+
+  try {
+    if (!table_exists('site_addon_variants')) {
+      $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
+      pdo()->exec("CREATE TABLE IF NOT EXISTS site_addon_variants(
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        addon_id INT NOT NULL,
+        name VARCHAR(190) NOT NULL,
+        slug VARCHAR(190) NOT NULL,
+        description TEXT NULL,
+        detail LONGTEXT NULL,
+        price_cents INT NOT NULL DEFAULT 0,
+        image_path VARCHAR(255) NULL,
+        is_active TINYINT(1) NOT NULL DEFAULT 1,
+        display_order INT NOT NULL DEFAULT 0,
+        meta_json $jsonMeta NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NULL,
+        UNIQUE KEY uniq_addon_variant_slug (addon_id, slug),
+        FOREIGN KEY (addon_id) REFERENCES site_addons(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    if (table_exists('site_addon_variants')) {
+      if (!column_exists('site_addon_variants', 'detail')) {
+        try {
+          pdo()->exec('ALTER TABLE site_addon_variants ADD detail LONGTEXT NULL AFTER description');
+        } catch (Throwable $e) {}
+      }
+      if (!column_exists('site_addon_variants', 'image_path')) {
+        try {
+          pdo()->exec('ALTER TABLE site_addon_variants ADD image_path VARCHAR(255) NULL AFTER price_cents');
+        } catch (Throwable $e) {}
+      }
+      try {
+        pdo()->exec('ALTER TABLE site_addon_variants ADD UNIQUE KEY uniq_addon_variant_slug (addon_id, slug)');
+      } catch (Throwable $e) {}
+    }
+  } catch (Throwable $e) {
+    $supports = false;
+    return $supports;
+  }
+
+  try {
+    $supports = table_exists('site_addon_variants');
+  } catch (Throwable $e) {
+    $supports = false;
+  }
+
+  return $supports;
+}
+
+function site_addon_variant_normalize(array $row): array {
+  $row['id'] = (int)$row['id'];
+  $row['addon_id'] = (int)$row['addon_id'];
+  $row['price_cents'] = (int)($row['price_cents'] ?? 0);
+  $row['is_active'] = (int)($row['is_active'] ?? 0);
+  $row['display_order'] = (int)($row['display_order'] ?? 0);
+  $row['description'] = isset($row['description']) && $row['description'] !== null ? (string)$row['description'] : null;
+  $row['detail'] = isset($row['detail']) && $row['detail'] !== null ? (string)$row['detail'] : null;
+  $row['image_path'] = isset($row['image_path']) && $row['image_path'] !== '' ? trim((string)$row['image_path']) : null;
+  if (isset($row['meta_json'])) {
+    $meta = $row['meta_json'];
+    unset($row['meta_json']);
+    $row['meta'] = $meta ? (safe_json_decode($meta) ?: []) : [];
+  } else {
+    $row['meta'] = [];
+  }
+  if (!is_array($row['meta'])) {
+    $row['meta'] = [];
+  }
+  if (!$row['detail'] && !empty($row['meta']['detail'])) {
+    $row['detail'] = (string)$row['meta']['detail'];
+  }
+  if (!$row['image_path'] && !empty($row['meta']['image_path'])) {
+    $row['image_path'] = $row['meta']['image_path'];
+  }
+  if (!empty($row['image_path'])) {
+    $row['image_url'] = BASE_URL.'/'.ltrim($row['image_path'], '/');
+  } else {
+    $row['image_url'] = null;
+  }
+  return $row;
+}
+
+function site_addon_variants_for_addons(array $addonIds, bool $onlyActive = true): array {
+  if (!$addonIds) {
+    return [];
+  }
+  if (!site_addon_supports_variants()) {
+    return [];
+  }
+
+  $placeholders = implode(', ', array_fill(0, count($addonIds), '?'));
+  $sql = 'SELECT * FROM site_addon_variants WHERE addon_id IN ('.$placeholders.')';
+  $params = array_map('intval', $addonIds);
+  if ($onlyActive) {
+    $sql .= ' AND is_active=1';
+  }
+  $sql .= ' ORDER BY display_order ASC, name ASC';
+  $st = pdo()->prepare($sql);
+  $st->execute($params);
+  $rows = $st->fetchAll();
+  if (!$rows) {
+    return [];
+  }
+  $map = [];
+  foreach ($rows as $row) {
+    $variant = site_addon_variant_normalize($row);
+    $map[$variant['addon_id']][] = $variant;
+  }
+  return $map;
+}
+
+function site_addon_variant_get(int $id): ?array {
+  if (!site_addon_supports_variants()) {
+    return null;
+  }
+  $st = pdo()->prepare('SELECT * FROM site_addon_variants WHERE id=? LIMIT 1');
+  $st->execute([$id]);
+  $row = $st->fetch();
+  return $row ? site_addon_variant_normalize($row) : null;
+}
+
+function site_addon_variant_first_active(int $addonId): ?array {
+  if (!site_addon_supports_variants()) {
+    return null;
+  }
+  $st = pdo()->prepare('SELECT * FROM site_addon_variants WHERE addon_id=? AND is_active=1 ORDER BY display_order ASC, name ASC LIMIT 1');
+  $st->execute([$addonId]);
+  $row = $st->fetch();
+  return $row ? site_addon_variant_normalize($row) : null;
+}
+
+function site_addon_variant_resolve_slug(int $addonId, string $slug, ?int $excludeId = null): string {
+  $slug = trim($slug);
+  if ($slug === '') {
+    $slug = bin2hex(random_bytes(4));
+  }
+  $base = $slug;
+  $pdo = pdo();
+  $i = 1;
+  while (true) {
+    if ($excludeId) {
+      $st = $pdo->prepare('SELECT id FROM site_addon_variants WHERE addon_id=? AND slug=? AND id!=? LIMIT 1');
+      $st->execute([$addonId, $slug, $excludeId]);
+    } else {
+      $st = $pdo->prepare('SELECT id FROM site_addon_variants WHERE addon_id=? AND slug=? LIMIT 1');
+      $st->execute([$addonId, $slug]);
+    }
+    if (!$st->fetchColumn()) {
+      return $slug;
+    }
+    $slug = $base.'-'.(++$i);
+  }
+}
+
+function site_addon_variant_save(int $addonId, array $input, ?int $id = null): int {
+  if (!site_addon_supports_variants()) {
+    throw new RuntimeException('Varyant desteği etkin değil.');
+  }
+  $addon = site_addon_get($addonId);
+  if (!$addon) {
+    throw new RuntimeException('Bağlı olduğu ek hizmet bulunamadı.');
+  }
+
+  $name = trim($input['name'] ?? '');
+  if ($name === '') {
+    throw new RuntimeException('Varyant adı zorunludur.');
+  }
+
+  $priceCents = isset($input['price_cents']) ? (int)$input['price_cents'] : money_to_cents((string)($input['price'] ?? '0'));
+  if ($priceCents < 0) {
+    $priceCents = 0;
+  }
+
+  $slug = trim($input['slug'] ?? '');
+  if ($slug === '') {
+    $slug = slugify($name);
+  }
+  if ($slug === '') {
+    $slug = bin2hex(random_bytes(4));
+  }
+
+  $description = trim($input['description'] ?? '');
+  $detail = trim($input['detail'] ?? '');
+  $displayOrder = isset($input['display_order']) ? (int)$input['display_order'] : 0;
+  $isActive = !empty($input['is_active']) ? 1 : 0;
+  $meta = isset($input['meta']) && is_array($input['meta']) ? $input['meta'] : [];
+  if (!is_array($meta)) {
+    $meta = [];
+  }
+  $imagePath = isset($input['image_path']) ? trim((string)$input['image_path']) : null;
+  if ($imagePath === '') {
+    $imagePath = null;
+  }
+
+  $pdo = pdo();
+  $now = now();
+
+  if ($id) {
+    $existing = site_addon_variant_get($id);
+    if (!$existing || $existing['addon_id'] !== $addonId) {
+      throw new RuntimeException('Varyant kaydı bulunamadı.');
+    }
+    if ($imagePath === null && !empty($existing['image_path'])) {
+      $imagePath = $existing['image_path'];
+    }
+    $slug = site_addon_variant_resolve_slug($addonId, $slug, $id);
+    $sets = [
+      'name=?',
+      'slug=?',
+      'description=?',
+      'detail=?',
+      'price_cents=?',
+      'image_path=?',
+      'is_active=?',
+      'display_order=?',
+      'meta_json=?',
+      'updated_at=?',
+    ];
+    $params = [
+      $name,
+      $slug,
+      $description !== '' ? $description : null,
+      $detail !== '' ? $detail : null,
+      $priceCents,
+      $imagePath ?: null,
+      $isActive,
+      $displayOrder,
+      $meta ? safe_json_encode($meta) : null,
+      $now,
+      $id,
+    ];
+    $sql = 'UPDATE site_addon_variants SET '.implode(', ', $sets).' WHERE id=?';
+    $pdo->prepare($sql)->execute($params);
+    return $id;
+  }
+
+  $slug = site_addon_variant_resolve_slug($addonId, $slug, null);
+  $sql = 'INSERT INTO site_addon_variants (addon_id, name, slug, description, detail, price_cents, image_path, is_active, display_order, meta_json, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)';
+  $pdo->prepare($sql)->execute([
+    $addonId,
+    $name,
+    $slug,
+    $description !== '' ? $description : null,
+    $detail !== '' ? $detail : null,
+    $priceCents,
+    $imagePath ?: null,
+    $isActive,
+    $displayOrder,
+    $meta ? safe_json_encode($meta) : null,
+    $now,
+    $now,
+  ]);
+  return (int)$pdo->lastInsertId();
+}
+
+function site_addon_variant_delete(int $id): void {
+  if (!site_addon_supports_variants()) {
+    return;
+  }
+  $variant = site_addon_variant_get($id);
+  if (!$variant) {
+    return;
+  }
+  $st = pdo()->prepare('DELETE FROM site_addon_variants WHERE id=?');
+  $st->execute([$id]);
+  if (!empty($variant['image_path'])) {
+    site_addon_delete_file($variant['image_path']);
+  }
+}
+
 function site_addon_supports_images(): bool {
   static $supports = null;
   if ($supports !== null) {
@@ -172,6 +450,9 @@ function site_addon_normalize(array $row): array {
   } else {
     $row['image_url'] = null;
   }
+  if (empty($row['variants']) || !is_array($row['variants'])) {
+    $row['variants'] = [];
+  }
   return $row;
 }
 
@@ -187,14 +468,32 @@ function site_addon_all(bool $onlyActive = true): array {
   $sql .= ' ORDER BY display_order ASC, name ASC';
   $st = pdo()->query($sql);
   $rows = $st->fetchAll();
-  return array_map('site_addon_normalize', $rows ?: []);
+  $addons = array_map('site_addon_normalize', $rows ?: []);
+  if ($addons && site_addon_supports_variants()) {
+    $ids = array_map(static fn(array $addon): int => (int)$addon['id'], $addons);
+    $variantMap = site_addon_variants_for_addons($ids, $onlyActive);
+    foreach ($addons as &$addon) {
+      $addonId = (int)$addon['id'];
+      $addon['variants'] = $variantMap[$addonId] ?? [];
+    }
+    unset($addon);
+  }
+  return $addons;
 }
 
 function site_addon_get(int $id): ?array {
   $st = pdo()->prepare('SELECT * FROM site_addons WHERE id=? LIMIT 1');
   $st->execute([$id]);
   $row = $st->fetch();
-  return $row ? site_addon_normalize($row) : null;
+  if (!$row) {
+    return null;
+  }
+  $addon = site_addon_normalize($row);
+  if (site_addon_supports_variants()) {
+    $map = site_addon_variants_for_addons([$addon['id']], false);
+    $addon['variants'] = $map[$addon['id']] ?? [];
+  }
+  return $addon;
 }
 
 function site_addon_find_by_slug(string $slug): ?array {
@@ -342,6 +641,14 @@ function site_addon_delete(int $id): void {
   if (!$addon) {
     return;
   }
+  if (site_addon_supports_variants()) {
+    $variantMap = site_addon_variants_for_addons([$id], false);
+    foreach ($variantMap[$id] ?? [] as $variant) {
+      if (!empty($variant['image_path'])) {
+        site_addon_delete_file($variant['image_path']);
+      }
+    }
+  }
   $st = pdo()->prepare('DELETE FROM site_addons WHERE id=?');
   $st->execute([$id]);
   $imagePath = $addon['image_path'] ?? ($addon['meta']['image_path'] ?? null);
@@ -361,6 +668,12 @@ function site_order_addons_list(int $orderId): array {
     $row['id'] = (int)$row['id'];
     $row['order_id'] = (int)$row['order_id'];
     $row['addon_id'] = (int)$row['addon_id'];
+    $row['variant_id'] = isset($row['variant_id']) ? (int)$row['variant_id'] : null;
+    if ($row['variant_id'] !== null && $row['variant_id'] <= 0) {
+      $row['variant_id'] = null;
+    }
+    $row['variant_name'] = isset($row['variant_name']) && $row['variant_name'] !== '' ? (string)$row['variant_name'] : null;
+    $row['variant_price_cents'] = isset($row['variant_price_cents']) ? (int)$row['variant_price_cents'] : null;
     $row['price_cents'] = (int)$row['price_cents'];
     $row['quantity'] = (int)$row['quantity'];
     $row['total_cents'] = (int)$row['total_cents'];
@@ -381,6 +694,19 @@ function site_order_addons_list(int $orderId): array {
     if (!empty($row['meta']['detail'])) {
       $row['detail'] = $row['meta']['detail'];
     }
+    if (!empty($row['meta']['variant']) && is_array($row['meta']['variant'])) {
+      $variantMeta = $row['meta']['variant'];
+      if (!empty($variantMeta['image_path']) && empty($row['variant_image_url'])) {
+        $row['variant_image_path'] = $variantMeta['image_path'];
+        $row['variant_image_url'] = BASE_URL.'/'.ltrim($variantMeta['image_path'], '/');
+      }
+      if (!empty($variantMeta['detail'])) {
+        $row['variant_detail'] = $variantMeta['detail'];
+      }
+      if (!empty($variantMeta['description']) && empty($row['variant_description'])) {
+        $row['variant_description'] = $variantMeta['description'];
+      }
+    }
     return $row;
   }, $rows);
 }
@@ -394,14 +720,60 @@ function site_order_sync_addons(int $orderId, array $selectedAddons): void {
   $total = 0;
   $now = now();
 
-  foreach ($selectedAddons as $addonId => $quantity) {
-    $addon = site_addon_get((int)$addonId);
+  foreach ($selectedAddons as $addonId => $payload) {
+    $addonId = (int)$addonId;
+    $addon = site_addon_get($addonId);
     if (!$addon || !$addon['is_active']) {
       continue;
     }
-    $qty = max(1, (int)$quantity);
-    $lineTotal = $addon['price_cents'] * $qty;
+
+    $quantity = 1;
+    $variantId = null;
+
+    if (is_array($payload)) {
+      if (isset($payload['quantity'])) {
+        $quantity = (int)$payload['quantity'];
+      } elseif (isset($payload['qty'])) {
+        $quantity = (int)$payload['qty'];
+      } elseif (isset($payload[0])) {
+        $quantity = (int)$payload[0];
+      }
+
+      if (isset($payload['variant_id'])) {
+        $variantId = (int)$payload['variant_id'];
+      } elseif (isset($payload['variant'])) {
+        $variantId = (int)$payload['variant'];
+      }
+    } else {
+      $quantity = (int)$payload;
+    }
+
+    $qty = max(1, $quantity);
+    $variant = null;
+
+    if ($variantId) {
+      $variant = site_addon_variant_get($variantId) ?: null;
+      if (!$variant || $variant['addon_id'] !== $addon['id'] || !$variant['is_active']) {
+        $variant = null;
+        $variantId = null;
+      }
+    }
+
+    if (!$variant && site_addon_supports_variants() && !empty($addon['variants'])) {
+      $fallback = site_addon_variant_first_active($addon['id']);
+      if ($fallback) {
+        $variant = $fallback;
+        $variantId = $fallback['id'];
+      }
+    }
+
+    $unitPrice = $variant ? (int)$variant['price_cents'] : (int)$addon['price_cents'];
+    if ($unitPrice < 0) {
+      $unitPrice = 0;
+    }
+    $lineTotal = $unitPrice * $qty;
     $total += $lineTotal;
+
     $meta = $addon['meta'];
     if (!is_array($meta)) {
       $meta = [];
@@ -412,13 +784,32 @@ function site_order_sync_addons(int $orderId, array $selectedAddons): void {
     if (!empty($addon['detail'])) {
       $meta['detail'] = $addon['detail'];
     }
-    $pdo->prepare('INSERT INTO site_order_addons (order_id, addon_id, addon_name, addon_description, price_cents, quantity, total_cents, meta_json, created_at) VALUES (?,?,?,?,?,?,?,?,?)')
+    if ($variant) {
+      $meta['variant'] = [
+        'id' => $variant['id'],
+        'name' => $variant['name'],
+        'description' => $variant['description'],
+        'detail' => $variant['detail'],
+        'price_cents' => $variant['price_cents'],
+      ];
+      if (!empty($variant['image_path'])) {
+        $meta['variant']['image_path'] = $variant['image_path'];
+        if (!empty($variant['image_url'])) {
+          $meta['variant']['image_url'] = $variant['image_url'];
+        }
+      }
+    }
+
+    $pdo->prepare('INSERT INTO site_order_addons (order_id, addon_id, addon_name, addon_description, variant_id, variant_name, variant_price_cents, price_cents, quantity, total_cents, meta_json, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([
           $orderId,
           (int)$addon['id'],
           $addon['name'],
           $addon['description'] ?? null,
-          $addon['price_cents'],
+          $variant ? $variant['id'] : null,
+          $variant ? $variant['name'] : null,
+          $variant ? (int)$variant['price_cents'] : null,
+          $unitPrice,
           $qty,
           $lineTotal,
           $meta ? safe_json_encode($meta) : null,

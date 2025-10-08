@@ -140,9 +140,18 @@ $_SESSION['current_order_oid'] = $paytr['merchant_oid'];
             <?php if ($hasAddons): ?>
               <li class="mt-3"><strong>Seçilen Ek Hizmetler</strong></li>
               <ul class="small ps-3 mb-2">
-                <?php foreach ($order['addons'] as $addonLine): ?>
+                <?php foreach ($order['addons'] as $addonLine):
+                  $addonName = $addonLine['addon_name'] ?? '';
+                  $variantName = $addonLine['variant_name'] ?? '';
+                ?>
                   <li class="d-flex justify-content-between">
-                    <span><?=h($addonLine['addon_name'])?> × <?= (int)$addonLine['quantity'] ?></span>
+                    <div>
+                      <strong><?=h($addonName)?></strong>
+                      <?php if ($variantName): ?>
+                        <div class="text-muted small"><?=h($variantName)?></div>
+                      <?php endif; ?>
+                      <div class="text-muted small">Adet: <?= (int)$addonLine['quantity'] ?></div>
+                    </div>
                     <span><?=h(format_currency((int)$addonLine['total_cents']))?></span>
                   </li>
                 <?php endforeach; ?>

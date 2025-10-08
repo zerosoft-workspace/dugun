@@ -46,9 +46,18 @@ unset($_SESSION['lead_success'], $_SESSION['order_summary']);
           <?php if ($hasAddons): ?>
             <li class="mt-3"><strong>Satın Alınan Ek Hizmetler</strong></li>
             <ul class="small ps-3 mb-2">
-              <?php foreach ($summary['addons'] as $addon): ?>
+              <?php foreach ($summary['addons'] as $addon):
+                $addonName = $addon['addon_name'] ?? '';
+                $variantName = $addon['variant_name'] ?? '';
+              ?>
                 <li class="d-flex justify-content-between">
-                  <span><?=h($addon['addon_name'])?> × <?= (int)$addon['quantity'] ?></span>
+                  <div>
+                    <strong><?=h($addonName)?></strong>
+                    <?php if ($variantName): ?>
+                      <div class="text-muted small"><?=h($variantName)?></div>
+                    <?php endif; ?>
+                    <div class="text-muted small">Adet: <?= (int)$addon['quantity'] ?></div>
+                  </div>
                   <span><?=h(format_currency((int)$addon['total_cents']))?></span>
                 </li>
               <?php endforeach; ?>
