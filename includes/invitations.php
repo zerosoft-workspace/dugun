@@ -1021,6 +1021,40 @@ function invitation_card_draw_pill(GdImage $img, int $x1, int $y1, int $x2, int 
   imagefilledrectangle($img, $x1 + $radius, $y1, $x2 - $radius, $y2, $color);
 }
 
+function invitation_card_upper(string $text): string {
+  $text = (string)$text;
+  if ($text === '') {
+    return $text;
+  }
+
+  $map = [
+    'i' => 'İ',
+    'ı' => 'I',
+    'ğ' => 'Ğ',
+    'ü' => 'Ü',
+    'ş' => 'Ş',
+    'ö' => 'Ö',
+    'ç' => 'Ç',
+  ];
+  $prepped = strtr($text, $map);
+
+  if (function_exists('mb_convert_case')) {
+    $converted = @mb_convert_case($prepped, MB_CASE_UPPER, 'tr_TR.UTF-8');
+    if (is_string($converted)) {
+      return $converted;
+    }
+  }
+
+  if (function_exists('mb_strtoupper')) {
+    $converted = @mb_strtoupper($prepped, 'UTF-8');
+    if (is_string($converted)) {
+      return $converted;
+    }
+  }
+
+  return strtoupper($prepped);
+}
+
 function invitation_card_render(array $template, array $event, ?array $contact = null): GdImage {
   $fontRegular = invitation_card_font_path('regular');
   $fontSemi = invitation_card_font_path('semibold') ?: $fontRegular;
@@ -1215,7 +1249,7 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   if ($themeLabel === '') {
     $themeLabel = 'Davetiye';
   }
-  $themeLabelUpper = function_exists('mb_strtoupper') ? mb_strtoupper($themeLabel, 'UTF-8') : strtoupper($themeLabel);
+  $themeLabelUpper = invitation_card_upper($themeLabel);
 
   $contentInsetX = 80;
   $contentInsetY = 140;
@@ -1252,7 +1286,7 @@ function invitation_card_render_basic(array $template, array $event, ?array $con
   if ($title === '') {
     $title = 'Düğün Davetiyemiz';
   }
-  $titleUpper = function_exists('mb_strtoupper') ? mb_strtoupper($title, 'UTF-8') : strtoupper($title);
+  $titleUpper = invitation_card_upper($title);
   $cursorY = $tagY2 + 72;
   $cursorY = invitation_card_basic_draw_centered(
     $img,
