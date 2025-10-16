@@ -93,6 +93,111 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   $payload['footer_nav_links'] = $navItems;
 
+  $heroMain = $content['hero_image_main'] ?? $defaults['hero_image_main'];
+  if (!empty($_POST['hero_image_main_remove'])) {
+    site_content_delete_asset($heroMain);
+    $heroMain = '';
+  }
+  if (!empty($_FILES['hero_image_main'])) {
+    $uploaded = site_content_store_upload($_FILES['hero_image_main'], $heroMain ?: null);
+    if ($uploaded) {
+      $heroMain = $uploaded;
+    }
+  }
+  $payload['hero_image_main'] = $heroMain;
+
+  $heroSecondary = $content['hero_image_secondary'] ?? $defaults['hero_image_secondary'];
+  if (!empty($_POST['hero_image_secondary_remove'])) {
+    site_content_delete_asset($heroSecondary);
+    $heroSecondary = '';
+  }
+  if (!empty($_FILES['hero_image_secondary'])) {
+    $uploaded = site_content_store_upload($_FILES['hero_image_secondary'], $heroSecondary ?: null);
+    if ($uploaded) {
+      $heroSecondary = $uploaded;
+    }
+  }
+  $payload['hero_image_secondary'] = $heroSecondary;
+
+  $aboutImage = $content['about_image'] ?? $defaults['about_image'];
+  if (!empty($_POST['about_image_remove'])) {
+    site_content_delete_asset($aboutImage);
+    $aboutImage = '';
+  }
+  if (!empty($_FILES['about_image'])) {
+    $uploaded = site_content_store_upload($_FILES['about_image'], $aboutImage ?: null);
+    if ($uploaded) {
+      $aboutImage = $uploaded;
+    }
+  }
+  $payload['about_image'] = $aboutImage;
+
+  $dealerImage = $content['dealer_showcase_image'] ?? $defaults['dealer_showcase_image'];
+  if (!empty($_POST['dealer_showcase_image_remove'])) {
+    site_content_delete_asset($dealerImage);
+    $dealerImage = '';
+  }
+  if (!empty($_FILES['dealer_showcase_image'])) {
+    $uploaded = site_content_store_upload($_FILES['dealer_showcase_image'], $dealerImage ?: null);
+    if ($uploaded) {
+      $dealerImage = $uploaded;
+    }
+  }
+  $payload['dealer_showcase_image'] = $dealerImage;
+
+  $galleryImages = $content['gallery_images'] ?? $defaults['gallery_images'];
+  if (!is_array($galleryImages)) {
+    $galleryImages = $defaults['gallery_images'];
+  }
+  $galleryRemove = $_POST['gallery_remove'] ?? [];
+  if (!is_array($galleryRemove)) {
+    $galleryRemove = [];
+  }
+  $galleryRemove = array_filter(array_map('strval', $galleryRemove));
+  if ($galleryRemove) {
+    $galleryImages = array_values(array_filter($galleryImages, function ($image) use ($galleryRemove) {
+      if (!is_string($image)) {
+        return false;
+      }
+      if (in_array($image, $galleryRemove, true)) {
+        site_content_delete_asset($image);
+        return false;
+      }
+      return trim($image) !== '';
+    }));
+  } else {
+    $galleryImages = array_values(array_filter($galleryImages, function ($image) {
+      return is_string($image) && trim($image) !== '';
+    }));
+  }
+
+  if (!empty($_FILES['gallery_uploads']) && isset($_FILES['gallery_uploads']['name']) && is_array($_FILES['gallery_uploads']['name'])) {
+    $names = $_FILES['gallery_uploads']['name'];
+    $tmpNames = $_FILES['gallery_uploads']['tmp_name'];
+    $errors = $_FILES['gallery_uploads']['error'];
+    $types = $_FILES['gallery_uploads']['type'];
+    $sizes = $_FILES['gallery_uploads']['size'];
+    $count = count($names);
+    for ($i = 0; $i < $count; $i++) {
+      $file = [
+        'name' => $names[$i] ?? '',
+        'tmp_name' => $tmpNames[$i] ?? '',
+        'error' => $errors[$i] ?? UPLOAD_ERR_NO_FILE,
+        'type' => $types[$i] ?? '',
+        'size' => $sizes[$i] ?? 0,
+      ];
+      $uploaded = site_content_store_upload($file);
+      if ($uploaded) {
+        $galleryImages[] = $uploaded;
+      }
+    }
+  }
+
+  $galleryImages = array_values(array_unique(array_filter($galleryImages, function ($image) {
+    return is_string($image) && trim($image) !== '';
+  })));
+  $payload['gallery_images'] = array_slice($galleryImages, 0, 12);
+
   site_settings_update($payload);
   flash('ok', 'Site içerikleri güncellendi.');
   redirect(BASE_URL.'/admin/site_content.php');
@@ -132,6 +237,11 @@ while (count($navItems) < 5) {
     .repeater-item{border:1px dashed rgba(14,165,181,.35);border-radius:16px;padding:1rem 1.25rem;background:#fff;}
     .repeater-item + .repeater-item{margin-top:1rem;}
     .btn-add-row{border-radius:12px;}
+    .media-preview{border-radius:18px;background:#f8fafc;padding:1rem;border:1px solid rgba(148,163,184,.25);display:flex;flex-direction:column;gap:.75rem;}
+    .media-preview img{border-radius:14px;width:100%;height:220px;object-fit:cover;box-shadow:0 14px 35px rgba(15,118,110,.18);}
+    .media-gallery-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
+    .media-gallery-item{background:#f8fafc;border-radius:16px;padding:.75rem;border:1px solid rgba(148,163,184,.25);display:flex;flex-direction:column;gap:.5rem;}
+    .media-gallery-item img{border-radius:12px;width:100%;height:120px;object-fit:cover;box-shadow:0 12px 28px rgba(15,118,110,.15);}
     @media (max-width: 991px){
       .settings-shell{gap:1rem;}
     }
@@ -140,12 +250,13 @@ while (count($navItems) < 5) {
 <body class="admin-body">
 <?php admin_layout_start('site', 'Site İçerikleri', 'Landing sayfanızdaki blokları düzenleyin ve hızlıca yayınlayın.'); ?>
     <?php flash_box(); ?>
-    <form method="post" class="settings-shell" novalidate>
+    <form method="post" class="settings-shell" novalidate enctype="multipart/form-data">
       <div class="row g-4 align-items-start">
         <div class="col-lg-4">
           <div class="pane-nav">
             <h6>İçerik Başlıkları</h6>
             <button type="button" class="pane-button active" data-pane-target="contact"><i class="bi bi-person-rolodex"></i>İletişim Bilgileri</button>
+            <button type="button" class="pane-button" data-pane-target="media"><i class="bi bi-images"></i>Görsel İçerikler</button>
             <button type="button" class="pane-button" data-pane-target="cta"><i class="bi bi-bullseye"></i>Çağrı Alanı</button>
             <button type="button" class="pane-button" data-pane-target="smtp"><i class="bi bi-envelope-paper"></i>SMTP Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="faq"><i class="bi bi-chat-dots"></i>Sıkça Sorulanlar</button>
@@ -206,6 +317,117 @@ while (count($navItems) < 5) {
                 <div class="col-md-6">
                   <label class="form-label">İkincil Buton URL</label>
                   <input type="text" name="contact_secondary_url" class="form-control" value="<?=h($content['contact_secondary_url'] ?? '')?>">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="media">
+            <?php
+              $heroMainImage = $content['hero_image_main'] ?? $defaults['hero_image_main'];
+              $heroSecondaryImage = $content['hero_image_secondary'] ?? $defaults['hero_image_secondary'];
+              $aboutImageCurrent = $content['about_image'] ?? $defaults['about_image'];
+              $dealerImageCurrent = $content['dealer_showcase_image'] ?? $defaults['dealer_showcase_image'];
+              $galleryImages = $content['gallery_images'] ?? $defaults['gallery_images'];
+              if (!is_array($galleryImages)) {
+                $galleryImages = $defaults['gallery_images'];
+              }
+            ?>
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Görsel İçerikler</h5>
+                  <p class="text-muted mb-0">Anasayfadaki görselleri güncelleyerek markanıza özel bir vitrin oluşturun.</p>
+                </div>
+                <i class="bi bi-camera-reels" style="font-size:1.6rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-4">
+                <div class="col-md-6">
+                  <div class="media-preview">
+                    <div>
+                      <strong>Hero Görseli 1</strong>
+                      <p class="text-muted small mb-0">Önerilen boyut: 1200x900px. JPG veya WEBP formatında yükleyin.</p>
+                    </div>
+                    <img src="<?=h($heroMainImage)?>" alt="Hero görseli 1" loading="lazy">
+                    <input type="file" name="hero_image_main" class="form-control" accept="image/*">
+                    <?php if (!empty($content['hero_image_main'])): ?>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="hero_image_main_remove" value="1" id="removeHeroMain">
+                        <label class="form-check-label" for="removeHeroMain">Yüklü görseli kaldır</label>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="media-preview">
+                    <div>
+                      <strong>Hero Görseli 2</strong>
+                      <p class="text-muted small mb-0">Hero bölümündeki ikinci görsel. Önerilen boyut: 900x900px.</p>
+                    </div>
+                    <img src="<?=h($heroSecondaryImage)?>" alt="Hero görseli 2" loading="lazy">
+                    <input type="file" name="hero_image_secondary" class="form-control" accept="image/*">
+                    <?php if (!empty($content['hero_image_secondary'])): ?>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="hero_image_secondary_remove" value="1" id="removeHeroSecondary">
+                        <label class="form-check-label" for="removeHeroSecondary">Yüklü görseli kaldır</label>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="media-preview">
+                    <div>
+                      <strong>Hakkımızda Görseli</strong>
+                      <p class="text-muted small mb-0">"Hakkımızda" bölümünde kullanılan görsel. Önerilen boyut: 1200x900px.</p>
+                    </div>
+                    <img src="<?=h($aboutImageCurrent)?>" alt="Hakkımızda görseli" loading="lazy">
+                    <input type="file" name="about_image" class="form-control" accept="image/*">
+                    <?php if (!empty($content['about_image'])): ?>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="about_image_remove" value="1" id="removeAboutImage">
+                        <label class="form-check-label" for="removeAboutImage">Yüklü görseli kaldır</label>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="media-preview">
+                    <div>
+                      <strong>Bayi Paneli Görseli</strong>
+                      <p class="text-muted small mb-0">"Bayi Ağı" bölümünde kullanılan tanıtım görseli. Önerilen boyut: 1200x900px.</p>
+                    </div>
+                    <img src="<?=h($dealerImageCurrent)?>" alt="Bayi paneli görseli" loading="lazy">
+                    <input type="file" name="dealer_showcase_image" class="form-control" accept="image/*">
+                    <?php if (!empty($content['dealer_showcase_image'])): ?>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="dealer_showcase_image_remove" value="1" id="removeDealerImage">
+                        <label class="form-check-label" for="removeDealerImage">Yüklü görseli kaldır</label>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                    <strong class="me-2">Galeri Görselleri</strong>
+                    <span class="badge text-bg-light" style="color:var(--admin-brand);background:rgba(14,165,181,.15);">En fazla 12 görsel</span>
+                  </div>
+                  <div class="media-gallery-grid mb-3">
+                    <?php foreach ($galleryImages as $idx => $image): ?>
+                      <?php if (!is_string($image) || trim($image) === '') { continue; } ?>
+                      <div class="media-gallery-item">
+                        <img src="<?=h($image)?>" alt="Galeri görseli <?=h((string)($idx + 1))?>" loading="lazy">
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" name="gallery_remove[]" value="<?=h($image)?>" id="galleryRemove<?=$idx?>">
+                          <label class="form-check-label small" for="galleryRemove<?=$idx?>">Görseli kaldır</label>
+                        </div>
+                      </div>
+                    <?php endforeach; ?>
+                    <?php if (!$galleryImages): ?>
+                      <p class="text-muted small mb-0">Henüz galeri görseli yok. Aşağıdan yeni görseller yükleyebilirsiniz.</p>
+                    <?php endif; ?>
+                  </div>
+                  <input type="file" name="gallery_uploads[]" class="form-control" accept="image/*" multiple>
+                  <div class="form-text">Birden fazla görsel seçebilirsiniz. JPG, PNG veya WEBP formatları desteklenir.</div>
                 </div>
               </div>
             </div>

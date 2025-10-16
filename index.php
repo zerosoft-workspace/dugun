@@ -17,6 +17,12 @@ $packages = site_public_packages();
 $content = site_public_content();
 $faqItems = $content['faq_items'];
 $footerNav = $content['footer_nav_links'];
+$heroImageMain = $content['hero_image_main'] ?? '';
+$heroImageSecondary = $content['hero_image_secondary'] ?? '';
+$aboutImage = $content['about_image'] ?? '';
+$galleryImages = $content['gallery_images'] ?? [];
+$galleryImages = is_array($galleryImages) ? $galleryImages : [];
+$dealerShowcaseImage = $content['dealer_showcase_image'] ?? '';
 $contactWebsiteUrl = site_normalize_url($content['contact_website'] ?? '') ?? '';
 $contactWebsiteLabel = $content['contact_website_label'] ?? '';
 $contactPhoneHref = site_phone_href($content['contact_phone'] ?? '') ?? '';
@@ -119,8 +125,8 @@ unset($_SESSION['lead_success']);
         </div>
       </div>
       <div class="col-lg-6 hero-visual">
-        <img src="https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80" alt="Düğün kutlaması" class="img-fluid">
-        <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80" alt="Etkinlikten kare" class="img-fluid">
+        <img src="<?=h($heroImageMain)?>" alt="Düğün kutlaması" class="img-fluid">
+        <img src="<?=h($heroImageSecondary)?>" alt="Etkinlikten kare" class="img-fluid">
       </div>
     </div>
     <div class="row mt-5 g-4 position-relative" style="z-index:2;">
@@ -153,7 +159,7 @@ unset($_SESSION['lead_success']);
   <section id="hakkimizda" class="mb-5">
     <div class="row align-items-center g-5">
       <div class="col-lg-6">
-        <img class="img-fluid rounded-4 shadow-lg" src="https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80" alt="Mutlu çift">
+        <img class="img-fluid rounded-4 shadow-lg" src="<?=h($aboutImage)?>" alt="Mutlu çift">
       </div>
       <div class="col-lg-6">
         <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">BİKARE Hakkında</span>
@@ -272,7 +278,7 @@ unset($_SESSION['lead_success']);
         <a class="btn btn-brand" href="<?=BASE_URL?>/dealer/apply.php">Bayi Ağına Katıl</a>
       </div>
       <div class="col-lg-6 text-center">
-        <img class="img-fluid rounded-4 shadow-lg" src="https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80" alt="Bayi paneli">
+        <img class="img-fluid rounded-4 shadow-lg" src="<?=h($dealerShowcaseImage)?>" alt="Bayi paneli">
       </div>
     </div>
   </section>
@@ -284,9 +290,10 @@ unset($_SESSION['lead_success']);
         <p class="muted">Misafirleriniz sadece düğünlerde değil; nişan, kına, doğum günü ve kurumsal etkinliklerde de QR kodunuzla içerik paylaşabilir.</p>
       </div>
       <div class="col-lg-7 gallery-grid">
-        <img src="https://images.unsplash.com/photo-1603015444030-0e4d0a568d2e?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Düğün davetlileri">
-        <img src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Kurumsal etkinlik">
-        <img src="https://images.unsplash.com/photo-1525253013412-55c1a69a5738?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Yemek organizasyonu">
+        <?php foreach ($galleryImages as $galleryImage): ?>
+          <?php $galleryImage = trim((string)$galleryImage); if ($galleryImage === '') { continue; } ?>
+          <img src="<?=h($galleryImage)?>" alt="BİKARE galeri görseli">
+        <?php endforeach; ?>
       </div>
     </div>
   </section>

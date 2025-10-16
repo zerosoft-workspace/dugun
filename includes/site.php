@@ -78,6 +78,18 @@ function site_public_packages(): array {
 function site_content_defaults(): array {
   $year = date('Y');
   return [
+    'hero_image_main' => 'https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80',
+    'hero_image_secondary' => 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80',
+    'about_image' => 'https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+    'gallery_images' => [
+      'https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1519741497674-611481863552?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1549583578-d17276cf1ec4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1529927066849-66e3b4c2772c?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+      'https://images.unsplash.com/photo-1541532713592-79a0317b6b77?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+    ],
+    'dealer_showcase_image' => 'https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
     'contact_title' => 'Bizimle iletişime geçin',
     'contact_text' => 'Projenizle ilgili sorularınızı, özel taleplerinizi veya demo isteğinizi paylaşın. Ekibimiz en kısa sürede dönüş yapacaktır.',
     'contact_phone' => '+90 850 222 55 66',
@@ -174,6 +186,7 @@ function site_settings_update(array $data): void {
 }
 
 function site_public_content(): array {
+  $defaults = site_content_defaults();
   $content = site_settings_all();
 
   foreach (array_keys($content) as $key) {
@@ -181,6 +194,30 @@ function site_public_content(): array {
       unset($content[$key]);
     }
   }
+
+  $heroMain = trim((string)($content['hero_image_main'] ?? ''));
+  if ($heroMain === '') {
+    $heroMain = $defaults['hero_image_main'];
+  }
+  $content['hero_image_main'] = $heroMain;
+
+  $heroSecondary = trim((string)($content['hero_image_secondary'] ?? ''));
+  if ($heroSecondary === '') {
+    $heroSecondary = $defaults['hero_image_secondary'];
+  }
+  $content['hero_image_secondary'] = $heroSecondary;
+
+  $aboutImage = trim((string)($content['about_image'] ?? ''));
+  if ($aboutImage === '') {
+    $aboutImage = $defaults['about_image'];
+  }
+  $content['about_image'] = $aboutImage;
+
+  $dealerShowcase = trim((string)($content['dealer_showcase_image'] ?? ''));
+  if ($dealerShowcase === '') {
+    $dealerShowcase = $defaults['dealer_showcase_image'];
+  }
+  $content['dealer_showcase_image'] = $dealerShowcase;
 
   if (empty($content['contact_website_label']) && !empty($content['contact_website'])) {
     $content['contact_website_label'] = preg_replace('~^https?://~i', '', $content['contact_website']);
@@ -198,6 +235,20 @@ function site_public_content(): array {
     return $q !== '' && $a !== '';
   }));
 
+  if (!isset($content['gallery_images']) || !is_array($content['gallery_images'])) {
+    $content['gallery_images'] = $defaults['gallery_images'];
+  }
+  $content['gallery_images'] = array_values(array_filter($content['gallery_images'], function ($item) {
+    if (!is_string($item)) {
+      return false;
+    }
+    $val = trim($item);
+    return $val !== '';
+  }));
+  if (!$content['gallery_images']) {
+    $content['gallery_images'] = $defaults['gallery_images'];
+  }
+
   if (!isset($content['footer_nav_links']) || !is_array($content['footer_nav_links'])) {
     $content['footer_nav_links'] = [];
   }
@@ -211,6 +262,60 @@ function site_public_content(): array {
   }));
 
   return $content;
+}
+
+function site_content_upload_dir(): string {
+  $dir = __DIR__.'/../uploads/site';
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
+  }
+  return $dir;
+}
+
+function site_content_delete_asset(?string $path): void {
+  if (!$path) {
+    return;
+  }
+  $normalized = ltrim((string)$path, '/');
+  if (strpos($normalized, 'uploads/site/') !== 0) {
+    return;
+  }
+  $full = realpath(__DIR__.'/../'.$normalized);
+  $base = realpath(site_content_upload_dir());
+  if ($full && $base && strpos($full, $base) === 0 && is_file($full)) {
+    @unlink($full);
+  }
+}
+
+function site_content_store_upload(array $file, ?string $previous = null): ?string {
+  $error = $file['error'] ?? UPLOAD_ERR_NO_FILE;
+  if ($error !== UPLOAD_ERR_OK) {
+    return null;
+  }
+  $tmp = $file['tmp_name'] ?? '';
+  if ($tmp === '' || !is_uploaded_file($tmp)) {
+    return null;
+  }
+  $name = $file['name'] ?? 'upload';
+  $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+  $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  if (!in_array($ext, $allowed, true)) {
+    return null;
+  }
+  $dir = site_content_upload_dir();
+  try {
+    $filename = bin2hex(random_bytes(8)).'.'.$ext;
+  } catch (Throwable $e) {
+    $filename = uniqid('site_', true).'.'.$ext;
+  }
+  $dest = $dir.'/'.$filename;
+  if (!@move_uploaded_file($tmp, $dest)) {
+    return null;
+  }
+  if ($previous) {
+    site_content_delete_asset($previous);
+  }
+  return '/uploads/site/'.$filename;
 }
 
 function site_phone_href(?string $phone): ?string {
