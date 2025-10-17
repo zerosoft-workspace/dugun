@@ -151,7 +151,7 @@ $LICENSE_PLANS = [
 $LICENSE_YEARS = [1,2,3,4,5];
 
 // Önizleme metin/tema (birebir yansısın)
-$TITLE    = $ev['guest_title'] ?: 'Düğünümüze Hoş Geldiniz';
+$TITLE    = $ev['guest_title'] ?: 'Etkinliğimize Hoş Geldiniz';
 $SUBTITLE = $ev['guest_subtitle'] ?: 'En güzel anlarınızı bizimle paylaşın';
 $PROMPT   = $ev['guest_prompt'] ?: 'Adınızı yazıp anınızı yükleyin.';
 $PRIMARY  = $ev['theme_primary'] ?: '#0ea5b5';

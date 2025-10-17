@@ -34,7 +34,7 @@ $ev = $st->fetch();
 if (!$ev || (int)$ev['is_active']!==1){ http_response_code(404); exit('Etkinlik bulunamadı veya pasif.'); }
 
 $VID      = (int)$ev['venue_id'];
-$TITLE    = $ev['guest_title'] ?: 'Düğünümüze Hoş Geldiniz';
+$TITLE    = $ev['guest_title'] ?: 'Etkinliğimize Hoş Geldiniz';
 $SUBTITLE = $ev['guest_subtitle'] ?: 'En güzel anlarınızı bizimle paylaşın';
 $PROMPT   = $ev['guest_prompt'] ?: 'Adınızı yazıp anınızı yükleyin.';
 $PRIMARY  = $ev['theme_primary'] ?: '#0ea5b5';
