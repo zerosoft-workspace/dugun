@@ -119,6 +119,14 @@ function send_mail_simple(string $to, string $subject, string $html){
   $fromAddr = defined('MAIL_FROM') && MAIL_FROM ? MAIL_FROM : 'no-reply@'.$fromHost;
   require_once __DIR__.'/mailer.php';
 
+  $overrides = mailer_settings_overrides();
+  if (!empty($overrides['from_email'])) {
+    $fromAddr = $overrides['from_email'];
+  }
+  if (!empty($overrides['from_name'])) {
+    $fromName = $overrides['from_name'];
+  }
+
   $sent = send_smtp_mail($to, $subject, $html, $fromAddr, $fromName);
 
   if ($sent) {
@@ -132,7 +140,7 @@ function send_mail_simple(string $to, string $subject, string $html){
   return @mail($to, '=?UTF-8?B?'.base64_encode($subject).'?=', $html, $headers);
 }
 
-/* -------------------- Çift hesabı ve lisans -------------------- */
+/* -------------------- Etkinlik paneli hesabı ve lisans -------------------- */
 function couple_set_account(int $event_id, string $email, string $plain_pass){
   $hash = password_hash($plain_pass, PASSWORD_DEFAULT);
   pdo()->prepare("UPDATE events
@@ -145,10 +153,10 @@ function couple_set_account(int $event_id, string $email, string $plain_pass){
 
   $loginUrl = BASE_URL.'/couple/login.php?event='.$event_id;
   $html = '<h3>'.h(APP_NAME).'</h3>
-           <p>Çift paneliniz hazır.</p>
+           <p>Etkinlik paneliniz hazır.</p>
            <p><b>Kullanıcı adı:</b> '.h($email).'<br><b>Şifre:</b> '.h($plain_pass).'</p>
            <p><a href="'.h($loginUrl).'">Panele giriş</a> — İlk girişte şifreyi değiştirmeniz istenecektir.</p>';
-  send_mail_simple($email, 'Çift Panel Giriş Bilgileriniz', $html);
+  send_mail_simple($email, 'Etkinlik Paneli Giriş Bilgileriniz', $html);
 }
 
 function license_extend_years(int $event_id, int $years){
@@ -183,6 +191,21 @@ function token_valid(int $eventId, string $token): bool {
 function public_upload_url(int $eventId): string {
   $t = make_token($eventId, current_slot());
   return BASE_URL.'/public/upload.php?event='.$eventId.'&t='.$t;
+}
+
+function public_invitation_url(string $token): string {
+  $token = trim($token);
+  return BASE_URL.'/public/invite.php?code='.rawurlencode($token);
+}
+
+function public_invitation_card_url(string $token): string {
+  $token = trim($token);
+  return BASE_URL.'/public/invite_card.php?code='.rawurlencode($token);
+}
+
+function public_invitation_card_share_url(string $shareToken): string {
+  $shareToken = trim($shareToken);
+  return BASE_URL.'/public/invite_card.php?share='.rawurlencode($shareToken);
 }
 
 /* -------------------- Dosya sistemi -------------------- */

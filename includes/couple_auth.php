@@ -147,14 +147,32 @@ function couple_require(int $event_id): void {
 }
 
 /* --------- Şifre güncelleme (aktif düğün için) --------- */
+function couple_current_requires_reset(): bool {
+  $event_id = couple_current_event_id();
+  if ($event_id <= 0) return false;
+
+  $sessionKey = couple_session_key($event_id);
+  if (isset($_SESSION[$sessionKey]['force_reset'])) {
+    return (int)$_SESSION[$sessionKey]['force_reset'] === 1;
+  }
+
+  $st = pdo()->prepare("SELECT couple_force_reset FROM events WHERE id=? LIMIT 1");
+  $st->execute([$event_id]);
+  return ((int)($st->fetchColumn() ?? 0)) === 1;
+}
+
 function couple_update_password_current(string $current_plain, string $new_plain): bool {
   $event_id = couple_current_event_id();
   if ($event_id <= 0) return false;
-  $st = pdo()->prepare("SELECT couple_password_hash FROM events WHERE id=? LIMIT 1");
+  $st = pdo()->prepare("SELECT couple_password_hash, couple_force_reset FROM events WHERE id=? LIMIT 1");
   $st->execute([$event_id]);
   $row = $st->fetch();
   if (!$row) return false;
-  if (!password_verify($current_plain, $row['couple_password_hash'] ?? '')) return false;
+
+  $requiresCurrent = ((int)($row['couple_force_reset'] ?? 0)) !== 1;
+  if ($requiresCurrent && !password_verify($current_plain, $row['couple_password_hash'] ?? '')) {
+    return false;
+  }
 
   $newHash = password_hash($new_plain, PASSWORD_DEFAULT);
   $up = pdo()->prepare("UPDATE events SET couple_password_hash=?, couple_force_reset=0, updated_at=NOW() WHERE id=?");

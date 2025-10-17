@@ -136,7 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           </div>
           <div class="feature-card">
             <strong>Markalı Deneyim</strong>
-            <p>BİKARE tasarımlı misafir sayfalarıyla çiftlerinize unutulmaz, paylaşılabilir galeriler sunun.</p>
+            <p>BİKARE tasarımlı misafir sayfalarıyla etkinlik sahiplerinize unutulmaz, paylaşılabilir galeriler sunun.</p>
           </div>
           <div class="feature-card">
             <strong>Özel Destek</strong>

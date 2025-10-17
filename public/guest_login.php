@@ -156,16 +156,16 @@ $tabCopy = [
         'button' => 'Misafir Paneline Gir',
     ],
     'couple' => [
-        'badge' => 'Çift Paneli',
+        'badge' => 'Etkinlik Paneli',
         'headline' => 'Tüm etkinlik yönetimi tek panelde birleşiyor.',
-        'text' => 'BİKARE çift paneliyle davetli listesinden QR yönetimine, kampanya yayınlarından misafir etkileşimlerine kadar tüm süreci kontrol edebilirsiniz.',
+        'text' => 'BİKARE etkinlik paneliyle davetli listesinden QR yönetimine, kampanya yayınlarından misafir etkileşimlerine kadar tüm süreci kontrol edebilirsiniz.',
         'features' => [
             'Misafir yüklemelerini gerçek zamanlı takip edin',
             'Etkinlik görünümünü kişiselleştirin ve davetiyeleri paylaşın',
             'Bayi ve destek ekibiyle tek ekrandan iletişim kurun',
         ],
-        'footer' => 'BİKARE, çiftlere kusursuz bir etkinlik deneyimi sunmak için Zerosoft tarafından geliştirildi.',
-        'button' => 'Çift Paneline Gir',
+        'footer' => 'BİKARE, etkinlik sahiplerine kusursuz bir deneyim sunmak için Zerosoft tarafından geliştirildi.',
+        'button' => 'Etkinlik Paneline Gir',
     ],
 ];
 
@@ -188,7 +188,7 @@ function portal_tab_link(string $tab, array $params = []): string {
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Misafir &amp; Çift Girişi — <?=h(APP_NAME)?></title>
+  <title>Misafir &amp; Etkinlik Girişi — <?=h(APP_NAME)?></title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
     <?=login_header_styles()?>
@@ -254,10 +254,10 @@ function portal_tab_link(string $tab, array $params = []): string {
       <section class="auth-form">
         <div class="tab-switch">
           <a class="<?= $activeTab === 'guest' ? 'active' : '' ?>" href="<?=h(portal_tab_link('guest'))?>">Misafir &amp; Davetli</a>
-          <a class="<?= $activeTab === 'couple' ? 'active' : '' ?>" href="<?=h(portal_tab_link('couple'))?>">Çift</a>
+          <a class="<?= $activeTab === 'couple' ? 'active' : '' ?>" href="<?=h(portal_tab_link('couple'))?>">Etkinlik</a>
         </div>
         <div>
-          <div class="brand">BİKARE <span><?=$activeTab === 'guest' ? 'Misafir &amp; Davetli Girişi' : 'Çift Girişi'?></span></div>
+          <div class="brand">BİKARE <span><?=$activeTab === 'guest' ? 'Misafir &amp; Davetli Girişi' : 'Etkinlik Girişi'?></span></div>
           <p class="form-note"><?php
             if ($activeTab === 'guest') {
                 echo 'Davetli veya misafir olarak tanımlandığınız etkinlik için e-posta adresinizi doğruladıktan sonra belirlediğiniz şifre ile panelinize ulaşabilirsiniz.';

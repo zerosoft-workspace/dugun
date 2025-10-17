@@ -17,6 +17,12 @@ $packages = site_public_packages();
 $content = site_public_content();
 $faqItems = $content['faq_items'];
 $footerNav = $content['footer_nav_links'];
+$heroImageMain = $content['hero_image_main'] ?? '';
+$heroImageSecondary = $content['hero_image_secondary'] ?? '';
+$aboutImage = $content['about_image'] ?? '';
+$galleryImages = $content['gallery_images'] ?? [];
+$galleryImages = is_array($galleryImages) ? $galleryImages : [];
+$dealerShowcaseImage = $content['dealer_showcase_image'] ?? '';
 $contactWebsiteUrl = site_normalize_url($content['contact_website'] ?? '') ?? '';
 $contactWebsiteLabel = $content['contact_website_label'] ?? '';
 $contactPhoneHref = site_phone_href($content['contact_phone'] ?? '') ?? '';
@@ -104,7 +110,7 @@ unset($_SESSION['lead_success']);
   @media(max-width:768px){.form-section{padding:32px;}}
 </style>
 </head><body>
-<?php site_public_header('home'); ?>
+<?php site_public_header('home', $content); ?>
 
 <main class="container py-5">
   <section class="hero mb-5">
@@ -112,15 +118,15 @@ unset($_SESSION['lead_success']);
       <div class="col-lg-6">
         <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Yeni nesil misafir paylaşımı</span>
         <h1 class="fw-bold display-5 mt-4 mb-3">Tek QR kodla tüm fotoğraf ve videoları toplayın</h1>
-        <p class="lead mb-4">BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak çift panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
+        <p class="lead mb-4">BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak etkinlik panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
         <div class="d-flex flex-wrap gap-3">
           <a class="btn btn-light text-dark fw-semibold" href="#paketler">Paketleri İncele</a>
           <a class="btn btn-outline-light fw-semibold" href="#lead-form">Hemen Başlayın</a>
         </div>
       </div>
       <div class="col-lg-6 hero-visual">
-        <img src="https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80" alt="Düğün kutlaması" class="img-fluid">
-        <img src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80" alt="Etkinlikten kare" class="img-fluid">
+        <img src="<?=h($heroImageMain)?>" alt="Düğün kutlaması" class="img-fluid">
+        <img src="<?=h($heroImageSecondary)?>" alt="Etkinlikten kare" class="img-fluid">
       </div>
     </div>
     <div class="row mt-5 g-4 position-relative" style="z-index:2;">
@@ -153,7 +159,7 @@ unset($_SESSION['lead_success']);
   <section id="hakkimizda" class="mb-5">
     <div class="row align-items-center g-5">
       <div class="col-lg-6">
-        <img class="img-fluid rounded-4 shadow-lg" src="https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80" alt="Mutlu çift">
+        <img class="img-fluid rounded-4 shadow-lg" src="<?=h($aboutImage)?>" alt="Mutlu etkinlik sahipleri">
       </div>
       <div class="col-lg-6">
         <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">BİKARE Hakkında</span>
@@ -183,7 +189,7 @@ unset($_SESSION['lead_success']);
         <div class="feature-card h-100">
           <div class="feature-icon mb-3">📸</div>
           <h4 class="fw-semibold mb-2">Anında QR Toplama</h4>
-          <p class="muted mb-0">Misafirleriniz QR kodu okutup doğrudan galerinize fotoğraf ve videoları yükler. Her yükleme çift panelinizde otomatik görünür.</p>
+          <p class="muted mb-0">Misafirleriniz QR kodu okutup doğrudan galerinize fotoğraf ve videoları yükler. Her yükleme etkinlik panelinizde otomatik görünür.</p>
         </div>
       </div>
       <div class="col-md-4">
@@ -211,7 +217,7 @@ unset($_SESSION['lead_success']);
       </div>
       <div class="col-lg-6 d-flex flex-column gap-3">
         <div class="timeline-step"><span>1</span><div><strong>Paketi seçin & ödeme yapın</strong><br><small class="text-muted">Formu doldurup güvenli ödeme adımında işlemi tamamlayın.</small></div></div>
-        <div class="timeline-step"><span>2</span><div><strong>Panel otomatik kurulsun</strong><br><small class="text-muted">Çift paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.</small></div></div>
+        <div class="timeline-step"><span>2</span><div><strong>Panel otomatik kurulsun</strong><br><small class="text-muted">Etkinlik paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.</small></div></div>
         <div class="timeline-step"><span>3</span><div><strong>Misafirlerinizi davet edin</strong><br><small class="text-muted">QR kodu paylaşın, fotoğraflar ve videolar gerçek zamanlı olarak panelinize düşsün.</small></div></div>
       </div>
     </div>
@@ -240,7 +246,7 @@ unset($_SESSION['lead_success']);
             <?php endif; ?>
             <ul class="small text-muted mb-0">
               <li>Kalıcı ve etkinliğe özel QR kodlar</li>
-              <li>Çift paneli otomatik kurulum ve e-posta bildirimi</li>
+              <li>Etkinlik paneli otomatik kurulum ve e-posta bildirimi</li>
               <li>Sosyal medya tarzı misafir galerisi</li>
               <li>HD fotoğraf & video yükleme desteği</li>
               <?php if ($pkg['cashback_rate'] > 0): ?>
@@ -272,7 +278,7 @@ unset($_SESSION['lead_success']);
         <a class="btn btn-brand" href="<?=BASE_URL?>/dealer/apply.php">Bayi Ağına Katıl</a>
       </div>
       <div class="col-lg-6 text-center">
-        <img class="img-fluid rounded-4 shadow-lg" src="https://images.unsplash.com/photo-1499951360447-b19be8fe80f5?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80" alt="Bayi paneli">
+        <img class="img-fluid rounded-4 shadow-lg" src="<?=h($dealerShowcaseImage)?>" alt="Bayi paneli">
       </div>
     </div>
   </section>
@@ -284,9 +290,10 @@ unset($_SESSION['lead_success']);
         <p class="muted">Misafirleriniz sadece düğünlerde değil; nişan, kına, doğum günü ve kurumsal etkinliklerde de QR kodunuzla içerik paylaşabilir.</p>
       </div>
       <div class="col-lg-7 gallery-grid">
-        <img src="https://images.unsplash.com/photo-1603015444030-0e4d0a568d2e?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Düğün davetlileri">
-        <img src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Kurumsal etkinlik">
-        <img src="https://images.unsplash.com/photo-1525253013412-55c1a69a5738?auto=compress&cs=tinysrgb&fit=crop&w=600&q=80" alt="Yemek organizasyonu">
+        <?php foreach ($galleryImages as $galleryImage): ?>
+          <?php $galleryImage = trim((string)$galleryImage); if ($galleryImage === '') { continue; } ?>
+          <img src="<?=h($galleryImage)?>" alt="BİKARE galeri görseli">
+        <?php endforeach; ?>
       </div>
     </div>
   </section>
@@ -412,7 +419,7 @@ unset($_SESSION['lead_success']);
         <h3 class="fw-bold mb-3">Sipariş Formu</h3>
         <p class="muted">Paketinizi seçin, bilgilerinizi girin ve PayTR ile güvenli ödeme adımına yönlendirilin. Ödeme onaylandığında giriş bilgilerinizi otomatik olarak e-posta ile alacaksınız.</p>
         <ul class="small text-muted ps-3">
-          <li>Misafir galerisi, QR kodlar ve çift paneli otomatik hazırlanır.</li>
+          <li>Misafir galerisi, QR kodlar ve etkinlik paneli otomatik hazırlanır.</li>
           <li>Referans kodu alanı isteğe bağlıdır. Kod kullanırsanız ilgili bayi cashback kazanır.</li>
           <li>Dilediğiniz zaman destek ekibimizle iletişime geçebilirsiniz.</li>
         </ul>
