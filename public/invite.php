@@ -224,7 +224,7 @@ body.theme-celebration{ background:linear-gradient(140deg,#e0f2fe 0%,#f8fafc 50%
           <button class="btn btn-primary btn-pill" type="submit"><i class="bi bi-door-open me-1"></i>Davetiyeyi Aç</button>
         </div>
       </form>
-      <p class="text-muted small mt-3">Şifrenizi hatırlamıyorsanız çift ile iletişime geçebilirsiniz.</p>
+      <p class="text-muted small mt-3">Şifrenizi hatırlamıyorsanız etkinlik sahibi ile iletişime geçebilirsiniz.</p>
     </div>
   <?php else: ?>
     <div class="invite-card mb-4">
@@ -259,7 +259,7 @@ body.theme-celebration{ background:linear-gradient(140deg,#e0f2fe 0%,#f8fafc 50%
         <a class="btn btn-primary btn-pill" href="<?=h($cardUrl)?>&download=1"><i class="bi bi-download me-1"></i>Kişisel kartı indir</a>
         <a class="btn btn-outline-secondary btn-pill" href="<?=h($cardPreviewUrl)?>" target="_blank" rel="noopener"><i class="bi bi-image me-1"></i>Kartı yeni sekmede aç</a>
       </div>
-      <div class="form-text text-muted mt-3">Genel paylaşım yapmak isterseniz çiftinizin kart bağlantısını <a href="<?=h($cardSharePreviewUrl)?>" target="_blank" rel="noopener">buradan</a> görüntüleyebilir veya bağlantıyı paylaşabilirsiniz.</div>
+      <div class="form-text text-muted mt-3">Genel paylaşım yapmak isterseniz etkinlik sahibinin kart bağlantısını <a href="<?=h($cardSharePreviewUrl)?>" target="_blank" rel="noopener">buradan</a> görüntüleyebilir veya bağlantıyı paylaşabilirsiniz.</div>
     </div>
 
     <div class="panel-card">

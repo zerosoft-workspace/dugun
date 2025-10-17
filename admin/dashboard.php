@@ -177,9 +177,9 @@ $statCards = [
     'href'  => BASE_URL.'/admin/venue_events.php?filter=past',
   ],
   [
-    'title' => 'Aktif Çiftler',
+    'title' => 'Aktif Etkinlik Panelleri',
     'value' => fmt_count($eventStats['active']),
-    'sub'   => 'Panel erişimi açık çift sayısı.',
+    'sub'   => 'Panel erişimi açık etkinlik sayısı.',
     'icon'  => 'bi-people',
     'href'  => BASE_URL.'/admin/venue_events.php?filter=active',
   ],

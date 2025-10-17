@@ -122,7 +122,7 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
       <div>
         <span class="visual-badge">BİKARE Studio</span>
         <h1 class="visual-title">Etkinlik yönetiminin kalbi burada.</h1>
-        <p class="visual-text">BİKARE ile kampanyaları planlayın, bayilerinizi yönetin ve çiftleriniz için unutulmaz dijital deneyimler hazırlayın. Yönetici paneli tüm operasyonu tek ekranda toplar.</p>
+        <p class="visual-text">BİKARE ile kampanyaları planlayın, bayilerinizi yönetin ve etkinlik sahipleriniz için unutulmaz dijital deneyimler hazırlayın. Yönetici paneli tüm operasyonu tek ekranda toplar.</p>
         <ul class="visual-list">
           <li><span>✓</span>Gerçek zamanlı etkinlik performansı ve raporlar</li>
           <li><span>✓</span>Bayi ve salon ağınızı tek noktadan yönetin</li>

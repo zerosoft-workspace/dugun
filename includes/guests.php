@@ -64,8 +64,8 @@ function guest_profile_host_preview(int $eventId): ?array {
     }
 
     $eventTitle = trim($event['title'] ?? '');
-    $displayName = $eventTitle !== '' ? $eventTitle.' · Çift' : 'Çift Önizleme';
-    $name = 'Çift Önizleme';
+    $displayName = $eventTitle !== '' ? $eventTitle.' · Etkinlik' : 'Etkinlik Önizleme';
+    $name = 'Etkinlik Önizleme';
     $now = now();
 
     $baseHost = parse_url(BASE_URL, PHP_URL_HOST) ?: 'bikare.local';

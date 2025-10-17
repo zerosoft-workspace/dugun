@@ -159,7 +159,7 @@ unset($_SESSION['lead_success']);
   <section id="hakkimizda" class="mb-5">
     <div class="row align-items-center g-5">
       <div class="col-lg-6">
-        <img class="img-fluid rounded-4 shadow-lg" src="<?=h($aboutImage)?>" alt="Mutlu çift">
+        <img class="img-fluid rounded-4 shadow-lg" src="<?=h($aboutImage)?>" alt="Mutlu etkinlik sahipleri">
       </div>
       <div class="col-lg-6">
         <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">BİKARE Hakkında</span>

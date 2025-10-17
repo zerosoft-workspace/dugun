@@ -384,11 +384,11 @@ function fetch_marketing_contacts(string $category): array {
 }
 
 $categories = [
-  'events'          => ['label' => 'Etkinlik Sahipleri',        'icon' => 'bi-calendar-heart',  'description' => 'Paneli yöneten çiftlerin iletişim bilgileri.'],
+  'events'          => ['label' => 'Etkinlik Sahipleri',        'icon' => 'bi-calendar-heart',  'description' => 'Paneli yöneten etkinlik sahiplerinin iletişim bilgileri.'],
   'dealers'         => ['label' => 'Bayiler',                    'icon' => 'bi-shop',             'description' => 'Platformdaki bayi ve çözüm ortakları.'],
   'representatives' => ['label' => 'Temsilciler',                'icon' => 'bi-person-badge',     'description' => 'Satış temsilcileri ve sorumluları.'],
   'leads'           => ['label' => 'Lead Havuzu',                'icon' => 'bi-lightning-charge', 'description' => 'Temsilci CRM üzerindeki potansiyel müşteriler.'],
-  'orders'          => ['label' => 'Online Siparişler',          'icon' => 'bi-bag-check',        'description' => 'Web sitesi üzerinden paket satın alan çiftler.'],
+  'orders'          => ['label' => 'Online Siparişler',          'icon' => 'bi-bag-check',        'description' => 'Web sitesi üzerinden paket satın alan etkinlik sahipleri.'],
   'guests'          => ['label' => 'Misafir İzinlileri',         'icon' => 'bi-people',           'description' => 'Pazarlama izni vermiş etkinlik misafirleri.'],
 ];
 

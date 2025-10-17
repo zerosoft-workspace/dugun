@@ -430,7 +430,7 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
   <?php flash_box(); ?>
 
   <?php if ($hostPreview): ?>
-    <div class="alert alert-info" style="border-radius:14px">Misafir panelini çift hesabınızla önizliyorsunuz. Yaptığınız işlemler misafirler tarafından görünür.</div>
+    <div class="alert alert-info" style="border-radius:14px">Misafir panelini etkinlik hesabınızla önizliyorsunuz. Yaptığınız işlemler misafirler tarafından görünür.</div>
   <?php endif; ?>
 
   <div class="card-lite p-4 mb-4">
@@ -470,7 +470,7 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
           <div class="pill">
             ✔
             <?php if ($hostPreview): ?>
-              Çift önizlemesi aktif
+              Etkinlik önizlemesi aktif
             <?php else: ?>
               <?=h(($profile['display_name'] ?: $profile['name']).' olarak giriş yaptınız')?>
             <?php endif; ?>
