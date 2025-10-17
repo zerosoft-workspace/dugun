@@ -547,6 +547,7 @@ CSS;
       'crm' => ['href' => BASE_URL.'/admin/representative_crm.php', 'label' => 'Temsilci CRM', 'icon' => 'bi-kanban'],
       'finance' => ['href' => BASE_URL.'/admin/finance.php', 'label' => 'Finans', 'icon' => 'bi-wallet2'],
       'analytics' => ['href' => BASE_URL.'/admin/representative_analytics.php', 'label' => 'Analizler', 'icon' => 'bi-graph-up'],
+      'marketing' => ['href' => BASE_URL.'/admin/marketing_contacts.php', 'label' => 'Pazarlama', 'icon' => 'bi-envelope-paper'],
     ];
     if (is_superadmin()) {
       $links['packages'] = ['href' => BASE_URL.'/admin/dealer_packages.php', 'label' => 'Paketler', 'icon' => 'bi-boxes'];

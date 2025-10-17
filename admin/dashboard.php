@@ -177,9 +177,9 @@ $statCards = [
     'href'  => BASE_URL.'/admin/venue_events.php?filter=past',
   ],
   [
-    'title' => 'Aktif Çiftler',
+    'title' => 'Aktif Etkinlik Panelleri',
     'value' => fmt_count($eventStats['active']),
-    'sub'   => 'Panel erişimi açık çift sayısı.',
+    'sub'   => 'Panel erişimi açık etkinlik sayısı.',
     'icon'  => 'bi-people',
     'href'  => BASE_URL.'/admin/venue_events.php?filter=active',
   ],
@@ -327,7 +327,7 @@ $statCards = [
             <i class="bi bi-chevron-right"></i>
           </a>
           <a href="<?=h(BASE_URL)?>/admin/campaigns.php">
-            <div class="info"><i class="bi bi-megaphone"></i><div><span>Kampanyalar</span><small>Tüm çift panellerinde yayınlanacak kampanyaları güncelleyin.</small></div></div>
+            <div class="info"><i class="bi bi-megaphone"></i><div><span>Kampanyalar</span><small>Tüm etkinlik panellerinde yayınlanacak kampanyaları güncelleyin.</small></div></div>
             <i class="bi bi-chevron-right"></i>
           </a>
           <a href="<?=h(BASE_URL)?>/admin/dealers.php">
@@ -349,7 +349,7 @@ $statCards = [
         <ul class="mb-0 ps-3">
           <li>Bayi bakiyeleri PayTR test modunda otomatik olarak onaylanır; canlıya alırken PayTR ayarlarını güncellemeyi unutmayın.</li>
           <li>Cashback işlemleri onaylandıktan sonra bayi ve müşteri e-postalarına otomatik bilgilendirme gönderilir.</li>
-          <li>Kampanya sayfasından yayınlanan içerikler tüm çift panellerinde eş zamanlı olarak görünür.</li>
+          <li>Kampanya sayfasından yayınlanan içerikler tüm etkinlik panellerinde eş zamanlı olarak görünür.</li>
         </ul>
       </div>
     </div>

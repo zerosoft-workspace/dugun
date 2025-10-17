@@ -99,7 +99,7 @@ if ($action === 'create_event') {
     couple_set_account($eventId, $email, $plain_pass);
   }
 
-  flash('ok', 'Etkinlik oluşturuldu ve bilgiler çifte e-posta ile gönderildi.');
+  flash('ok', 'Etkinlik oluşturuldu ve bilgiler etkinlik sahibine e-posta ile gönderildi.');
   redirect($_SERVER['PHP_SELF'].'?venue_id='.$venueId);
 }
 
@@ -220,7 +220,7 @@ dealer_layout_start('venues', [
   <div class="d-flex justify-content-between flex-wrap gap-3 align-items-start mb-3">
     <div>
       <h5 class="mb-1">Yeni Etkinlik Oluştur</h5>
-      <p class="text-muted mb-0">Çift e-postasını yazın, giriş bilgileri otomatik olarak gönderilsin.</p>
+      <p class="text-muted mb-0">Etkinlik sahibi e-postasını yazın, giriş bilgileri otomatik olarak gönderilsin.</p>
     </div>
     <div class="d-flex flex-column align-items-end gap-2">
       <span class="badge-soft"><i class="bi bi-shield-check"></i><?= dealer_has_valid_license($dealer) ? 'Lisans geçerli' : 'Lisans süresi doldu' ?></span>
@@ -246,7 +246,7 @@ dealer_layout_start('venues', [
       <input type="date" class="form-control" name="event_date" value="<?=h(date('Y-m-d'))?>" <?= $canManage ? '' : 'disabled' ?>>
     </div>
     <div class="col-md-4">
-      <label class="form-label">Çift E-postası</label>
+      <label class="form-label">Etkinlik Sahibi E-postası</label>
       <input type="email" class="form-control" name="couple_email" required <?= $canManage ? '' : 'disabled' ?>>
     </div>
     <div class="col-12 d-grid d-md-flex justify-content-md-end">
@@ -293,7 +293,7 @@ dealer_layout_start('venues', [
           <tr>
             <td>
               <div class="fw-semibold mb-1"><?=h($ev['title'])?></div>
-              <div class="small text-muted">Çift e-postası: <?=h($ev['couple_username'] ?? $ev['contact_email'])?></div>
+              <div class="small text-muted">Etkinlik sahibi e-postası: <?=h($ev['couple_username'] ?? $ev['contact_email'])?></div>
             </td>
             <td class="small">
               <?= $ev['event_date'] ? h(date('d.m.Y', strtotime($ev['event_date']))) : '—' ?>

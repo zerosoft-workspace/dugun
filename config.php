@@ -67,6 +67,10 @@ define('SMTP_PORT', $smtpPort);
 define('SMTP_USER', config_env('SMTP_USER', ''));
 define('SMTP_PASS', config_env('SMTP_PASS', ''));
 define('SMTP_SECURE', strtoupper((string)config_env('SMTP_SECURE', 'tls')));
+define('SMS_API_URL', config_value('SMS_API_URL', ''));
+define('SMS_API_KEY', config_value('SMS_API_KEY', ''));
+define('SMS_API_SECRET', config_value('SMS_API_SECRET', ''));
+define('SMS_SENDER', config_value('SMS_SENDER', ''));
 /* ================= PAYTR ================== */
 define('PAYTR_MERCHANT_ID', config_env('PAYTR_MERCHANT_ID', '')); 
 define('PAYTR_MERCHANT_KEY', config_env('PAYTR_MERCHANT_KEY', ''));

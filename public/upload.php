@@ -34,7 +34,7 @@ $ev = $st->fetch();
 if (!$ev || (int)$ev['is_active']!==1){ http_response_code(404); exit('Etkinlik bulunamadı veya pasif.'); }
 
 $VID      = (int)$ev['venue_id'];
-$TITLE    = $ev['guest_title'] ?: 'Düğünümüze Hoş Geldiniz';
+$TITLE    = $ev['guest_title'] ?: 'Etkinliğimize Hoş Geldiniz';
 $SUBTITLE = $ev['guest_subtitle'] ?: 'En güzel anlarınızı bizimle paylaşın';
 $PROMPT   = $ev['guest_prompt'] ?: 'Adınızı yazıp anınızı yükleyin.';
 $PRIMARY  = $ev['theme_primary'] ?: '#0ea5b5';
@@ -55,6 +55,7 @@ $sPos = isset($layoutArr['subtitle']) ? $layoutArr['subtitle'] : array('x'=>24,'
 $pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'y'=>396);
 
 $profile = guest_profile_current($event_id);
+$hostPreview = $profile ? guest_profile_is_host_preview($profile) : false;
 $token_ok = token_valid($event_id, $token);
 $pageCsrf = csrf_token();
 
@@ -428,6 +429,10 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
 <div class="container py-4 page-shell">
   <?php flash_box(); ?>
 
+  <?php if ($hostPreview): ?>
+    <div class="alert alert-info" style="border-radius:14px">Misafir panelini etkinlik hesabınızla önizliyorsunuz. Yaptığınız işlemler misafirler tarafından görünür.</div>
+  <?php endif; ?>
+
   <div class="card-lite p-4 mb-4">
     <div class="preview-shell">
       <div class="preview-stage" id="pvStage">
@@ -447,7 +452,7 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
         </div>
       </div>
     </div>
-    <div class="smallmuted mt-3">Önizleme, çift panelde kaydettiğiniz düzenin birebir yansımasıdır.</div>
+    <div class="smallmuted mt-3">Önizleme, etkinlik panelinde kaydettiğiniz düzenin birebir yansımasıdır.</div>
   </div>
 
   <?php if(!$token_ok): ?>
@@ -461,7 +466,17 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
         <div class="smallmuted">Fotoğraf veya videolarınızı yüksek çözünürlükte yükleyin. Adınızı paylaşmayı unutmayın.</div>
       </div>
       <?php if($profile): ?>
-        <div class="pill">✔ <?=h($profile['display_name'] ?: $profile['name'])?> olarak giriş yaptınız</div>
+        <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
+          <div class="pill">
+            ✔
+            <?php if ($hostPreview): ?>
+              Etkinlik önizlemesi aktif
+            <?php else: ?>
+              <?=h(($profile['display_name'] ?: $profile['name']).' olarak giriş yaptınız')?>
+            <?php endif; ?>
+          </div>
+          <a class="small text-decoration-none fw-semibold" href="<?=BASE_URL?>/public/guest_logout.php?event=<?=$event_id?>">Çıkış Yap</a>
+        </div>
       <?php else: ?>
         <a class="btn btn-zs-outline" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
       <?php endif; ?>

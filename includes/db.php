@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240615_01');
+  define('APP_SCHEMA_VERSION', '20240705_01');
 }
 
 function pdo(): PDO {
@@ -17,14 +17,33 @@ function pdo(): PDO {
   return $pdo;
 }
 function column_exists(string $t, string $c): bool {
-  $st=pdo()->prepare("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?");
-  $st->execute([$t,$c]); return (bool)$st->fetchColumn();
+  static $cache = [];
+  $key = strtolower($t).':'.strtolower($c);
+  if (array_key_exists($key, $cache)) {
+    return $cache[$key];
+  }
+
+  $st = pdo()->prepare("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+  $st->execute([$t, $c]);
+  $exists = (bool)$st->fetchColumn();
+  $cache[$key] = $exists;
+
+  return $exists;
 }
 
 function table_exists(string $t): bool {
-  $st = pdo()->prepare("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? LIMIT 1");
+  static $cache = [];
+  $key = strtolower($t);
+  if (array_key_exists($key, $cache)) {
+    return $cache[$key];
+  }
+
+  $st = pdo()->prepare("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1");
   $st->execute([$t]);
-  return (bool)$st->fetchColumn();
+  $exists = (bool)$st->fetchColumn();
+  $cache[$key] = $exists;
+
+  return $exists;
 }
 
 function ensure_site_orders_campaigns_column(): bool {
@@ -59,6 +78,43 @@ function ensure_schema_patches(PDO $pdo): void {
   } catch (Throwable $e) {
     // ignore migration errors, column will exist on fresh installs
   }
+
+  static $patchedInvitations = false;
+  if (!$patchedInvitations) {
+    try {
+      if (table_exists('event_invitation_templates')) {
+        if (!column_exists('event_invitation_templates', 'share_token')) {
+          $pdo->exec("ALTER TABLE event_invitation_templates ADD share_token VARCHAR(64) NULL AFTER event_id");
+        }
+        if (!column_exists('event_invitation_templates', 'theme')) {
+          $pdo->exec("ALTER TABLE event_invitation_templates ADD theme VARCHAR(32) NOT NULL DEFAULT 'wedding' AFTER share_token");
+          try {
+            $pdo->exec("UPDATE event_invitation_templates SET theme='wedding' WHERE theme='' OR theme IS NULL");
+          } catch (Throwable $e) {
+            // ignore data backfill errors
+          }
+        }
+        try {
+          $pdo->exec("ALTER TABLE event_invitation_templates ADD UNIQUE KEY uniq_invitation_share (share_token)");
+        } catch (Throwable $e) {
+          // index already exists or cannot be created, ignore
+        }
+        try {
+          $st = $pdo->query("SELECT id FROM event_invitation_templates WHERE share_token IS NULL OR share_token = ''");
+          while ($row = $st->fetch()) {
+            $token = bin2hex(random_bytes(16));
+            $upd = $pdo->prepare("UPDATE event_invitation_templates SET share_token = :token WHERE id = :id");
+            $upd->execute([':token' => $token, ':id' => $row['id']]);
+          }
+        } catch (Throwable $e) {
+          // ignore population errors; token will be generated lazily when needed
+        }
+      }
+    } catch (Throwable $e) {
+      // ignore migration errors related to invitation share tokens
+    }
+    $patchedInvitations = true;
+  }
 }
 
 function install_schema(){
@@ -82,16 +138,42 @@ function install_schema(){
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-  $currentVersion = null;
+  $metaValues = [];
   try {
-    $st = $pdo->prepare("SELECT meta_value FROM app_meta WHERE meta_key='schema_version' LIMIT 1");
-    $st->execute();
-    $currentVersion = $st->fetchColumn() ?: null;
+    $keys = ['schema_version', 'schema_health_checked_at'];
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $st = $pdo->prepare("SELECT meta_key, meta_value FROM app_meta WHERE meta_key IN ($placeholders)");
+    $st->execute($keys);
+    while ($row = $st->fetch()) {
+      $metaValues[$row['meta_key']] = $row['meta_value'];
+    }
   } catch (Throwable $e) {
-    $currentVersion = null;
+    $metaValues = [];
+  }
+
+  $currentVersion = $metaValues['schema_version'] ?? null;
+  $lastHealthCheckAt = null;
+  if (!empty($metaValues['schema_health_checked_at'])) {
+    try {
+      $lastHealthCheckAt = new DateTimeImmutable($metaValues['schema_health_checked_at']);
+    } catch (Throwable $e) {
+      $lastHealthCheckAt = null;
+    }
   }
 
   $needsInstall = ($currentVersion !== APP_SCHEMA_VERSION);
+  $shouldVerify = true;
+
+  if (!$needsInstall && $lastHealthCheckAt instanceof DateTimeImmutable) {
+    $secondsSinceCheck = time() - $lastHealthCheckAt->getTimestamp();
+    if ($secondsSinceCheck >= 0 && $secondsSinceCheck < 300) {
+      $shouldVerify = false;
+    }
+  }
+
+  if (!$needsInstall && !$shouldVerify) {
+    return;
+  }
 
   if (!$needsInstall) {
     $criticalTables = [
@@ -114,6 +196,8 @@ function install_schema(){
       'event_quiz_questions',
       'event_quiz_answers',
       'event_quiz_attempts',
+      'event_invitation_templates',
+      'event_invitation_contacts',
     ];
     foreach ($criticalTables as $table) {
       if (!table_exists($table)) {
@@ -123,9 +207,15 @@ function install_schema(){
     }
   }
 
-  ensure_schema_patches($pdo);
-
   if (!$needsInstall) {
+    ensure_schema_patches($pdo);
+    try {
+      $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+      $st = $pdo->prepare("INSERT INTO app_meta(meta_key, meta_value, updated_at) VALUES('schema_health_checked_at', :val, :upd) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=VALUES(updated_at)");
+      $st->execute([':val' => $now, ':upd' => $now]);
+    } catch (Throwable $e) {
+      // ignore inability to persist the cache marker
+    }
     return;
   }
 
@@ -480,23 +570,6 @@ function install_schema(){
     FOREIGN KEY (question_id) REFERENCES event_quiz_questions(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-  pdo()->exec("CREATE TABLE IF NOT EXISTS event_quiz_attempts(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    question_id INT NOT NULL,
-    answer_id INT NULL,
-    profile_id INT NULL,
-    guest_name VARCHAR(190) NULL,
-    is_correct TINYINT(1) NOT NULL DEFAULT 0,
-    points INT NOT NULL DEFAULT 0,
-    answered_at DATETIME NOT NULL,
-    INDEX idx_quiz_attempt_question (question_id, profile_id),
-    INDEX idx_quiz_attempt_profile (profile_id),
-    UNIQUE KEY uniq_quiz_attempt (question_id, profile_id),
-    FOREIGN KEY (question_id) REFERENCES event_quiz_questions(id) ON DELETE CASCADE,
-    FOREIGN KEY (answer_id) REFERENCES event_quiz_answers(id) ON DELETE SET NULL,
-    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_topups(
     id INT AUTO_INCREMENT PRIMARY KEY,
     dealer_id INT NOT NULL,
@@ -612,6 +685,144 @@ function install_schema(){
       SET a.commission_rate = r.commission_rate
       WHERE a.commission_rate IS NULL");
   } catch (Throwable $e) {}
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_leads(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    representative_id INT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NULL,
+    phone VARCHAR(64) NULL,
+    company VARCHAR(190) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'new',
+    source VARCHAR(64) NULL,
+    notes TEXT NULL,
+    last_contact_at DATETIME NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_leads_dealer_status (dealer_id, status),
+    INDEX idx_leads_rep (representative_id),
+    INDEX idx_leads_next (next_action_at),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_lead_notes(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    representative_id INT NULL,
+    note TEXT NOT NULL,
+    contact_type VARCHAR(32) NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (lead_id) REFERENCES dealer_leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL,
+    INDEX idx_lead_notes_lead (lead_id),
+    INDEX idx_lead_notes_next (next_action_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_leads(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    representative_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NULL,
+    phone VARCHAR(64) NULL,
+    company VARCHAR(190) NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'new',
+    source VARCHAR(64) NULL,
+    potential_value_cents INT NULL,
+    notes TEXT NULL,
+    last_contact_at DATETIME NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    INDEX idx_rep_leads_rep (representative_id),
+    INDEX idx_rep_leads_status (representative_id, status),
+    INDEX idx_rep_leads_next (representative_id, next_action_at),
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_lead_notes(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    lead_id INT NOT NULL,
+    representative_id INT NOT NULL,
+    note TEXT NOT NULL,
+    contact_type VARCHAR(32) NULL,
+    next_action_at DATETIME NULL,
+    created_at DATETIME NOT NULL,
+    FOREIGN KEY (lead_id) REFERENCES representative_leads(id) ON DELETE CASCADE,
+    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
+    INDEX idx_rep_lead_notes_lead (lead_id),
+    INDEX idx_rep_lead_notes_next (representative_id, next_action_at)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* müşteri web siparişleri */
+  $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
+  pdo()->exec("CREATE TABLE IF NOT EXISTS site_orders(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    package_id INT NOT NULL,
+    dealer_id INT NULL,
+    event_id INT NULL,
+    customer_name VARCHAR(190) NOT NULL,
+    customer_email VARCHAR(190) NOT NULL,
+    customer_phone VARCHAR(64) NULL,
+    event_title VARCHAR(190) NOT NULL,
+    event_date DATE NULL,
+    referral_code VARCHAR(64) NULL,
+    status VARCHAR(24) NOT NULL DEFAULT 'pending_payment',
+    merchant_oid VARCHAR(64) NULL,
+    paytr_token VARCHAR(64) NULL,
+    paytr_reference VARCHAR(64) NULL,
+    price_cents INT NOT NULL DEFAULT 0,
+    base_price_cents INT NOT NULL DEFAULT 0,
+    addons_total_cents INT NOT NULL DEFAULT 0,
+    campaigns_total_cents INT NOT NULL DEFAULT 0,
+    cashback_cents INT NOT NULL DEFAULT 0,
+    paid_at DATETIME NULL,
+    meta_json $jsonMeta NULL,
+    payload_json $jsonMeta NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_site_orders_oid (merchant_oid),
+    FOREIGN KEY (package_id) REFERENCES dealer_packages(id) ON DELETE RESTRICT,
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('site_orders', 'merchant_oid')) {
+    pdo()->exec("ALTER TABLE site_orders ADD merchant_oid VARCHAR(64) NULL AFTER status");
+  }
+  if (!column_exists('site_orders', 'paytr_token')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paytr_token VARCHAR(64) NULL AFTER merchant_oid");
+  }
+  if (!column_exists('site_orders', 'paytr_reference')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paytr_reference VARCHAR(64) NULL AFTER paytr_token");
+  }
+  if (!column_exists('site_orders', 'paid_at')) {
+    pdo()->exec("ALTER TABLE site_orders ADD paid_at DATETIME NULL AFTER cashback_cents");
+  }
+  if (!column_exists('site_orders', 'base_price_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD base_price_cents INT NOT NULL DEFAULT 0 AFTER price_cents");
+    pdo()->exec("UPDATE site_orders SET base_price_cents = price_cents WHERE base_price_cents = 0");
+  }
+  if (!column_exists('site_orders', 'addons_total_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD addons_total_cents INT NOT NULL DEFAULT 0 AFTER base_price_cents");
+  }
+  if (!column_exists('site_orders', 'campaigns_total_cents')) {
+    pdo()->exec("ALTER TABLE site_orders ADD campaigns_total_cents INT NOT NULL DEFAULT 0 AFTER addons_total_cents");
+  }
+  if (!column_exists('site_orders', 'payload_json')) {
+    pdo()->exec("ALTER TABLE site_orders ADD payload_json $jsonMeta NULL AFTER meta_json");
+  }
+  try {
+    pdo()->exec("ALTER TABLE site_orders MODIFY status VARCHAR(24) NOT NULL DEFAULT 'pending_payment'");
+  } catch (Throwable $e) {}
+  try {
+    pdo()->exec("ALTER TABLE site_orders ADD UNIQUE KEY uniq_site_orders_oid (merchant_oid)");
+  } catch (Throwable $e) {
+    // index already exists
+  }
 
   pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_representative_commissions(
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -757,144 +968,6 @@ function install_schema(){
     FOREIGN KEY (request_id) REFERENCES representative_payout_requests(id) ON DELETE CASCADE,
     FOREIGN KEY (commission_id) REFERENCES dealer_representative_commissions(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_leads(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    dealer_id INT NOT NULL,
-    representative_id INT NULL,
-    name VARCHAR(190) NOT NULL,
-    email VARCHAR(190) NULL,
-    phone VARCHAR(64) NULL,
-    company VARCHAR(190) NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'new',
-    source VARCHAR(64) NULL,
-    notes TEXT NULL,
-    last_contact_at DATETIME NULL,
-    next_action_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NULL,
-    INDEX idx_leads_dealer_status (dealer_id, status),
-    INDEX idx_leads_rep (representative_id),
-    INDEX idx_leads_next (next_action_at),
-    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE,
-    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_lead_notes(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    lead_id INT NOT NULL,
-    representative_id INT NULL,
-    note TEXT NOT NULL,
-    contact_type VARCHAR(32) NULL,
-    next_action_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
-    FOREIGN KEY (lead_id) REFERENCES dealer_leads(id) ON DELETE CASCADE,
-    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE SET NULL,
-    INDEX idx_lead_notes_lead (lead_id),
-    INDEX idx_lead_notes_next (next_action_at)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_leads(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    representative_id INT NOT NULL,
-    name VARCHAR(190) NOT NULL,
-    email VARCHAR(190) NULL,
-    phone VARCHAR(64) NULL,
-    company VARCHAR(190) NULL,
-    status VARCHAR(32) NOT NULL DEFAULT 'new',
-    source VARCHAR(64) NULL,
-    potential_value_cents INT NULL,
-    notes TEXT NULL,
-    last_contact_at DATETIME NULL,
-    next_action_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NULL,
-    INDEX idx_rep_leads_rep (representative_id),
-    INDEX idx_rep_leads_status (representative_id, status),
-    INDEX idx_rep_leads_next (representative_id, next_action_at),
-    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  pdo()->exec("CREATE TABLE IF NOT EXISTS representative_lead_notes(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    lead_id INT NOT NULL,
-    representative_id INT NOT NULL,
-    note TEXT NOT NULL,
-    contact_type VARCHAR(32) NULL,
-    next_action_at DATETIME NULL,
-    created_at DATETIME NOT NULL,
-    FOREIGN KEY (lead_id) REFERENCES representative_leads(id) ON DELETE CASCADE,
-    FOREIGN KEY (representative_id) REFERENCES dealer_representatives(id) ON DELETE CASCADE,
-    INDEX idx_rep_lead_notes_lead (lead_id),
-    INDEX idx_rep_lead_notes_next (representative_id, next_action_at)
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  /* müşteri web siparişleri */
-  $jsonMeta = supports_json() ? 'JSON' : 'LONGTEXT';
-  pdo()->exec("CREATE TABLE IF NOT EXISTS site_orders(
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    package_id INT NOT NULL,
-    dealer_id INT NULL,
-    event_id INT NULL,
-    customer_name VARCHAR(190) NOT NULL,
-    customer_email VARCHAR(190) NOT NULL,
-    customer_phone VARCHAR(64) NULL,
-    event_title VARCHAR(190) NOT NULL,
-    event_date DATE NULL,
-    referral_code VARCHAR(64) NULL,
-    status VARCHAR(24) NOT NULL DEFAULT 'pending_payment',
-    merchant_oid VARCHAR(64) NULL,
-    paytr_token VARCHAR(64) NULL,
-    paytr_reference VARCHAR(64) NULL,
-    price_cents INT NOT NULL DEFAULT 0,
-    base_price_cents INT NOT NULL DEFAULT 0,
-    addons_total_cents INT NOT NULL DEFAULT 0,
-    campaigns_total_cents INT NOT NULL DEFAULT 0,
-    cashback_cents INT NOT NULL DEFAULT 0,
-    paid_at DATETIME NULL,
-    meta_json $jsonMeta NULL,
-    payload_json $jsonMeta NULL,
-    created_at DATETIME NOT NULL,
-    updated_at DATETIME NULL,
-    UNIQUE KEY uniq_site_orders_oid (merchant_oid),
-    FOREIGN KEY (package_id) REFERENCES dealer_packages(id) ON DELETE RESTRICT,
-    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE SET NULL,
-    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE SET NULL
-  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-  if (!column_exists('site_orders', 'merchant_oid')) {
-    pdo()->exec("ALTER TABLE site_orders ADD merchant_oid VARCHAR(64) NULL AFTER status");
-  }
-  if (!column_exists('site_orders', 'paytr_token')) {
-    pdo()->exec("ALTER TABLE site_orders ADD paytr_token VARCHAR(64) NULL AFTER merchant_oid");
-  }
-  if (!column_exists('site_orders', 'paytr_reference')) {
-    pdo()->exec("ALTER TABLE site_orders ADD paytr_reference VARCHAR(64) NULL AFTER paytr_token");
-  }
-  if (!column_exists('site_orders', 'paid_at')) {
-    pdo()->exec("ALTER TABLE site_orders ADD paid_at DATETIME NULL AFTER cashback_cents");
-  }
-  if (!column_exists('site_orders', 'base_price_cents')) {
-    pdo()->exec("ALTER TABLE site_orders ADD base_price_cents INT NOT NULL DEFAULT 0 AFTER price_cents");
-    pdo()->exec("UPDATE site_orders SET base_price_cents = price_cents WHERE base_price_cents = 0");
-  }
-  if (!column_exists('site_orders', 'addons_total_cents')) {
-    pdo()->exec("ALTER TABLE site_orders ADD addons_total_cents INT NOT NULL DEFAULT 0 AFTER base_price_cents");
-  }
-  if (!column_exists('site_orders', 'campaigns_total_cents')) {
-    pdo()->exec("ALTER TABLE site_orders ADD campaigns_total_cents INT NOT NULL DEFAULT 0 AFTER addons_total_cents");
-  }
-  if (!column_exists('site_orders', 'payload_json')) {
-    pdo()->exec("ALTER TABLE site_orders ADD payload_json $jsonMeta NULL AFTER meta_json");
-  }
-  try {
-    pdo()->exec("ALTER TABLE site_orders MODIFY status VARCHAR(24) NOT NULL DEFAULT 'pending_payment'");
-  } catch (Throwable $e) {}
-  try {
-    pdo()->exec("ALTER TABLE site_orders ADD UNIQUE KEY uniq_site_orders_oid (merchant_oid)");
-  } catch (Throwable $e) {
-    // index already exists
-  }
 
   /* sipariş ek hizmet kataloğu */
   pdo()->exec("CREATE TABLE IF NOT EXISTS site_addons(
@@ -1047,6 +1120,46 @@ function install_schema(){
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+  /* event invitation templates */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_invitation_templates(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL UNIQUE,
+    share_token VARCHAR(64) NULL,
+    theme VARCHAR(32) NOT NULL DEFAULT 'wedding',
+    title VARCHAR(190) NOT NULL,
+    subtitle VARCHAR(190) NULL,
+    message TEXT NOT NULL,
+    primary_color VARCHAR(16) NOT NULL DEFAULT '#0ea5b5',
+    accent_color VARCHAR(16) NOT NULL DEFAULT '#f8fafc',
+    button_label VARCHAR(120) NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+    UNIQUE KEY uniq_invitation_share (share_token)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* event invitation contacts */
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_invitation_contacts(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    event_id INT NOT NULL,
+    name VARCHAR(190) NOT NULL,
+    email VARCHAR(190) NULL,
+    phone VARCHAR(32) NULL,
+    phone_normalized VARCHAR(32) NULL,
+    invite_token VARCHAR(64) NOT NULL,
+    password_hash VARCHAR(255) NULL,
+    password_set_at DATETIME NULL,
+    last_viewed_at DATETIME NULL,
+    last_sent_at DATETIME NULL,
+    send_count INT NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL,
+    UNIQUE KEY uniq_invite_token (invite_token),
+    INDEX idx_invite_event (event_id),
+    INDEX idx_invite_email (event_id, email),
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
   /* guest profiles & sosyal etkileşim tabloları */
   pdo()->exec("CREATE TABLE IF NOT EXISTS guest_profiles(
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1066,15 +1179,34 @@ function install_schema(){
     verified_at DATETIME NULL,
     marketing_opt_in TINYINT(1) NOT NULL DEFAULT 0,
     marketing_opted_at DATETIME NULL,
+    is_host_preview TINYINT(1) NOT NULL DEFAULT 0,
     last_verification_sent_at DATETIME NULL,
     last_seen_at DATETIME NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL,
     UNIQUE KEY uniq_guest_profile (event_id, email),
     INDEX idx_guest_event (event_id),
+    INDEX idx_guest_host_preview (event_id, is_host_preview),
     INDEX idx_guest_verify (verify_token),
     INDEX idx_guest_password_token (password_token),
     FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS event_quiz_attempts(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    question_id INT NOT NULL,
+    answer_id INT NULL,
+    profile_id INT NULL,
+    guest_name VARCHAR(190) NULL,
+    is_correct TINYINT(1) NOT NULL DEFAULT 0,
+    points INT NOT NULL DEFAULT 0,
+    answered_at DATETIME NOT NULL,
+    INDEX idx_quiz_attempt_question (question_id, profile_id),
+    INDEX idx_quiz_attempt_profile (profile_id),
+    UNIQUE KEY uniq_quiz_attempt (question_id, profile_id),
+    FOREIGN KEY (question_id) REFERENCES event_quiz_questions(id) ON DELETE CASCADE,
+    FOREIGN KEY (answer_id) REFERENCES event_quiz_answers(id) ON DELETE SET NULL,
+    FOREIGN KEY (profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
   if (!column_exists('guest_profiles', 'avatar_token')) {
@@ -1087,6 +1219,14 @@ function install_schema(){
     try {
       pdo()->exec("ALTER TABLE guest_profiles ADD marketing_opt_in TINYINT(1) NOT NULL DEFAULT 0 AFTER verify_token");
       pdo()->exec("ALTER TABLE guest_profiles ADD marketing_opted_at DATETIME NULL AFTER marketing_opt_in");
+    } catch (Throwable $e) {}
+  }
+  if (!column_exists('guest_profiles', 'is_host_preview')) {
+    try {
+      pdo()->exec("ALTER TABLE guest_profiles ADD is_host_preview TINYINT(1) NOT NULL DEFAULT 0 AFTER marketing_opted_at");
+    } catch (Throwable $e) {}
+    try {
+      pdo()->exec("CREATE INDEX idx_guest_host_preview ON guest_profiles(event_id, is_host_preview)");
     } catch (Throwable $e) {}
   }
   if (!column_exists('guest_profiles', 'last_verification_sent_at')) {
@@ -1339,7 +1479,11 @@ try {
     $st->execute([APP_SCHEMA_VERSION, date('Y-m-d H:i:s')]);
   } catch (Throwable $e) {}
 }
-  if (!column_exists('dealers', 'balance_cents')) {
-    pdo()->exec("ALTER TABLE dealers ADD balance_cents INT NOT NULL DEFAULT 0 AFTER last_login_at");
+  if (table_exists('dealers') && !column_exists('dealers', 'balance_cents')) {
+    try {
+      pdo()->exec("ALTER TABLE dealers ADD balance_cents INT NOT NULL DEFAULT 0 AFTER last_login_at");
+    } catch (Throwable $e) {
+      // ignore migration errors so legacy environments without the table remain operational
+    }
   }
 

@@ -1,7 +1,8 @@
 <?php
 require_once __DIR__.'/functions.php';
+require_once __DIR__.'/site.php';
 
-function site_public_header(string $active = 'home'): void {
+function site_public_header(string $active = 'home', ?array $content = null): void {
   $links = [
     'home' => ['label' => 'Ana Sayfa', 'url' => BASE_URL.'/index.php#hero'],
     'features' => ['label' => 'Özellikler', 'url' => BASE_URL.'/index.php#ozellikler'],
@@ -9,9 +10,19 @@ function site_public_header(string $active = 'home'): void {
     'partners' => ['label' => 'Anlaşmalı Şirketler', 'url' => BASE_URL.'/public/partners.php'],
     'contact' => ['label' => 'İletişim', 'url' => BASE_URL.'/index.php#iletisim'],
   ];
+  if ($content === null) {
+    $content = site_public_content();
+  }
+  $logo = trim((string)($content['site_logo'] ?? ''));
   echo '<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm py-3 site-navbar sticky-top">';
   echo '<div class="container">';
-  echo '<a class="navbar-brand fw-bold fs-3" href="'.h(BASE_URL).'/index.php#hero">'.h(APP_NAME).'</a>';
+  echo '<a class="navbar-brand fw-bold fs-3 d-flex align-items-center gap-2" href="'.h(BASE_URL).'/index.php#hero">';
+  if ($logo !== '') {
+    echo '<img src="'.h($logo).'" alt="'.h(APP_NAME).'" style="max-height:42px;object-fit:contain">';
+  } else {
+    echo h(APP_NAME);
+  }
+  echo '</a>';
   echo '<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#publicNav" aria-controls="publicNav" aria-expanded="false" aria-label="Menüyü Aç">';
   echo '<span class="navbar-toggler-icon"></span>';
   echo '</button>';

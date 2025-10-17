@@ -114,6 +114,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'APP_BASE_URL' => rtrim($baseUrl, '/'),
             ];
 
+            $htaccessFile = $storageDir.'/.htaccess';
+            $htaccessContents = <<<HTACCESS
+# Prevent direct web access to setup artifacts
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule mod_authz_host.c>
+    Deny from all
+</IfModule>
+HTACCESS;
+
+            if (!is_file($htaccessFile)) {
+                if (file_put_contents($htaccessFile, $htaccessContents, LOCK_EX) === false) {
+                    $errors[] = 'storage/.htaccess dosyası oluşturulamadı. İzinleri kontrol edin.';
+                }
+            } else {
+                $existingHtaccess = file_get_contents($htaccessFile);
+                if ($existingHtaccess === false) {
+                    $errors[] = 'storage/.htaccess dosyası okunamadı. İzinleri kontrol edin.';
+                } elseif (strpos($existingHtaccess, 'Require all denied') === false && strpos($existingHtaccess, 'Deny from all') === false) {
+                    if (file_put_contents($htaccessFile, PHP_EOL.$htaccessContents.PHP_EOL, FILE_APPEND | LOCK_EX) === false) {
+                        $errors[] = 'storage/.htaccess dosyası güncellenemedi. İzinleri kontrol edin.';
+                    }
+                }
+            }
+
+        }
+
+        if (!$errors) {
             $json = json_encode($configData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
             if ($json === false || file_put_contents($setupFile, $json, LOCK_EX) === false) {
                 $errors[] = 'Veritabanı bilgileri kaydedilemedi.';
@@ -164,7 +193,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <?php if ($success): ?>
         <div class="alert success">Kurulum tamamlandı. Şimdi <a href="<?= h(($defaults['base_url'] ?? $detectedBase).'/admin/login.php') ?>">yönetim paneline giriş yapabilirsiniz</a>.</div>
     <?php else: ?>
-        <p class="muted">Lütfen veritabanı bağlantı bilgilerini girin. Bu bilgiler <code>storage/setup.json</code> dosyasında saklanacaktır.</p>
+        <p class="muted">Lütfen veritabanı bağlantı bilgilerini girin. Bu bilgiler doğrudan web erişimine kapatılmış olan <code>storage/setup.json</code> dosyasında saklanacaktır.</p>
         <?php if ($errors): ?>
             <div class="alert error">
                 <strong>Kurulum tamamlanamadı:</strong>

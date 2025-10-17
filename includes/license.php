@@ -1,5 +1,5 @@
 <?php
-// includes/license.php — Çift panel lisans süresi yönetimi (korumalı)
+// includes/license.php — Etkinlik paneli lisans süresi yönetimi (korumalı)
 // NOT: Bu dosya lisans fonksiyonlarının KANONİK kaynağı olmalı.
 // Eğer aynı fonksiyonları includes/functions.php içine de koyduysanız,
 // ya oradan silin (önerilen) ya da bu dosyayı function_exists kontrolleri ile kullanın.
