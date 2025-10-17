@@ -17,14 +17,33 @@ function pdo(): PDO {
   return $pdo;
 }
 function column_exists(string $t, string $c): bool {
-  $st=pdo()->prepare("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? AND COLUMN_NAME=?");
-  $st->execute([$t,$c]); return (bool)$st->fetchColumn();
+  static $cache = [];
+  $key = strtolower($t).':'.strtolower($c);
+  if (array_key_exists($key, $cache)) {
+    return $cache[$key];
+  }
+
+  $st = pdo()->prepare("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+  $st->execute([$t, $c]);
+  $exists = (bool)$st->fetchColumn();
+  $cache[$key] = $exists;
+
+  return $exists;
 }
 
 function table_exists(string $t): bool {
-  $st = pdo()->prepare("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=? LIMIT 1");
+  static $cache = [];
+  $key = strtolower($t);
+  if (array_key_exists($key, $cache)) {
+    return $cache[$key];
+  }
+
+  $st = pdo()->prepare("SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? LIMIT 1");
   $st->execute([$t]);
-  return (bool)$st->fetchColumn();
+  $exists = (bool)$st->fetchColumn();
+  $cache[$key] = $exists;
+
+  return $exists;
 }
 
 function ensure_site_orders_campaigns_column(): bool {
@@ -60,40 +79,41 @@ function ensure_schema_patches(PDO $pdo): void {
     // ignore migration errors, column will exist on fresh installs
   }
 
-  try {
-    if (table_exists('event_invitation_templates')) {
-      if (!column_exists('event_invitation_templates', 'share_token')) {
-        $pdo->exec("ALTER TABLE event_invitation_templates ADD share_token VARCHAR(64) NULL AFTER event_id");
-      }
-      if (!column_exists('event_invitation_templates', 'theme')) {
-        $pdo->exec("ALTER TABLE event_invitation_templates ADD theme VARCHAR(32) NOT NULL DEFAULT 'wedding' AFTER share_token");
-        try {
-          $pdo->exec("UPDATE event_invitation_templates SET theme='wedding' WHERE theme='' OR theme IS NULL");
-        } catch (Throwable $e) {
-          // ignore data backfill errors
+  static $patchedInvitations = false;
+  if (!$patchedInvitations) {
+    try {
+      if (table_exists('event_invitation_templates')) {
+        if (!column_exists('event_invitation_templates', 'share_token')) {
+          $pdo->exec("ALTER TABLE event_invitation_templates ADD share_token VARCHAR(64) NULL AFTER event_id");
         }
-      }
-      try {
-        $pdo->exec("ALTER TABLE event_invitation_templates ADD UNIQUE KEY uniq_invitation_share (share_token)");
-      } catch (Throwable $e) {
-        // index already exists or cannot be created, ignore
-      }
-      try {
-        $st = $pdo->query("SELECT id, event_id, share_token FROM event_invitation_templates");
-        while ($row = $st->fetch()) {
-          if (!empty($row['share_token'])) {
-            continue;
+        if (!column_exists('event_invitation_templates', 'theme')) {
+          $pdo->exec("ALTER TABLE event_invitation_templates ADD theme VARCHAR(32) NOT NULL DEFAULT 'wedding' AFTER share_token");
+          try {
+            $pdo->exec("UPDATE event_invitation_templates SET theme='wedding' WHERE theme='' OR theme IS NULL");
+          } catch (Throwable $e) {
+            // ignore data backfill errors
           }
-          $token = bin2hex(random_bytes(16));
-          $upd = $pdo->prepare("UPDATE event_invitation_templates SET share_token=:token WHERE id=:id");
-          $upd->execute([':token' => $token, ':id' => $row['id']]);
         }
-      } catch (Throwable $e) {
-        // ignore population errors; token will be generated lazily when needed
+        try {
+          $pdo->exec("ALTER TABLE event_invitation_templates ADD UNIQUE KEY uniq_invitation_share (share_token)");
+        } catch (Throwable $e) {
+          // index already exists or cannot be created, ignore
+        }
+        try {
+          $st = $pdo->query("SELECT id FROM event_invitation_templates WHERE share_token IS NULL OR share_token = ''");
+          while ($row = $st->fetch()) {
+            $token = bin2hex(random_bytes(16));
+            $upd = $pdo->prepare("UPDATE event_invitation_templates SET share_token = :token WHERE id = :id");
+            $upd->execute([':token' => $token, ':id' => $row['id']]);
+          }
+        } catch (Throwable $e) {
+          // ignore population errors; token will be generated lazily when needed
+        }
       }
+    } catch (Throwable $e) {
+      // ignore migration errors related to invitation share tokens
     }
-  } catch (Throwable $e) {
-    // ignore migration errors related to invitation share tokens
+    $patchedInvitations = true;
   }
 }
 
@@ -118,16 +138,42 @@ function install_schema(){
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-  $currentVersion = null;
+  $metaValues = [];
   try {
-    $st = $pdo->prepare("SELECT meta_value FROM app_meta WHERE meta_key='schema_version' LIMIT 1");
-    $st->execute();
-    $currentVersion = $st->fetchColumn() ?: null;
+    $keys = ['schema_version', 'schema_health_checked_at'];
+    $placeholders = implode(',', array_fill(0, count($keys), '?'));
+    $st = $pdo->prepare("SELECT meta_key, meta_value FROM app_meta WHERE meta_key IN ($placeholders)");
+    $st->execute($keys);
+    while ($row = $st->fetch()) {
+      $metaValues[$row['meta_key']] = $row['meta_value'];
+    }
   } catch (Throwable $e) {
-    $currentVersion = null;
+    $metaValues = [];
+  }
+
+  $currentVersion = $metaValues['schema_version'] ?? null;
+  $lastHealthCheckAt = null;
+  if (!empty($metaValues['schema_health_checked_at'])) {
+    try {
+      $lastHealthCheckAt = new DateTimeImmutable($metaValues['schema_health_checked_at']);
+    } catch (Throwable $e) {
+      $lastHealthCheckAt = null;
+    }
   }
 
   $needsInstall = ($currentVersion !== APP_SCHEMA_VERSION);
+  $shouldVerify = true;
+
+  if (!$needsInstall && $lastHealthCheckAt instanceof DateTimeImmutable) {
+    $secondsSinceCheck = time() - $lastHealthCheckAt->getTimestamp();
+    if ($secondsSinceCheck >= 0 && $secondsSinceCheck < 300) {
+      $shouldVerify = false;
+    }
+  }
+
+  if (!$needsInstall && !$shouldVerify) {
+    return;
+  }
 
   if (!$needsInstall) {
     $criticalTables = [
@@ -161,9 +207,15 @@ function install_schema(){
     }
   }
 
-  ensure_schema_patches($pdo);
-
   if (!$needsInstall) {
+    ensure_schema_patches($pdo);
+    try {
+      $now = (new DateTimeImmutable('now'))->format('Y-m-d H:i:s');
+      $st = $pdo->prepare("INSERT INTO app_meta(meta_key, meta_value, updated_at) VALUES('schema_health_checked_at', :val, :upd) ON DUPLICATE KEY UPDATE meta_value=VALUES(meta_value), updated_at=VALUES(updated_at)");
+      $st->execute([':val' => $now, ':upd' => $now]);
+    } catch (Throwable $e) {
+      // ignore inability to persist the cache marker
+    }
     return;
   }
 
