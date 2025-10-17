@@ -156,16 +156,16 @@ $tabCopy = [
         'button' => 'Misafir Paneline Gir',
     ],
     'couple' => [
-        'badge' => 'Çift Paneli',
+        'badge' => 'Etkinlik Paneli',
         'headline' => 'Tüm etkinlik yönetimi tek panelde birleşiyor.',
-        'text' => 'BİKARE çift paneliyle davetli listesinden QR yönetimine, kampanya yayınlarından misafir etkileşimlerine kadar tüm süreci kontrol edebilirsiniz.',
+        'text' => 'BİKARE etkinlik paneliyle davetli listesinden QR yönetimine, kampanya yayınlarından misafir etkileşimlerine kadar tüm süreci kontrol edebilirsiniz.',
         'features' => [
             'Misafir yüklemelerini gerçek zamanlı takip edin',
             'Etkinlik görünümünü kişiselleştirin ve davetiyeleri paylaşın',
             'Bayi ve destek ekibiyle tek ekrandan iletişim kurun',
         ],
         'footer' => 'BİKARE, çiftlere kusursuz bir etkinlik deneyimi sunmak için Zerosoft tarafından geliştirildi.',
-        'button' => 'Çift Paneline Gir',
+        'button' => 'Etkinlik Paneline Gir',
     ],
 ];
 

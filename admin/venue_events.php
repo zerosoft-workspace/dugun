@@ -287,7 +287,7 @@ if (isset($_GET['export']) && $_GET['export']==='pdf') {
                   <td class="text-center"><?= fmt_bytes_ve((int)$e['total_bytes']) ?></td>
                   <td class="small">
                     <a class="badge-soft text-decoration-none" target="_blank" href="<?=h($pub)?>">Misafir Yükleme</a>
-                    <a class="badge-soft text-decoration-none" target="_blank" href="<?=h($couple)?>">Çift Paneli</a>
+                    <a class="badge-soft text-decoration-none" target="_blank" href="<?=h($couple)?>">Etkinlik Paneli</a>
                   </td>
                   <td>
                     <?= $e['is_active'] ? '<span class="badge bg-success">Aktif</span>' : '<span class="badge bg-secondary">Pasif</span>' ?>

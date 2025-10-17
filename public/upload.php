@@ -452,7 +452,7 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
         </div>
       </div>
     </div>
-    <div class="smallmuted mt-3">Önizleme, çift panelde kaydettiğiniz düzenin birebir yansımasıdır.</div>
+    <div class="smallmuted mt-3">Önizleme, etkinlik panelinde kaydettiğiniz düzenin birebir yansımasıdır.</div>
   </div>
 
   <?php if(!$token_ok): ?>

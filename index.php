@@ -118,7 +118,7 @@ unset($_SESSION['lead_success']);
       <div class="col-lg-6">
         <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Yeni nesil misafir paylaşımı</span>
         <h1 class="fw-bold display-5 mt-4 mb-3">Tek QR kodla tüm fotoğraf ve videoları toplayın</h1>
-        <p class="lead mb-4">BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak çift panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
+        <p class="lead mb-4">BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak etkinlik panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
         <div class="d-flex flex-wrap gap-3">
           <a class="btn btn-light text-dark fw-semibold" href="#paketler">Paketleri İncele</a>
           <a class="btn btn-outline-light fw-semibold" href="#lead-form">Hemen Başlayın</a>
@@ -189,7 +189,7 @@ unset($_SESSION['lead_success']);
         <div class="feature-card h-100">
           <div class="feature-icon mb-3">📸</div>
           <h4 class="fw-semibold mb-2">Anında QR Toplama</h4>
-          <p class="muted mb-0">Misafirleriniz QR kodu okutup doğrudan galerinize fotoğraf ve videoları yükler. Her yükleme çift panelinizde otomatik görünür.</p>
+          <p class="muted mb-0">Misafirleriniz QR kodu okutup doğrudan galerinize fotoğraf ve videoları yükler. Her yükleme etkinlik panelinizde otomatik görünür.</p>
         </div>
       </div>
       <div class="col-md-4">
@@ -217,7 +217,7 @@ unset($_SESSION['lead_success']);
       </div>
       <div class="col-lg-6 d-flex flex-column gap-3">
         <div class="timeline-step"><span>1</span><div><strong>Paketi seçin & ödeme yapın</strong><br><small class="text-muted">Formu doldurup güvenli ödeme adımında işlemi tamamlayın.</small></div></div>
-        <div class="timeline-step"><span>2</span><div><strong>Panel otomatik kurulsun</strong><br><small class="text-muted">Çift paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.</small></div></div>
+        <div class="timeline-step"><span>2</span><div><strong>Panel otomatik kurulsun</strong><br><small class="text-muted">Etkinlik paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.</small></div></div>
         <div class="timeline-step"><span>3</span><div><strong>Misafirlerinizi davet edin</strong><br><small class="text-muted">QR kodu paylaşın, fotoğraflar ve videolar gerçek zamanlı olarak panelinize düşsün.</small></div></div>
       </div>
     </div>
@@ -246,7 +246,7 @@ unset($_SESSION['lead_success']);
             <?php endif; ?>
             <ul class="small text-muted mb-0">
               <li>Kalıcı ve etkinliğe özel QR kodlar</li>
-              <li>Çift paneli otomatik kurulum ve e-posta bildirimi</li>
+              <li>Etkinlik paneli otomatik kurulum ve e-posta bildirimi</li>
               <li>Sosyal medya tarzı misafir galerisi</li>
               <li>HD fotoğraf & video yükleme desteği</li>
               <?php if ($pkg['cashback_rate'] > 0): ?>
@@ -419,7 +419,7 @@ unset($_SESSION['lead_success']);
         <h3 class="fw-bold mb-3">Sipariş Formu</h3>
         <p class="muted">Paketinizi seçin, bilgilerinizi girin ve PayTR ile güvenli ödeme adımına yönlendirilin. Ödeme onaylandığında giriş bilgilerinizi otomatik olarak e-posta ile alacaksınız.</p>
         <ul class="small text-muted ps-3">
-          <li>Misafir galerisi, QR kodlar ve çift paneli otomatik hazırlanır.</li>
+          <li>Misafir galerisi, QR kodlar ve etkinlik paneli otomatik hazırlanır.</li>
           <li>Referans kodu alanı isteğe bağlıdır. Kod kullanırsanız ilgili bayi cashback kazanır.</li>
           <li>Dilediğiniz zaman destek ekibimizle iletişime geçebilirsiniz.</li>
         </ul>

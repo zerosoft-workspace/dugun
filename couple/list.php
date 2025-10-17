@@ -94,7 +94,7 @@ body{ background:#f8fafc }
 
   <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="m-0"><?=h($ev['title'])?> — Yüklemeler</h4>
-    <a class="btn btn-outline-secondary" href="index.php">← Çift paneli</a>
+    <a class="btn btn-outline-secondary" href="index.php">← Etkinlik paneli</a>
   </div>
 
   <div class="card-lite p-3 mb-3">

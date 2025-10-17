@@ -175,7 +175,7 @@ $pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title><?=h($ev['title'])?> — Çift Paneli</title>
+<title><?=h($ev['title'])?> — Etkinlik Paneli</title>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <?=theme_head_assets()?>
@@ -373,7 +373,7 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
     <div class="sidebar-brand">
       <div class="sidebar-logo"><?=$appInitials?></div>
       <div>
-        <span class="sidebar-welcome">Çift Paneli</span>
+        <span class="sidebar-welcome">Etkinlik Paneli</span>
         <h2 class="sidebar-title"><?=h(APP_NAME)?></h2>
       </div>
     </div>

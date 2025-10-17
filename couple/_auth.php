@@ -1,5 +1,5 @@
 <?php
-// couple/_auth.php — Çift paneli ortak koruma (tek URL login modeli)
+// couple/_auth.php — Etkinlik paneli ortak koruma (tek URL login modeli)
 require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';

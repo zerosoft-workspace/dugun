@@ -140,7 +140,7 @@ function send_mail_simple(string $to, string $subject, string $html){
   return @mail($to, '=?UTF-8?B?'.base64_encode($subject).'?=', $html, $headers);
 }
 
-/* -------------------- Çift hesabı ve lisans -------------------- */
+/* -------------------- Etkinlik paneli hesabı ve lisans -------------------- */
 function couple_set_account(int $event_id, string $email, string $plain_pass){
   $hash = password_hash($plain_pass, PASSWORD_DEFAULT);
   pdo()->prepare("UPDATE events
@@ -153,10 +153,10 @@ function couple_set_account(int $event_id, string $email, string $plain_pass){
 
   $loginUrl = BASE_URL.'/couple/login.php?event='.$event_id;
   $html = '<h3>'.h(APP_NAME).'</h3>
-           <p>Çift paneliniz hazır.</p>
+           <p>Etkinlik paneliniz hazır.</p>
            <p><b>Kullanıcı adı:</b> '.h($email).'<br><b>Şifre:</b> '.h($plain_pass).'</p>
            <p><a href="'.h($loginUrl).'">Panele giriş</a> — İlk girişte şifreyi değiştirmeniz istenecektir.</p>';
-  send_mail_simple($email, 'Çift Panel Giriş Bilgileriniz', $html);
+  send_mail_simple($email, 'Etkinlik Paneli Giriş Bilgileriniz', $html);
 }
 
 function license_extend_years(int $event_id, int $years){
