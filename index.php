@@ -15,20 +15,82 @@ install_schema();
 
 $packages = site_public_packages();
 $content = site_public_content();
+$defaults = site_content_defaults();
 $faqItems = $content['faq_items'];
 $footerNav = $content['footer_nav_links'];
+$heroBadge = trim((string)($content['hero_badge'] ?? ''));
+$heroTitle = trim((string)($content['hero_title'] ?? ''));
+$heroText = trim((string)($content['hero_text'] ?? ''));
+$heroPrimaryLabel = trim((string)($content['hero_primary_label'] ?? ''));
+$heroPrimaryUrl = site_resolve_button_url($content['hero_primary_url'] ?? '') ?? '';
+$heroSecondaryLabel = trim((string)($content['hero_secondary_label'] ?? ''));
+$heroSecondaryUrl = site_resolve_button_url($content['hero_secondary_url'] ?? '') ?? '';
+$heroMetrics = $content['hero_metrics'] ?? [];
+if (!is_array($heroMetrics) || !$heroMetrics) {
+  $heroMetrics = $defaults['hero_metrics'];
+}
 $heroImageMain = $content['hero_image_main'] ?? '';
 $heroImageSecondary = $content['hero_image_secondary'] ?? '';
 $aboutImage = $content['about_image'] ?? '';
+$aboutBadge = trim((string)($content['about_badge'] ?? ''));
+$aboutTitle = trim((string)($content['about_title'] ?? ''));
+$aboutText = trim((string)($content['about_text'] ?? ''));
+$aboutFeatures = $content['about_features'] ?? [];
+if (!is_array($aboutFeatures) || !$aboutFeatures) {
+  $aboutFeatures = $defaults['about_features'];
+}
+$featureBlocks = $content['feature_blocks'] ?? [];
+if (!is_array($featureBlocks) || !$featureBlocks) {
+  $featureBlocks = $defaults['feature_blocks'];
+}
+$timelineTitle = trim((string)($content['timeline_title'] ?? ''));
+$timelineText = trim((string)($content['timeline_text'] ?? ''));
+$timelineSteps = $content['timeline_steps'] ?? [];
+if (!is_array($timelineSteps) || !$timelineSteps) {
+  $timelineSteps = $defaults['timeline_steps'];
+}
+$packagesTitle = trim((string)($content['packages_title'] ?? ''));
+$packagesText = trim((string)($content['packages_text'] ?? ''));
+$packagesHighlights = $content['packages_highlights'] ?? [];
+if (!is_array($packagesHighlights) || !$packagesHighlights) {
+  $packagesHighlights = $defaults['packages_highlights'];
+}
 $galleryImages = $content['gallery_images'] ?? [];
 $galleryImages = is_array($galleryImages) ? $galleryImages : [];
 $dealerShowcaseImage = $content['dealer_showcase_image'] ?? '';
+$dealerBadge = trim((string)($content['dealer_badge'] ?? ''));
+$dealerTitle = trim((string)($content['dealer_title'] ?? ''));
+$dealerText = trim((string)($content['dealer_text'] ?? ''));
+$dealerHighlights = $content['dealer_highlights'] ?? [];
+if (!is_array($dealerHighlights) || !$dealerHighlights) {
+  $dealerHighlights = $defaults['dealer_highlights'];
+}
+$dealerButtonLabel = trim((string)($content['dealer_button_label'] ?? ''));
+$dealerButtonUrl = site_resolve_button_url($content['dealer_button_url'] ?? '') ?? '';
+$galleryTitle = trim((string)($content['gallery_title'] ?? ''));
+$galleryText = trim((string)($content['gallery_text'] ?? ''));
+$testimonials = $content['testimonials'] ?? [];
+if (!is_array($testimonials) || !$testimonials) {
+  $testimonials = $defaults['testimonials'];
+}
 $contactWebsiteUrl = site_normalize_url($content['contact_website'] ?? '') ?? '';
 $contactWebsiteLabel = $content['contact_website_label'] ?? '';
 $contactPhoneHref = site_phone_href($content['contact_phone'] ?? '') ?? '';
 $contactPrimaryUrl = site_resolve_button_url($content['contact_primary_url'] ?? '') ?? '';
 $contactSecondaryUrl = site_resolve_button_url($content['contact_secondary_url'] ?? '') ?? '';
 $contactCtaButtonUrl = site_resolve_button_url($content['contact_cta_button_url'] ?? '') ?? '';
+$ctaBannerTitle = trim((string)($content['cta_banner_title'] ?? ''));
+$ctaBannerText = trim((string)($content['cta_banner_text'] ?? ''));
+$ctaBannerButtonLabel = trim((string)($content['cta_banner_button_label'] ?? ''));
+$ctaBannerButtonUrl = site_resolve_button_url($content['cta_banner_button_url'] ?? '') ?? '';
+$leadFormTitle = trim((string)($content['lead_form_title'] ?? ''));
+$leadFormText = trim((string)($content['lead_form_text'] ?? ''));
+$leadFormBullets = $content['lead_form_bullets'] ?? [];
+if (!is_array($leadFormBullets) || !$leadFormBullets) {
+  $leadFormBullets = $defaults['lead_form_bullets'];
+}
+$leadFormNotice = trim((string)($content['lead_form_notice'] ?? ''));
+$leadFormSubmitLabel = trim((string)($content['lead_form_submit_label'] ?? ''));
 $formData = $_SESSION['lead_form'] ?? [
   'customer_name' => '',
   'customer_email' => '',
@@ -116,12 +178,22 @@ unset($_SESSION['lead_success']);
   <section class="hero mb-5">
     <div class="row align-items-center g-5 position-relative" style="z-index:2;">
       <div class="col-lg-6">
-        <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Yeni nesil misafir paylaşımı</span>
-        <h1 class="fw-bold display-5 mt-4 mb-3">Tek QR kodla tüm fotoğraf ve videoları toplayın</h1>
-        <p class="lead mb-4">BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak etkinlik panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
+        <?php if ($heroBadge !== ''): ?>
+          <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold"><?=h($heroBadge)?></span>
+        <?php endif; ?>
+        <?php if ($heroTitle !== ''): ?>
+          <h1 class="fw-bold display-5 mt-4 mb-3"><?=h($heroTitle)?></h1>
+        <?php endif; ?>
+        <?php if ($heroText !== ''): ?>
+          <p class="lead mb-4"><?=nl2br(h($heroText))?></p>
+        <?php endif; ?>
         <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-light text-dark fw-semibold" href="#paketler">Paketleri İncele</a>
-          <a class="btn btn-outline-light fw-semibold" href="#lead-form">Hemen Başlayın</a>
+          <?php if ($heroPrimaryUrl && $heroPrimaryLabel !== ''): ?>
+            <a class="btn btn-light text-dark fw-semibold" href="<?=h($heroPrimaryUrl)?>"><?=h($heroPrimaryLabel)?></a>
+          <?php endif; ?>
+          <?php if ($heroSecondaryUrl && $heroSecondaryLabel !== ''): ?>
+            <a class="btn btn-outline-light fw-semibold" href="<?=h($heroSecondaryUrl)?>"><?=h($heroSecondaryLabel)?></a>
+          <?php endif; ?>
         </div>
       </div>
       <div class="col-lg-6 hero-visual">
@@ -130,24 +202,20 @@ unset($_SESSION['lead_success']);
       </div>
     </div>
     <div class="row mt-5 g-4 position-relative" style="z-index:2;">
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">12.500+</div>
-          <div class="small">Toplanan fotoğraf ve videolar</div>
+      <?php foreach ($heroMetrics as $metric):
+        $metricValue = trim((string)($metric['value'] ?? ''));
+        $metricLabel = trim((string)($metric['label'] ?? ''));
+        if ($metricValue === '' && $metricLabel === '') {
+          continue;
+        }
+      ?>
+        <div class="col-md-4">
+          <div class="metrics-card h-100">
+            <?php if ($metricValue !== ''): ?><div class="h2 fw-bold mb-1"><?=h($metricValue)?></div><?php endif; ?>
+            <?php if ($metricLabel !== ''): ?><div class="small"><?=h($metricLabel)?></div><?php endif; ?>
+          </div>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">%98</div>
-          <div class="small">Misafir memnuniyeti</div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">5 dk</div>
-          <div class="small">Ödeme sonrası panel hazır olma süresi</div>
-        </div>
-      </div>
+      <?php endforeach; ?>
     </div>
   </section>
 
@@ -162,71 +230,82 @@ unset($_SESSION['lead_success']);
         <img class="img-fluid rounded-4 shadow-lg" src="<?=h($aboutImage)?>" alt="Mutlu etkinlik sahipleri">
       </div>
       <div class="col-lg-6">
-        <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">BİKARE Hakkında</span>
-        <h2 class="fw-bold mt-3">Her anınızı dijital sahneye taşıyan çözüm ortağınız</h2>
-        <p class="muted">Zerosoft olarak düğün, nişan, kurumsal davet ve tüm özel etkinliklerinizde misafirlerinizle aynı anda nefes alan bir platform geliştirdik. BİKARE; yüksek yükleme kapasitesi, güçlü misafir etkileşim araçları ve otomatik QR kod altyapısıyla sizi teknik detaylardan kurtarır.</p>
-        <div class="row g-3">
-          <div class="col-sm-6">
-            <div class="feature-card h-100">
-              <h5 class="fw-semibold">Profesyonel destek</h5>
-              <p class="muted small mb-0">Kurulumdan canlı yayına kadar deneyimli ekibimizle yanınızdayız.</p>
-            </div>
+        <?php if ($aboutBadge !== ''): ?>
+          <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold"><?=h($aboutBadge)?></span>
+        <?php endif; ?>
+        <?php if ($aboutTitle !== ''): ?>
+          <h2 class="fw-bold mt-3"><?=h($aboutTitle)?></h2>
+        <?php endif; ?>
+        <?php if ($aboutText !== ''): ?>
+          <p class="muted"><?=nl2br(h($aboutText))?></p>
+        <?php endif; ?>
+        <?php if ($aboutFeatures): ?>
+          <div class="row g-3">
+            <?php foreach ($aboutFeatures as $feature):
+              $featureTitle = trim((string)($feature['title'] ?? ''));
+              $featureText = trim((string)($feature['text'] ?? ''));
+              if ($featureTitle === '' && $featureText === '') {
+                continue;
+              }
+            ?>
+              <div class="col-sm-6">
+                <div class="feature-card h-100">
+                  <?php if ($featureTitle !== ''): ?><h5 class="fw-semibold"><?=h($featureTitle)?></h5><?php endif; ?>
+                  <?php if ($featureText !== ''): ?><p class="muted small mb-0"><?=nl2br(h($featureText))?></p><?php endif; ?>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
-          <div class="col-sm-6">
-            <div class="feature-card h-100">
-              <h5 class="fw-semibold">Tamamen yerli altyapı</h5>
-              <p class="muted small mb-0">Verileriniz Türkiye lokasyonlu sunucularda güvenle saklanır.</p>
-            </div>
-          </div>
-        </div>
+        <?php endif; ?>
       </div>
     </div>
   </section>
 
   <section id="ozellikler" class="mb-5">
     <div class="row g-4">
-      <div class="col-md-4">
-        <div class="feature-card h-100">
-          <div class="feature-icon mb-3">📸</div>
-          <h4 class="fw-semibold mb-2">Anında QR Toplama</h4>
-          <p class="muted mb-0">Misafirleriniz QR kodu okutup doğrudan galerinize fotoğraf ve videoları yükler. Her yükleme etkinlik panelinizde otomatik görünür.</p>
+      <?php foreach ($featureBlocks as $block):
+        $icon = trim((string)($block['icon'] ?? ''));
+        $title = trim((string)($block['title'] ?? ''));
+        $text = trim((string)($block['text'] ?? ''));
+        if ($icon === '' && $title === '' && $text === '') {
+          continue;
+        }
+      ?>
+        <div class="col-md-4">
+          <div class="feature-card h-100">
+            <?php if ($icon !== ''): ?><div class="feature-icon mb-3"><?=h($icon)?></div><?php endif; ?>
+            <?php if ($title !== ''): ?><h4 class="fw-semibold mb-2"><?=h($title)?></h4><?php endif; ?>
+            <?php if ($text !== ''): ?><p class="muted mb-0"><?=nl2br(h($text))?></p><?php endif; ?>
+          </div>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="feature-card h-100">
-          <div class="feature-icon mb-3">✨</div>
-          <h4 class="fw-semibold mb-2">Sosyal Galeri Deneyimi</h4>
-          <p class="muted mb-0">Beğeniler, yıldızlar ve yorumlarla misafir galerisi sosyal medya tadında. Albümünüzü dilediğiniz gibi düzenleyin.</p>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="feature-card h-100">
-          <div class="feature-icon mb-3">🔒</div>
-          <h4 class="fw-semibold mb-2">Güvenli Online Ödeme</h4>
-          <p class="muted mb-0">PayTR altyapısıyla kart bilgileriniz güvende. Ödeme tamamlandığında paneliniz ve QR kodlarınız otomatik hazırlanır.</p>
-        </div>
-      </div>
+      <?php endforeach; ?>
     </div>
   </section>
 
   <section id="nasil" class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-6">
-        <h2 class="fw-bold mb-3">BİKARE nasıl çalışır?</h2>
-        <p class="muted">Basit 3 adımda etkinliğinizi dijitalleştiriyoruz. Kurulum ve teknik detaylarla vakit kaybetmenize gerek yok.</p>
+        <?php if ($timelineTitle !== ''): ?><h2 class="fw-bold mb-3"><?=h($timelineTitle)?></h2><?php endif; ?>
+        <?php if ($timelineText !== ''): ?><p class="muted"><?=nl2br(h($timelineText))?></p><?php endif; ?>
       </div>
       <div class="col-lg-6 d-flex flex-column gap-3">
-        <div class="timeline-step"><span>1</span><div><strong>Paketi seçin & ödeme yapın</strong><br><small class="text-muted">Formu doldurup güvenli ödeme adımında işlemi tamamlayın.</small></div></div>
-        <div class="timeline-step"><span>2</span><div><strong>Panel otomatik kurulsun</strong><br><small class="text-muted">Etkinlik paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.</small></div></div>
-        <div class="timeline-step"><span>3</span><div><strong>Misafirlerinizi davet edin</strong><br><small class="text-muted">QR kodu paylaşın, fotoğraflar ve videolar gerçek zamanlı olarak panelinize düşsün.</small></div></div>
+        <?php foreach ($timelineSteps as $idx => $step):
+          $stepTitle = trim((string)($step['title'] ?? ''));
+          $stepText = trim((string)($step['text'] ?? ''));
+          if ($stepTitle === '' && $stepText === '') {
+            continue;
+          }
+        ?>
+          <div class="timeline-step"><span><?=h((string)($idx + 1))?></span><div><?php if ($stepTitle !== ''): ?><strong><?=h($stepTitle)?></strong><?php endif; ?><?php if ($stepText !== ''): ?><br><small class="text-muted"><?=nl2br(h($stepText))?></small><?php endif; ?></div></div>
+        <?php endforeach; ?>
       </div>
     </div>
   </section>
 
   <section id="paketler" class="mb-5">
     <div class="text-center mb-4">
-      <h2 class="fw-bold">İhtiyacınıza uygun paketleri seçin</h2>
-      <p class="muted">Her paket güvenli online ödeme, otomatik panel kurulumu ve sınırsız misafir yüklemesi içerir.</p>
+      <?php if ($packagesTitle !== ''): ?><h2 class="fw-bold"><?=h($packagesTitle)?></h2><?php endif; ?>
+      <?php if ($packagesText !== ''): ?><p class="muted"><?=nl2br(h($packagesText))?></p><?php endif; ?>
     </div>
     <div class="row g-4">
       <?php foreach ($packages as $pkg): ?>
@@ -244,15 +323,25 @@ unset($_SESSION['lead_success']);
             <?php if (!empty($pkg['description'])): ?>
               <p class="muted small mb-4"><?=nl2br(h($pkg['description']))?></p>
             <?php endif; ?>
-            <ul class="small text-muted mb-0">
-              <li>Kalıcı ve etkinliğe özel QR kodlar</li>
-              <li>Etkinlik paneli otomatik kurulum ve e-posta bildirimi</li>
-              <li>Sosyal medya tarzı misafir galerisi</li>
-              <li>HD fotoğraf & video yükleme desteği</li>
-              <?php if ($pkg['cashback_rate'] > 0): ?>
+            <?php if ($packagesHighlights): ?>
+              <ul class="small text-muted mb-0">
+                <?php foreach ($packagesHighlights as $highlight):
+                  $highlight = trim((string)$highlight);
+                  if ($highlight === '') {
+                    continue;
+                  }
+                ?>
+                  <li><?=h($highlight)?></li>
+                <?php endforeach; ?>
+                <?php if ($pkg['cashback_rate'] > 0): ?>
+                  <li>Referans koduyla %<?=number_format($pkg['cashback_rate'] * 100, 0)?> cashback</li>
+                <?php endif; ?>
+              </ul>
+            <?php elseif ($pkg['cashback_rate'] > 0): ?>
+              <ul class="small text-muted mb-0">
                 <li>Referans koduyla %<?=number_format($pkg['cashback_rate'] * 100, 0)?> cashback</li>
-              <?php endif; ?>
-            </ul>
+              </ul>
+            <?php endif; ?>
           </div>
         </div>
       <?php endforeach; ?>
@@ -267,15 +356,24 @@ unset($_SESSION['lead_success']);
   <section id="bayi-avantaj" class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-6">
-        <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold">Bayi Ağı</span>
-        <h2 class="fw-bold mt-3">Etkinlik sektöründeki iş ortaklarımız için kazandıran sistem</h2>
-        <p class="muted">Bayi panelinizden bakiye yönetebilir, PayTR entegrasyonlu paketler satın alabilir, etkinliklerinizi tek ekrandan yönetebilirsiniz. Referans kodu ile gerçekleştirdiğiniz satışlardan onay sonrası cashback kazanırsınız.</p>
-        <ul class="muted">
-          <li>Salon bazlı etkinlik yönetimi ve QR kod üretimi</li>
-          <li>Detaylı raporlama, bakiye ve cashback geçmişi</li>
-          <li>PayTR ile güvenli tahsilat ve hızlı aktivasyon</li>
-        </ul>
-        <a class="btn btn-brand" href="<?=BASE_URL?>/dealer/apply.php">Bayi Ağına Katıl</a>
+        <?php if ($dealerBadge !== ''): ?><span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold"><?=h($dealerBadge)?></span><?php endif; ?>
+        <?php if ($dealerTitle !== ''): ?><h2 class="fw-bold mt-3"><?=h($dealerTitle)?></h2><?php endif; ?>
+        <?php if ($dealerText !== ''): ?><p class="muted"><?=nl2br(h($dealerText))?></p><?php endif; ?>
+        <?php if ($dealerHighlights): ?>
+          <ul class="muted">
+            <?php foreach ($dealerHighlights as $highlight):
+              $highlight = trim((string)$highlight);
+              if ($highlight === '') {
+                continue;
+              }
+            ?>
+              <li><?=h($highlight)?></li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
+        <?php if ($dealerButtonUrl && $dealerButtonLabel !== ''): ?>
+          <a class="btn btn-brand" href="<?=h($dealerButtonUrl)?>"><?=h($dealerButtonLabel)?></a>
+        <?php endif; ?>
       </div>
       <div class="col-lg-6 text-center">
         <img class="img-fluid rounded-4 shadow-lg" src="<?=h($dealerShowcaseImage)?>" alt="Bayi paneli">
@@ -286,8 +384,8 @@ unset($_SESSION['lead_success']);
   <section class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-5">
-        <h2 class="fw-bold mb-3">Gerçek hikayelerden ilham alın</h2>
-        <p class="muted">Misafirleriniz sadece düğünlerde değil; nişan, kına, doğum günü ve kurumsal etkinliklerde de QR kodunuzla içerik paylaşabilir.</p>
+        <?php if ($galleryTitle !== ''): ?><h2 class="fw-bold mb-3"><?=h($galleryTitle)?></h2><?php endif; ?>
+        <?php if ($galleryText !== ''): ?><p class="muted"><?=nl2br(h($galleryText))?></p><?php endif; ?>
       </div>
       <div class="col-lg-7 gallery-grid">
         <?php foreach ($galleryImages as $galleryImage): ?>
@@ -300,20 +398,22 @@ unset($_SESSION['lead_success']);
 
   <section class="mb-5">
     <div class="row g-4">
-      <div class="col-md-6">
-        <div class="testimonial h-100">
-          <p class="mb-3">"Misafirlerimiz tüm fotoğrafları bir araya getirirken inanılmaz eğlendi. Panellerin otomatik kurulması bizim için büyük kolaylık sağladı."</p>
-          <div class="fw-semibold">İpek &amp; Cem</div>
-          <div class="small text-muted">İstanbul Boğazı Düğünü</div>
+      <?php foreach ($testimonials as $testimonial):
+        $quote = trim((string)($testimonial['quote'] ?? ''));
+        $author = trim((string)($testimonial['author'] ?? ''));
+        $role = trim((string)($testimonial['role'] ?? ''));
+        if ($quote === '' && $author === '' && $role === '') {
+          continue;
+        }
+      ?>
+        <div class="col-md-6">
+          <div class="testimonial h-100">
+            <?php if ($quote !== ''): ?><p class="mb-3"><?=nl2br(h($quote))?></p><?php endif; ?>
+            <?php if ($author !== ''): ?><div class="fw-semibold"><?=h($author)?></div><?php endif; ?>
+            <?php if ($role !== ''): ?><div class="small text-muted"><?=h($role)?></div><?php endif; ?>
+          </div>
         </div>
-      </div>
-      <div class="col-md-6">
-        <div class="testimonial h-100">
-          <p class="mb-3">"Kurumsal lansmanımızda katılımcıların videolarını toplamak bu kadar kolay olmamıştı. BİKARE ekibi her detayla ilgilendi."</p>
-          <div class="fw-semibold">Berna U.</div>
-          <div class="small text-muted">Etkinlik Ajansı Sahibi</div>
-        </div>
-      </div>
+      <?php endforeach; ?>
     </div>
   </section>
 
@@ -404,11 +504,13 @@ unset($_SESSION['lead_success']);
   <section class="cta-section mb-5 text-center text-lg-start">
     <div class="row g-4 align-items-center">
       <div class="col-lg-8">
-        <h2 class="fw-bold mb-2">Etkinliğiniz için hazırız</h2>
-        <p class="mb-0">Formu doldurup güvenli ödeme adımını tamamlayın, paneliniz birkaç dakika içinde aktif olsun. Anılarınızı kaybetmeyin, değerini artırın.</p>
+        <?php if ($ctaBannerTitle !== ''): ?><h2 class="fw-bold mb-2"><?=h($ctaBannerTitle)?></h2><?php endif; ?>
+        <?php if ($ctaBannerText !== ''): ?><p class="mb-0"><?=nl2br(h($ctaBannerText))?></p><?php endif; ?>
       </div>
       <div class="col-lg-4 text-lg-end">
-        <a class="btn btn-light text-dark fw-semibold px-4 py-3" href="#lead-form">Paket Seç &amp; Ödeme Yap</a>
+        <?php if ($ctaBannerButtonUrl && $ctaBannerButtonLabel !== ''): ?>
+          <a class="btn btn-light text-dark fw-semibold px-4 py-3" href="<?=h($ctaBannerButtonUrl)?>"><?=h($ctaBannerButtonLabel)?></a>
+        <?php endif; ?>
       </div>
     </div>
   </section>
@@ -416,13 +518,20 @@ unset($_SESSION['lead_success']);
   <section id="lead-form" class="form-section">
     <div class="row g-4 align-items-start">
       <div class="col-lg-5">
-        <h3 class="fw-bold mb-3">Sipariş Formu</h3>
-        <p class="muted">Paketinizi seçin, bilgilerinizi girin ve PayTR ile güvenli ödeme adımına yönlendirilin. Ödeme onaylandığında giriş bilgilerinizi otomatik olarak e-posta ile alacaksınız.</p>
-        <ul class="small text-muted ps-3">
-          <li>Misafir galerisi, QR kodlar ve etkinlik paneli otomatik hazırlanır.</li>
-          <li>Referans kodu alanı isteğe bağlıdır. Kod kullanırsanız ilgili bayi cashback kazanır.</li>
-          <li>Dilediğiniz zaman destek ekibimizle iletişime geçebilirsiniz.</li>
-        </ul>
+        <?php if ($leadFormTitle !== ''): ?><h3 class="fw-bold mb-3"><?=h($leadFormTitle)?></h3><?php endif; ?>
+        <?php if ($leadFormText !== ''): ?><p class="muted"><?=nl2br(h($leadFormText))?></p><?php endif; ?>
+        <?php if ($leadFormBullets): ?>
+          <ul class="small text-muted ps-3">
+            <?php foreach ($leadFormBullets as $bullet):
+              $bullet = trim((string)$bullet);
+              if ($bullet === '') {
+                continue;
+              }
+            ?>
+              <li><?=h($bullet)?></li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
       </div>
       <div class="col-lg-7">
         <form method="post" action="order.php" class="row g-3">
@@ -471,8 +580,8 @@ unset($_SESSION['lead_success']);
             <textarea name="notes" class="form-control input-rounded" rows="3" placeholder="Etkinlikle ilgili paylaşmak istediğiniz ek bilgiler"><?=h($formData['notes'])?></textarea>
           </div>
           <div class="col-12 d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center pt-3">
-            <span class="muted small">Formu gönderdiğinizde PayTR güvenli ödeme sayfasına yönlendirileceksiniz.</span>
-            <button class="btn btn-brand" type="submit">Ödeme Adımına Geç</button>
+            <?php if ($leadFormNotice !== ''): ?><span class="muted small"><?=h($leadFormNotice)?></span><?php endif; ?>
+            <button class="btn btn-brand" type="submit"><?=h($leadFormSubmitLabel !== '' ? $leadFormSubmitLabel : 'Gönder')?></button>
           </div>
         </form>
       </div>

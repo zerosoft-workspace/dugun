@@ -17,6 +17,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   csrf_or_die();
 
   $payload = [
+    'hero_badge' => trim($_POST['hero_badge'] ?? ''),
+    'hero_title' => trim($_POST['hero_title'] ?? ''),
+    'hero_text' => trim($_POST['hero_text'] ?? ''),
+    'hero_primary_label' => trim($_POST['hero_primary_label'] ?? ''),
+    'hero_primary_url' => trim($_POST['hero_primary_url'] ?? ''),
+    'hero_secondary_label' => trim($_POST['hero_secondary_label'] ?? ''),
+    'hero_secondary_url' => trim($_POST['hero_secondary_url'] ?? ''),
+    'about_badge' => trim($_POST['about_badge'] ?? ''),
+    'about_title' => trim($_POST['about_title'] ?? ''),
+    'about_text' => trim($_POST['about_text'] ?? ''),
+    'packages_title' => trim($_POST['packages_title'] ?? ''),
+    'packages_text' => trim($_POST['packages_text'] ?? ''),
+    'dealer_badge' => trim($_POST['dealer_badge'] ?? ''),
+    'dealer_title' => trim($_POST['dealer_title'] ?? ''),
+    'dealer_text' => trim($_POST['dealer_text'] ?? ''),
+    'dealer_button_label' => trim($_POST['dealer_button_label'] ?? ''),
+    'dealer_button_url' => trim($_POST['dealer_button_url'] ?? ''),
+    'gallery_title' => trim($_POST['gallery_title'] ?? ''),
+    'gallery_text' => trim($_POST['gallery_text'] ?? ''),
+    'timeline_title' => trim($_POST['timeline_title'] ?? ''),
+    'timeline_text' => trim($_POST['timeline_text'] ?? ''),
+    'cta_banner_title' => trim($_POST['cta_banner_title'] ?? ''),
+    'cta_banner_text' => trim($_POST['cta_banner_text'] ?? ''),
+    'cta_banner_button_label' => trim($_POST['cta_banner_button_label'] ?? ''),
+    'cta_banner_button_url' => trim($_POST['cta_banner_button_url'] ?? ''),
+    'lead_form_title' => trim($_POST['lead_form_title'] ?? ''),
+    'lead_form_text' => trim($_POST['lead_form_text'] ?? ''),
+    'lead_form_notice' => trim($_POST['lead_form_notice'] ?? ''),
+    'lead_form_submit_label' => trim($_POST['lead_form_submit_label'] ?? ''),
     'default_dealer_referral_code' => trim($_POST['default_dealer_referral_code'] ?? ''),
     'contact_title' => trim($_POST['contact_title'] ?? ''),
     'contact_text' => trim($_POST['contact_text'] ?? ''),
@@ -103,6 +132,132 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $navItems = $defaults['footer_nav_links'];
   }
   $payload['footer_nav_links'] = $navItems;
+
+  $heroMetrics = [];
+  $metricValues = $_POST['hero_metric_value'] ?? [];
+  $metricLabels = $_POST['hero_metric_label'] ?? [];
+  foreach ($metricValues as $idx => $value) {
+    $value = trim((string)$value);
+    $label = trim((string)($metricLabels[$idx] ?? ''));
+    if ($value === '' && $label === '') {
+      continue;
+    }
+    $heroMetrics[] = ['value' => $value, 'label' => $label];
+  }
+  if (!$heroMetrics) {
+    $heroMetrics = $defaults['hero_metrics'];
+  }
+  $payload['hero_metrics'] = $heroMetrics;
+
+  $aboutFeatures = [];
+  $aboutFeatureTitles = $_POST['about_feature_title'] ?? [];
+  $aboutFeatureTexts = $_POST['about_feature_text'] ?? [];
+  foreach ($aboutFeatureTitles as $idx => $title) {
+    $title = trim((string)$title);
+    $text = trim((string)($aboutFeatureTexts[$idx] ?? ''));
+    if ($title === '' && $text === '') {
+      continue;
+    }
+    $aboutFeatures[] = ['title' => $title, 'text' => $text];
+  }
+  if (!$aboutFeatures) {
+    $aboutFeatures = $defaults['about_features'];
+  }
+  $payload['about_features'] = $aboutFeatures;
+
+  $featureBlocks = [];
+  $featureIcons = $_POST['feature_icon'] ?? [];
+  $featureTitles = $_POST['feature_title'] ?? [];
+  $featureTexts = $_POST['feature_text'] ?? [];
+  foreach ($featureTitles as $idx => $title) {
+    $icon = trim((string)($featureIcons[$idx] ?? ''));
+    $title = trim((string)$title);
+    $text = trim((string)($featureTexts[$idx] ?? ''));
+    if ($icon === '' && $title === '' && $text === '') {
+      continue;
+    }
+    $featureBlocks[] = ['icon' => $icon, 'title' => $title, 'text' => $text];
+  }
+  if (!$featureBlocks) {
+    $featureBlocks = $defaults['feature_blocks'];
+  }
+  $payload['feature_blocks'] = $featureBlocks;
+
+  $timelineSteps = [];
+  $timelineTitles = $_POST['timeline_step_title'] ?? [];
+  $timelineTexts = $_POST['timeline_step_text'] ?? [];
+  foreach ($timelineTitles as $idx => $title) {
+    $title = trim((string)$title);
+    $text = trim((string)($timelineTexts[$idx] ?? ''));
+    if ($title === '' && $text === '') {
+      continue;
+    }
+    $timelineSteps[] = ['title' => $title, 'text' => $text];
+  }
+  if (!$timelineSteps) {
+    $timelineSteps = $defaults['timeline_steps'];
+  }
+  $payload['timeline_steps'] = $timelineSteps;
+
+  $packagesHighlights = [];
+  $packageHighlightsInput = $_POST['packages_highlight'] ?? [];
+  foreach ($packageHighlightsInput as $highlight) {
+    $highlight = trim((string)$highlight);
+    if ($highlight === '') {
+      continue;
+    }
+    $packagesHighlights[] = $highlight;
+  }
+  if (!$packagesHighlights) {
+    $packagesHighlights = $defaults['packages_highlights'];
+  }
+  $payload['packages_highlights'] = $packagesHighlights;
+
+  $dealerHighlights = [];
+  $dealerHighlightsInput = $_POST['dealer_highlight'] ?? [];
+  foreach ($dealerHighlightsInput as $highlight) {
+    $highlight = trim((string)$highlight);
+    if ($highlight === '') {
+      continue;
+    }
+    $dealerHighlights[] = $highlight;
+  }
+  if (!$dealerHighlights) {
+    $dealerHighlights = $defaults['dealer_highlights'];
+  }
+  $payload['dealer_highlights'] = $dealerHighlights;
+
+  $testimonials = [];
+  $testimonialQuotes = $_POST['testimonial_quote'] ?? [];
+  $testimonialAuthors = $_POST['testimonial_author'] ?? [];
+  $testimonialRoles = $_POST['testimonial_role'] ?? [];
+  foreach ($testimonialQuotes as $idx => $quote) {
+    $quote = trim((string)$quote);
+    $author = trim((string)($testimonialAuthors[$idx] ?? ''));
+    $role = trim((string)($testimonialRoles[$idx] ?? ''));
+    if ($quote === '' && $author === '' && $role === '') {
+      continue;
+    }
+    $testimonials[] = ['quote' => $quote, 'author' => $author, 'role' => $role];
+  }
+  if (!$testimonials) {
+    $testimonials = $defaults['testimonials'];
+  }
+  $payload['testimonials'] = $testimonials;
+
+  $leadFormBullets = [];
+  $leadFormBulletsInput = $_POST['lead_form_bullet'] ?? [];
+  foreach ($leadFormBulletsInput as $bullet) {
+    $bullet = trim((string)$bullet);
+    if ($bullet === '') {
+      continue;
+    }
+    $leadFormBullets[] = $bullet;
+  }
+  if (!$leadFormBullets) {
+    $leadFormBullets = $defaults['lead_form_bullets'];
+  }
+  $payload['lead_form_bullets'] = $leadFormBullets;
 
   $siteLogo = $content['site_logo'] ?? $defaults['site_logo'];
   if (!empty($_POST['site_logo_remove'])) {
@@ -230,12 +385,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $content = site_settings_all();
 $faqItems = $content['faq_items'];
 $navItems = $content['footer_nav_links'];
+$heroMetrics = $content['hero_metrics'] ?? $defaults['hero_metrics'];
+if (!is_array($heroMetrics)) {
+  $heroMetrics = $defaults['hero_metrics'];
+}
+$heroMetrics = array_values($heroMetrics);
+$aboutFeatures = $content['about_features'] ?? $defaults['about_features'];
+if (!is_array($aboutFeatures)) {
+  $aboutFeatures = $defaults['about_features'];
+}
+$aboutFeatures = array_values($aboutFeatures);
+$featureBlocks = $content['feature_blocks'] ?? $defaults['feature_blocks'];
+if (!is_array($featureBlocks)) {
+  $featureBlocks = $defaults['feature_blocks'];
+}
+$featureBlocks = array_values($featureBlocks);
+$timelineSteps = $content['timeline_steps'] ?? $defaults['timeline_steps'];
+if (!is_array($timelineSteps)) {
+  $timelineSteps = $defaults['timeline_steps'];
+}
+$timelineSteps = array_values($timelineSteps);
+$packagesHighlights = $content['packages_highlights'] ?? $defaults['packages_highlights'];
+if (!is_array($packagesHighlights)) {
+  $packagesHighlights = $defaults['packages_highlights'];
+}
+$packagesHighlights = array_values($packagesHighlights);
+$dealerHighlights = $content['dealer_highlights'] ?? $defaults['dealer_highlights'];
+if (!is_array($dealerHighlights)) {
+  $dealerHighlights = $defaults['dealer_highlights'];
+}
+$dealerHighlights = array_values($dealerHighlights);
+$testimonials = $content['testimonials'] ?? $defaults['testimonials'];
+if (!is_array($testimonials)) {
+  $testimonials = $defaults['testimonials'];
+}
+$testimonials = array_values($testimonials);
+$leadFormBullets = $content['lead_form_bullets'] ?? $defaults['lead_form_bullets'];
+if (!is_array($leadFormBullets)) {
+  $leadFormBullets = $defaults['lead_form_bullets'];
+}
+$leadFormBullets = array_values($leadFormBullets);
 
 while (count($faqItems) < 4) {
   $faqItems[] = ['question' => '', 'answer' => ''];
 }
 while (count($navItems) < 5) {
   $navItems[] = ['label' => '', 'url' => ''];
+}
+while (count($heroMetrics) < 3) {
+  $heroMetrics[] = ['value' => '', 'label' => ''];
+}
+while (count($aboutFeatures) < 2) {
+  $aboutFeatures[] = ['title' => '', 'text' => ''];
+}
+while (count($featureBlocks) < 3) {
+  $featureBlocks[] = ['icon' => '', 'title' => '', 'text' => ''];
+}
+while (count($timelineSteps) < 3) {
+  $timelineSteps[] = ['title' => '', 'text' => ''];
+}
+while (count($packagesHighlights) < 4) {
+  $packagesHighlights[] = '';
+}
+while (count($dealerHighlights) < 3) {
+  $dealerHighlights[] = '';
+}
+while (count($testimonials) < 2) {
+  $testimonials[] = ['quote' => '', 'author' => '', 'role' => ''];
+}
+while (count($leadFormBullets) < 3) {
+  $leadFormBullets[] = '';
 }
 
 ?><!doctype html>
@@ -280,6 +499,13 @@ while (count($navItems) < 5) {
           <div class="pane-nav">
             <h6>İçerik Başlıkları</h6>
             <button type="button" class="pane-button active" data-pane-target="contact"><i class="bi bi-person-rolodex"></i>İletişim Bilgileri</button>
+            <button type="button" class="pane-button" data-pane-target="hero"><i class="bi bi-stars"></i>Hero &amp; Giriş</button>
+            <button type="button" class="pane-button" data-pane-target="about"><i class="bi bi-file-earmark-text"></i>Hakkımızda Bölümü</button>
+            <button type="button" class="pane-button" data-pane-target="features"><i class="bi bi-grid-3x3-gap"></i>Özellikler &amp; Akış</button>
+            <button type="button" class="pane-button" data-pane-target="packages"><i class="bi bi-box-seam"></i>Paket Bilgileri</button>
+            <button type="button" class="pane-button" data-pane-target="dealer"><i class="bi bi-people"></i>Bayi &amp; Yorumlar</button>
+            <button type="button" class="pane-button" data-pane-target="gallery"><i class="bi bi-collection"></i>Galeri Başlıkları</button>
+            <button type="button" class="pane-button" data-pane-target="lead"><i class="bi bi-ui-checks"></i>Sipariş Formu</button>
             <button type="button" class="pane-button" data-pane-target="media"><i class="bi bi-images"></i>Görsel İçerikler</button>
             <button type="button" class="pane-button" data-pane-target="cta"><i class="bi bi-bullseye"></i>Çağrı Alanı</button>
             <button type="button" class="pane-button" data-pane-target="sales"><i class="bi bi-shop"></i>Satış Ayarları</button>
@@ -289,6 +515,330 @@ while (count($navItems) < 5) {
           </div>
         </div>
         <div class="col-lg-8">
+          <div class="card card-lite content-pane" data-pane="hero">
+            <div class="card-section border-bottom">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Hero &amp; Açılış Metni</h5>
+                  <p class="text-muted mb-0">Anasayfa giriş alanındaki başlık, açıklama ve butonları burada güncelleyin.</p>
+                </div>
+                <i class="bi bi-stars" style="font-size:1.6rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Hero Rozeti</label>
+                  <input type="text" name="hero_badge" class="form-control" value="<?=h($content['hero_badge'] ?? '')?>" placeholder="Örn. Yeni nesil çözüm">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Hero Başlığı</label>
+                  <input type="text" name="hero_title" class="form-control" value="<?=h($content['hero_title'] ?? '')?>" required>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Hero Açıklaması</label>
+                  <textarea name="hero_text" class="form-control" rows="3" placeholder="Hero açıklama metni"><?=h($content['hero_text'] ?? '')?></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Birincil Buton Metni</label>
+                  <input type="text" name="hero_primary_label" class="form-control" value="<?=h($content['hero_primary_label'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Birincil Buton URL</label>
+                  <input type="text" name="hero_primary_url" class="form-control" value="<?=h($content['hero_primary_url'] ?? '')?>" placeholder="#paketler">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">İkincil Buton Metni</label>
+                  <input type="text" name="hero_secondary_label" class="form-control" value="<?=h($content['hero_secondary_label'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">İkincil Buton URL</label>
+                  <input type="text" name="hero_secondary_url" class="form-control" value="<?=h($content['hero_secondary_url'] ?? '')?>" placeholder="#lead-form">
+                </div>
+              </div>
+            </div>
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h6 class="fw-semibold mb-1">Öne Çıkan Rakamlar</h6>
+                  <p class="text-muted small mb-0">Hero alanındaki metrikler için değer ve açıklama girin. Boş satırlar yayınlanmaz.</p>
+                </div>
+              </div>
+              <?php foreach ($heroMetrics as $idx => $metric): ?>
+                <div class="row g-3 align-items-end mb-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Değer</label>
+                    <input type="text" class="form-control" name="hero_metric_value[]" value="<?=h($metric['value'])?>" placeholder="Örn. 12.500+">
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">Açıklama</label>
+                    <input type="text" class="form-control" name="hero_metric_label[]" value="<?=h($metric['label'])?>" placeholder="Örn. Toplanan içerikler">
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="about">
+            <div class="card-section border-bottom">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Hakkımızda Bölümü</h5>
+                  <p class="text-muted mb-0">"Hakkımızda" alanındaki başlık, açıklama ve öne çıkan maddeleri düzenleyin.</p>
+                </div>
+                <i class="bi bi-file-earmark-text" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Rozet</label>
+                  <input type="text" name="about_badge" class="form-control" value="<?=h($content['about_badge'] ?? '')?>">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Başlık</label>
+                  <input type="text" name="about_title" class="form-control" value="<?=h($content['about_title'] ?? '')?>">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Açıklama</label>
+                  <textarea name="about_text" class="form-control" rows="4" placeholder="Bölüm açıklaması"><?=h($content['about_text'] ?? '')?></textarea>
+                </div>
+              </div>
+            </div>
+            <div class="card-section">
+              <h6 class="fw-semibold mb-3">Öne Çıkan Özellikler</h6>
+              <div class="row g-3">
+                <?php foreach ($aboutFeatures as $idx => $feature): ?>
+                  <div class="col-md-6">
+                    <div class="repeater-item h-100">
+                      <label class="form-label">Başlık</label>
+                      <input type="text" class="form-control mb-2" name="about_feature_title[]" value="<?=h($feature['title'])?>" placeholder="Örn. Profesyonel destek">
+                      <label class="form-label">Açıklama</label>
+                      <textarea class="form-control" name="about_feature_text[]" rows="3" placeholder="Kısa açıklama"><?=h($feature['text'])?></textarea>
+                    </div>
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="features">
+            <div class="card-section border-bottom">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Özellik Kartları</h5>
+                  <p class="text-muted mb-0">Hero altındaki üçlü özellik kartlarını özelleştirin. Emoji veya kısa ikon ifadeleri kullanabilirsiniz.</p>
+                </div>
+                <i class="bi bi-grid-3x3-gap" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <?php foreach ($featureBlocks as $idx => $block): ?>
+                <div class="repeater-item mb-3">
+                  <div class="row g-3">
+                    <div class="col-md-2">
+                      <label class="form-label">İkon</label>
+                      <input type="text" class="form-control" name="feature_icon[]" value="<?=h($block['icon'])?>" placeholder="Örn. 📸">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label">Başlık</label>
+                      <input type="text" class="form-control" name="feature_title[]" value="<?=h($block['title'])?>">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Açıklama</label>
+                      <textarea class="form-control" name="feature_text[]" rows="2" placeholder="Özellik açıklaması"><?=h($block['text'])?></textarea>
+                    </div>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Zaman Çizelgesi</h5>
+                  <p class="text-muted mb-0">"BİKARE nasıl çalışır?" bölümündeki başlık ve adımları düzenleyin.</p>
+                </div>
+                <i class="bi bi-list-ol" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                  <label class="form-label">Bölüm Başlığı</label>
+                  <input type="text" name="timeline_title" class="form-control" value="<?=h($content['timeline_title'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Bölüm Açıklaması</label>
+                  <textarea name="timeline_text" class="form-control" rows="2"><?=h($content['timeline_text'] ?? '')?></textarea>
+                </div>
+              </div>
+              <?php foreach ($timelineSteps as $idx => $step): ?>
+                <div class="repeater-item mb-3">
+                  <div class="row g-3">
+                    <div class="col-md-4">
+                      <label class="form-label">Adım Başlığı</label>
+                      <input type="text" class="form-control" name="timeline_step_title[]" value="<?=h($step['title'])?>" placeholder="Adım <?=h((string)($idx + 1))?>">
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label">Adım Açıklaması</label>
+                      <textarea class="form-control" name="timeline_step_text[]" rows="2" placeholder="Açıklama"><?=h($step['text'])?></textarea>
+                    </div>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="packages">
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Paketler Bölümü</h5>
+                  <p class="text-muted mb-0">Paket listesi üstündeki başlık, açıklama ve vurgulu maddeleri güncelleyin.</p>
+                </div>
+                <i class="bi bi-box-seam" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Bölüm Başlığı</label>
+                  <input type="text" name="packages_title" class="form-control" value="<?=h($content['packages_title'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Bölüm Açıklaması</label>
+                  <textarea name="packages_text" class="form-control" rows="2"><?=h($content['packages_text'] ?? '')?></textarea>
+                </div>
+              </div>
+              <div class="row g-3 mt-1">
+                <?php foreach ($packagesHighlights as $highlight): ?>
+                  <div class="col-md-6">
+                    <label class="form-label">Öne Çıkan Madde</label>
+                    <input type="text" class="form-control" name="packages_highlight[]" value="<?=h($highlight)?>" placeholder="Örn. Otomatik panel kurulumu">
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="dealer">
+            <div class="card-section border-bottom">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Bayi Ağı Bölümü</h5>
+                  <p class="text-muted mb-0">Bayi vitrini metinlerini ve aksiyon butonunu özelleştirin.</p>
+                </div>
+                <i class="bi bi-people" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label">Rozet</label>
+                  <input type="text" name="dealer_badge" class="form-control" value="<?=h($content['dealer_badge'] ?? '')?>">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Başlık</label>
+                  <input type="text" name="dealer_title" class="form-control" value="<?=h($content['dealer_title'] ?? '')?>">
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Açıklama</label>
+                  <textarea name="dealer_text" class="form-control" rows="4"><?=h($content['dealer_text'] ?? '')?></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Buton Metni</label>
+                  <input type="text" name="dealer_button_label" class="form-control" value="<?=h($content['dealer_button_label'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Buton URL</label>
+                  <input type="text" name="dealer_button_url" class="form-control" value="<?=h($content['dealer_button_url'] ?? '')?>" placeholder="dealer/apply.php">
+                </div>
+              </div>
+            </div>
+            <div class="card-section border-bottom">
+              <h6 class="fw-semibold mb-3">Bayi Avantajları</h6>
+              <div class="row g-3">
+                <?php foreach ($dealerHighlights as $highlight): ?>
+                  <div class="col-md-6">
+                    <label class="form-label">Madde</label>
+                    <input type="text" class="form-control" name="dealer_highlight[]" value="<?=h($highlight)?>" placeholder="Örn. Detaylı raporlama">
+                  </div>
+                <?php endforeach; ?>
+              </div>
+            </div>
+            <div class="card-section">
+              <h6 class="fw-semibold mb-3">Referans Yorumları</h6>
+              <?php foreach ($testimonials as $testimonial): ?>
+                <div class="repeater-item mb-3">
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <label class="form-label">Alıntı</label>
+                      <textarea class="form-control" name="testimonial_quote[]" rows="2" placeholder="Müşteri yorumu"><?=h($testimonial['quote'])?></textarea>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">İsim</label>
+                      <input type="text" class="form-control" name="testimonial_author[]" value="<?=h($testimonial['author'])?>">
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label">Unvan / Etkinlik</label>
+                      <input type="text" class="form-control" name="testimonial_role[]" value="<?=h($testimonial['role'])?>">
+                    </div>
+                  </div>
+                </div>
+              <?php endforeach; ?>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="gallery">
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Galeri Başlıkları</h5>
+                  <p class="text-muted mb-0">Galeri bölümünde görünen başlık ve açıklama metnini düzenleyin.</p>
+                </div>
+                <i class="bi bi-collection" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Başlık</label>
+                  <input type="text" name="gallery_title" class="form-control" value="<?=h($content['gallery_title'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Açıklama</label>
+                  <textarea name="gallery_text" class="form-control" rows="3"><?=h($content['gallery_text'] ?? '')?></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="lead">
+            <div class="card-section">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Sipariş Formu Alanı</h5>
+                  <p class="text-muted mb-0">Sipariş formu yanında gösterilen metin ve bilgilendirici maddeleri düzenleyin.</p>
+                </div>
+                <i class="bi bi-ui-checks" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Form Başlığı</label>
+                  <input type="text" name="lead_form_title" class="form-control" value="<?=h($content['lead_form_title'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Form Açıklaması</label>
+                  <textarea name="lead_form_text" class="form-control" rows="3"><?=h($content['lead_form_text'] ?? '')?></textarea>
+                </div>
+              </div>
+              <div class="row g-3 mt-1">
+                <?php foreach ($leadFormBullets as $bullet): ?>
+                  <div class="col-md-6">
+                    <label class="form-label">Bilgilendirme Maddesi</label>
+                    <input type="text" class="form-control" name="lead_form_bullet[]" value="<?=h($bullet)?>">
+                  </div>
+                <?php endforeach; ?>
+              </div>
+              <div class="row g-3 mt-1">
+                <div class="col-md-6">
+                  <label class="form-label">Alt Bilgi (Formu Gönder)</label>
+                  <input type="text" name="lead_form_notice" class="form-control" value="<?=h($content['lead_form_notice'] ?? '')?>" placeholder="Formu gönderdiğinizde ...">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Buton Metni</label>
+                  <input type="text" name="lead_form_submit_label" class="form-control" value="<?=h($content['lead_form_submit_label'] ?? '')?>" placeholder="Ödeme Adımına Geç">
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="card card-lite content-pane active" data-pane="contact">
             <div class="card-section border-bottom">
               <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
@@ -554,6 +1104,32 @@ while (count($navItems) < 5) {
                 <div class="col-12">
                   <label class="form-label">CTA Buton URL</label>
                   <input type="text" name="contact_cta_button_url" class="form-control" value="<?=h($content['contact_cta_button_url'] ?? '')?>">
+                </div>
+              </div>
+              <hr class="my-4">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h6 class="fw-semibold mb-1">Alt Sayfa CTA Bloğu</h6>
+                  <p class="text-muted small mb-0">"Etkinliğiniz için hazırız" alanındaki metin ve buton bilgilerini burada güncelleyin.</p>
+                </div>
+                <i class="bi bi-lightning-charge-fill" style="font-size:1.4rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Alt CTA Başlığı</label>
+                  <input type="text" name="cta_banner_title" class="form-control" value="<?=h($content['cta_banner_title'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Alt CTA Açıklaması</label>
+                  <textarea name="cta_banner_text" class="form-control" rows="2"><?=h($content['cta_banner_text'] ?? '')?></textarea>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Alt CTA Buton Metni</label>
+                  <input type="text" name="cta_banner_button_label" class="form-control" value="<?=h($content['cta_banner_button_label'] ?? '')?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Alt CTA Buton URL</label>
+                  <input type="text" name="cta_banner_button_url" class="form-control" value="<?=h($content['cta_banner_button_url'] ?? '')?>" placeholder="#lead-form">
                 </div>
               </div>
             </div>

@@ -80,9 +80,77 @@ function site_content_defaults(): array {
   return [
     'default_dealer_referral_code' => '',
     'site_logo' => '',
+    'hero_badge' => 'Yeni nesil misafir paylaşımı',
+    'hero_title' => 'Tek QR kodla tüm fotoğraf ve videoları toplayın',
+    'hero_text' => 'BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak etkinlik panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.',
+    'hero_primary_label' => 'Paketleri İncele',
+    'hero_primary_url' => '#paketler',
+    'hero_secondary_label' => 'Hemen Başlayın',
+    'hero_secondary_url' => '#lead-form',
+    'hero_metrics' => [
+      ['value' => '12.500+', 'label' => 'Toplanan fotoğraf ve videolar'],
+      ['value' => '%98', 'label' => 'Misafir memnuniyeti'],
+      ['value' => '5 dk', 'label' => 'Ödeme sonrası panel hazır olma süresi'],
+    ],
     'hero_image_main' => 'https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80',
     'hero_image_secondary' => 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80',
     'about_image' => 'https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+    'about_badge' => 'BİKARE Hakkında',
+    'about_title' => 'Her anınızı dijital sahneye taşıyan çözüm ortağınız',
+    'about_text' => 'Zerosoft olarak düğün, nişan, kurumsal davet ve tüm özel etkinliklerinizde misafirlerinizle aynı anda nefes alan bir platform geliştirdik. BİKARE; yüksek yükleme kapasitesi, güçlü misafir etkileşim araçları ve otomatik QR kod altyapısıyla sizi teknik detaylardan kurtarır.',
+    'about_features' => [
+      ['title' => 'Profesyonel destek', 'text' => 'Kurulumdan canlı yayına kadar deneyimli ekibimizle yanınızdayız.'],
+      ['title' => 'Tamamen yerli altyapı', 'text' => 'Verileriniz Türkiye lokasyonlu sunucularda güvenle saklanır.'],
+    ],
+    'feature_blocks' => [
+      ['icon' => '📸', 'title' => 'Anında QR Toplama', 'text' => 'Misafirleriniz QR kodu okutup doğrudan galerinize fotoğraf ve videoları yükler. Her yükleme etkinlik panelinizde otomatik görünür.'],
+      ['icon' => '✨', 'title' => 'Sosyal Galeri Deneyimi', 'text' => 'Beğeniler, yıldızlar ve yorumlarla misafir galerisi sosyal medya tadında. Albümünüzü dilediğiniz gibi düzenleyin.'],
+      ['icon' => '🔒', 'title' => 'Güvenli Online Ödeme', 'text' => 'PayTR altyapısıyla kart bilgileriniz güvende. Ödeme tamamlandığında paneliniz ve QR kodlarınız otomatik hazırlanır.'],
+    ],
+    'timeline_title' => 'BİKARE nasıl çalışır?',
+    'timeline_text' => 'Basit 3 adımda etkinliğinizi dijitalleştiriyoruz. Kurulum ve teknik detaylarla vakit kaybetmenize gerek yok.',
+    'timeline_steps' => [
+      ['title' => 'Paketi seçin & ödeme yapın', 'text' => 'Formu doldurup güvenli ödeme adımında işlemi tamamlayın.'],
+      ['title' => 'Panel otomatik kurulsun', 'text' => 'Etkinlik paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.'],
+      ['title' => 'Misafirlerinizi davet edin', 'text' => 'QR kodu paylaşın, fotoğraflar ve videolar gerçek zamanlı olarak panelinize düşsün.'],
+    ],
+    'packages_title' => 'İhtiyacınıza uygun paketleri seçin',
+    'packages_text' => 'Her paket güvenli online ödeme, otomatik panel kurulumu ve sınırsız misafir yüklemesi içerir.',
+    'packages_highlights' => [
+      'Kalıcı ve etkinliğe özel QR kodlar',
+      'Etkinlik paneli otomatik kurulum ve e-posta bildirimi',
+      'Sosyal medya tarzı misafir galerisi',
+      'HD fotoğraf & video yükleme desteği',
+    ],
+    'dealer_badge' => 'Bayi Ağı',
+    'dealer_title' => 'Etkinlik sektöründeki iş ortaklarımız için kazandıran sistem',
+    'dealer_text' => 'Bayi panelinizden bakiye yönetebilir, PayTR entegrasyonlu paketler satın alabilir, etkinliklerinizi tek ekrandan yönetebilirsiniz. Referans kodu ile gerçekleştirdiğiniz satışlardan onay sonrası cashback kazanırsınız.',
+    'dealer_highlights' => [
+      'Salon bazlı etkinlik yönetimi ve QR kod üretimi',
+      'Detaylı raporlama, bakiye ve cashback geçmişi',
+      'PayTR ile güvenli tahsilat ve hızlı aktivasyon',
+    ],
+    'dealer_button_label' => 'Bayi Ağına Katıl',
+    'dealer_button_url' => 'dealer/apply.php',
+    'gallery_title' => 'Gerçek hikayelerden ilham alın',
+    'gallery_text' => 'Misafirleriniz sadece düğünlerde değil; nişan, kına, doğum günü ve kurumsal etkinliklerde de QR kodunuzla içerik paylaşabilir.',
+    'testimonials' => [
+      ['quote' => '"Misafirlerimiz tüm fotoğrafları bir araya getirirken inanılmaz eğlendi. Panellerin otomatik kurulması bizim için büyük kolaylık sağladı."', 'author' => 'İpek & Cem', 'role' => 'İstanbul Boğazı Düğünü'],
+      ['quote' => '"Kurumsal lansmanımızda katılımcıların videolarını toplamak bu kadar kolay olmamıştı. BİKARE ekibi her detayla ilgilendi."', 'author' => 'Berna U.', 'role' => 'Etkinlik Ajansı Sahibi'],
+    ],
+    'cta_banner_title' => 'Etkinliğiniz için hazırız',
+    'cta_banner_text' => 'Formu doldurup güvenli ödeme adımını tamamlayın, paneliniz birkaç dakika içinde aktif olsun. Anılarınızı kaybetmeyin, değerini artırın.',
+    'cta_banner_button_label' => 'Paket Seç & Ödeme Yap',
+    'cta_banner_button_url' => '#lead-form',
+    'lead_form_title' => 'Sipariş Formu',
+    'lead_form_text' => 'Paketinizi seçin, bilgilerinizi girin ve PayTR ile güvenli ödeme adımına yönlendirilin. Ödeme onaylandığında giriş bilgilerinizi otomatik olarak e-posta ile alacaksınız.',
+    'lead_form_bullets' => [
+      'Misafir galerisi, QR kodlar ve etkinlik paneli otomatik hazırlanır.',
+      'Referans kodu alanı isteğe bağlıdır. Kod kullanırsanız ilgili bayi cashback kazanır.',
+      'Dilediğiniz zaman destek ekibimizle iletişime geçebilirsiniz.',
+    ],
+    'lead_form_notice' => 'Formu gönderdiğinizde PayTR güvenli ödeme sayfasına yönlendirileceksiniz.',
+    'lead_form_submit_label' => 'Ödeme Adımına Geç',
     'gallery_images' => [
       'https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
       'https://images.unsplash.com/photo-1519741497674-611481863552?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
@@ -357,6 +425,17 @@ function site_resolve_button_url(?string $url): ?string {
   }
   if (preg_match('~^(mailto:|tel:|#)~i', $url)) {
     return $url;
+  }
+  if (preg_match('~^https?://~i', $url)) {
+    return $url;
+  }
+  if (defined('BASE_URL')) {
+    $base = rtrim((string)BASE_URL, '/');
+    $path = ltrim($url, '/');
+    if ($path === '') {
+      return $base;
+    }
+    return $base.'/'.$path;
   }
   return site_normalize_url($url);
 }
