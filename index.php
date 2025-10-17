@@ -110,7 +110,7 @@ unset($_SESSION['lead_success']);
   @media(max-width:768px){.form-section{padding:32px;}}
 </style>
 </head><body>
-<?php site_public_header('home'); ?>
+<?php site_public_header('home', $content); ?>
 
 <main class="container py-5">
   <section class="hero mb-5">

@@ -93,6 +93,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   $payload['footer_nav_links'] = $navItems;
 
+  $siteLogo = $content['site_logo'] ?? $defaults['site_logo'];
+  if (!empty($_POST['site_logo_remove'])) {
+    site_content_delete_asset($siteLogo);
+    $siteLogo = '';
+  }
+  if (!empty($_FILES['site_logo'])) {
+    $uploaded = site_content_store_upload($_FILES['site_logo'], $siteLogo ?: null);
+    if ($uploaded) {
+      $siteLogo = $uploaded;
+    }
+  }
+  $payload['site_logo'] = $siteLogo;
+
   $heroMain = $content['hero_image_main'] ?? $defaults['hero_image_main'];
   if (!empty($_POST['hero_image_main_remove'])) {
     site_content_delete_asset($heroMain);
@@ -324,6 +337,7 @@ while (count($navItems) < 5) {
 
           <div class="card card-lite content-pane" data-pane="media">
             <?php
+              $siteLogoCurrent = $content['site_logo'] ?? $defaults['site_logo'];
               $heroMainImage = $content['hero_image_main'] ?? $defaults['hero_image_main'];
               $heroSecondaryImage = $content['hero_image_secondary'] ?? $defaults['hero_image_secondary'];
               $aboutImageCurrent = $content['about_image'] ?? $defaults['about_image'];
@@ -342,6 +356,29 @@ while (count($navItems) < 5) {
                 <i class="bi bi-camera-reels" style="font-size:1.6rem;color:var(--admin-brand);"></i>
               </div>
               <div class="row g-4">
+                <div class="col-12">
+                  <div class="media-preview">
+                    <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
+                      <div>
+                        <strong>Site Logosu</strong>
+                        <p class="text-muted small mb-0">Header bölümünde kullanılan logo. Şeffaf arka planlı SVG veya PNG önerilir.</p>
+                      </div>
+                      <span class="badge text-bg-light" style="color:var(--admin-brand);background:rgba(14,165,181,.15);">120x40px önerilir</span>
+                    </div>
+                    <?php if (!empty($siteLogoCurrent)): ?>
+                      <img src="<?=h($siteLogoCurrent)?>" alt="Site logosu" style="object-fit:contain;background:#fff;padding:1.25rem;height:140px;width:auto;max-width:100%;display:block;margin:0 auto;">
+                    <?php else: ?>
+                      <div class="text-muted small">Şu anda varsayılan yazı tabanlı logo kullanılıyor.</div>
+                    <?php endif; ?>
+                    <input type="file" name="site_logo" class="form-control" accept="image/*">
+                    <?php if (!empty($content['site_logo'])): ?>
+                      <div class="form-check">
+                        <input class="form-check-input" type="checkbox" name="site_logo_remove" value="1" id="removeSiteLogo">
+                        <label class="form-check-label" for="removeSiteLogo">Yüklü logoyu kaldır</label>
+                      </div>
+                    <?php endif; ?>
+                  </div>
+                </div>
                 <div class="col-md-6">
                   <div class="media-preview">
                     <div>

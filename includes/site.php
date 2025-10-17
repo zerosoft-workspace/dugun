@@ -78,6 +78,7 @@ function site_public_packages(): array {
 function site_content_defaults(): array {
   $year = date('Y');
   return [
+    'site_logo' => '',
     'hero_image_main' => 'https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80',
     'hero_image_secondary' => 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80',
     'about_image' => 'https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
@@ -195,6 +196,12 @@ function site_public_content(): array {
     }
   }
 
+  $logo = trim((string)($content['site_logo'] ?? ''));
+  if ($logo === '') {
+    $logo = $defaults['site_logo'];
+  }
+  $content['site_logo'] = $logo;
+
   $heroMain = trim((string)($content['hero_image_main'] ?? ''));
   if ($heroMain === '') {
     $heroMain = $defaults['hero_image_main'];
@@ -298,7 +305,7 @@ function site_content_store_upload(array $file, ?string $previous = null): ?stri
   }
   $name = $file['name'] ?? 'upload';
   $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-  $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+  $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
   if (!in_array($ext, $allowed, true)) {
     return null;
   }
