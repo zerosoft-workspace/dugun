@@ -3,6 +3,7 @@ require_once __DIR__.'/../config.php';
 require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/site.php';
+require_once __DIR__.'/../includes/dealers.php';
 require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/partials/ui.php';
 
@@ -16,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   csrf_or_die();
 
   $payload = [
+    'default_dealer_referral_code' => trim($_POST['default_dealer_referral_code'] ?? ''),
     'contact_title' => trim($_POST['contact_title'] ?? ''),
     'contact_text' => trim($_POST['contact_text'] ?? ''),
     'contact_phone' => trim($_POST['contact_phone'] ?? ''),
@@ -54,6 +56,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $payload['smtp_secure'] = $smtpSecure;
   $payload['smtp_from_email'] = trim($_POST['smtp_from_email'] ?? '');
   $payload['smtp_from_name'] = trim($_POST['smtp_from_name'] ?? '');
+
+  $defaultReferral = $payload['default_dealer_referral_code'];
+  if ($defaultReferral !== '') {
+    $defaultDealer = dealer_find_by_code($defaultReferral);
+    if (!$defaultDealer || !in_array($defaultDealer['status'], [DEALER_STATUS_ACTIVE, DEALER_STATUS_PENDING], true)) {
+      flash('fail', 'Varsayılan bayi referans kodu bulunamadı veya pasif durumda. Kod alanı temizlendi.');
+      $payload['default_dealer_referral_code'] = '';
+    }
+  }
 
   $faqItems = [];
   $faqQuestions = $_POST['faq_question'] ?? [];
@@ -271,6 +282,7 @@ while (count($navItems) < 5) {
             <button type="button" class="pane-button active" data-pane-target="contact"><i class="bi bi-person-rolodex"></i>İletişim Bilgileri</button>
             <button type="button" class="pane-button" data-pane-target="media"><i class="bi bi-images"></i>Görsel İçerikler</button>
             <button type="button" class="pane-button" data-pane-target="cta"><i class="bi bi-bullseye"></i>Çağrı Alanı</button>
+            <button type="button" class="pane-button" data-pane-target="sales"><i class="bi bi-shop"></i>Satış Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="smtp"><i class="bi bi-envelope-paper"></i>SMTP Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="faq"><i class="bi bi-chat-dots"></i>Sıkça Sorulanlar</button>
             <button type="button" class="pane-button" data-pane-target="footer"><i class="bi bi-columns-gap"></i>Footer İçeriği</button>
@@ -467,6 +479,49 @@ while (count($navItems) < 5) {
                   <div class="form-text">Birden fazla görsel seçebilirsiniz. JPG, PNG veya WEBP formatları desteklenir.</div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="sales">
+            <div class="card-section border-bottom">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Satış Ayarları</h5>
+                  <p class="text-muted mb-0">Web siparişlerinde referans kodu boş bırakıldığında atanacak varsayılan bayi kodunu belirleyin.</p>
+                </div>
+                <i class="bi bi-shop" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Varsayılan Bayi Referans Kodu</label>
+                <input type="text" name="default_dealer_referral_code" class="form-control" value="<?=h($content['default_dealer_referral_code'] ?? '')?>" placeholder="Örn. BIKARE01">
+                <div class="form-text">Müşteri referans kodu girmezse bu bayi siparişe otomatik atanır.</div>
+              </div>
+              <?php
+                $currentCode = trim((string)($content['default_dealer_referral_code'] ?? ''));
+                if ($currentCode !== '') {
+                  $currentDealer = dealer_find_by_code($currentCode);
+                  if ($currentDealer) {
+                    $badgeClass = in_array($currentDealer['status'], [DEALER_STATUS_ACTIVE, DEALER_STATUS_PENDING], true) ? 'text-bg-success' : 'text-bg-warning';
+                    $statusLabel = dealer_status_badge($currentDealer['status']);
+              ?>
+                <div class="alert alert-light border d-flex align-items-center gap-3" role="alert">
+                  <div class="flex-grow-1">
+                    <div class="fw-semibold"><?=h($currentDealer['name'] ?? ($currentDealer['contact_name'] ?? 'Bayi'))?></div>
+                    <div class="small text-muted mb-1">Kod: <?=h($currentCode)?></div>
+                    <span class="badge <?=$badgeClass?>"><?=$statusLabel?></span>
+                  </div>
+                  <i class="bi bi-people-fill fs-4 text-secondary"></i>
+                </div>
+              <?php
+                  } else {
+              ?>
+                <div class="alert alert-warning" role="alert">
+                  Bu kod herhangi bir bayi ile eşleşmediği için siparişlerde kullanılmayacak.
+                </div>
+              <?php
+                  }
+                }
+              ?>
             </div>
           </div>
 

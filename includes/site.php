@@ -78,6 +78,7 @@ function site_public_packages(): array {
 function site_content_defaults(): array {
   $year = date('Y');
   return [
+    'default_dealer_referral_code' => '',
     'site_logo' => '',
     'hero_image_main' => 'https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80',
     'hero_image_secondary' => 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80',
@@ -195,6 +196,8 @@ function site_public_content(): array {
       unset($content[$key]);
     }
   }
+
+  unset($content['default_dealer_referral_code']);
 
   $logo = trim((string)($content['site_logo'] ?? ''));
   if ($logo === '') {
@@ -582,6 +585,10 @@ function site_create_customer_order(array $input): array {
   $notes = trim($input['notes'] ?? '');
   $referral = trim($input['referral_code'] ?? '');
 
+  if ($referral === '') {
+    $referral = site_default_dealer_referral_code();
+  }
+
   if ($packageId <= 0) {
     throw new RuntimeException('Lütfen bir paket seçin.');
   }
@@ -661,6 +668,16 @@ function site_create_customer_order(array $input): array {
       'phone' => $customerPhone,
     ],
   ];
+}
+
+function site_default_dealer_referral_code(): string {
+  static $cached = null;
+  if ($cached !== null) {
+    return $cached;
+  }
+  $settings = site_settings_all();
+  $cached = trim((string)($settings['default_dealer_referral_code'] ?? ''));
+  return $cached;
 }
 
 function site_ensure_order_paytr_token(int $order_id): array {
