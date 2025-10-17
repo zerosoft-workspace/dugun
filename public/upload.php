@@ -24,6 +24,15 @@ function client_ip(){
 function is_image_mime($m){ return (bool)preg_match('~^image/(jpeg|png|webp|gif)$~i',$m); }
 function is_video_mime($m){ return (bool)preg_match('~^video/(mp4|quicktime|webm)$~i',$m); }
 
+function dealer_qr_code_matches_event(string $code, int $eventId): bool {
+  if ($code === '' || $eventId <= 0) {
+    return false;
+  }
+  $st = pdo()->prepare('SELECT 1 FROM dealer_qr_codes WHERE code=? AND target_event_id=? LIMIT 1');
+  $st->execute([$code, $eventId]);
+  return (bool)$st->fetchColumn();
+}
+
 $event_id = (int)($_GET['event'] ?? 0);
 $token    = trim($_GET['t'] ?? '');
 if ($event_id <= 0){ http_response_code(400); exit('Geçersiz istek'); }
@@ -54,9 +63,15 @@ $tPos = isset($layoutArr['title'])    ? $layoutArr['title']    : array('x'=>24,'
 $sPos = isset($layoutArr['subtitle']) ? $layoutArr['subtitle'] : array('x'=>24,'y'=>60);
 $pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'y'=>396);
 
+$permaCode = trim($_GET['code'] ?? '');
+$permaCodeActive = dealer_qr_code_matches_event($permaCode, $event_id);
+$token_ok = token_valid($event_id, $token);
+if ($permaCodeActive) {
+  $token = make_token($event_id, current_slot());
+  $token_ok = true;
+}
 $profile = guest_profile_current($event_id);
 $hostPreview = $profile ? guest_profile_is_host_preview($profile) : false;
-$token_ok = token_valid($event_id, $token);
 $pageCsrf = csrf_token();
 
 $wheelEntries = event_wheel_entries_list($event_id, true);
@@ -269,7 +284,10 @@ if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='quiz_answer'){
 if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='upload'){
   csrf_or_die();
   $p_token = trim($_POST['t']??'');
-  if(!token_valid($event_id,$p_token)){
+  $postedCode = trim($_POST['code'] ?? '');
+  $postedCodeValid = dealer_qr_code_matches_event($postedCode, $event_id);
+  $tokenValid = token_valid($event_id,$p_token);
+  if(!$tokenValid && !$postedCodeValid){
     $errors[]='Güvenlik anahtarı zaman aşımına uğradı. Lütfen QR’ı yeniden okutun.';
   }else{
     $guest = trim($_POST['guest_name']??'');
@@ -302,7 +320,10 @@ if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='upload'){
       }
     }
   }
-  $to=BASE_URL.'/public/upload.php?event='.$event_id.'&t='.rawurlencode($token);
+  $redirectToken = make_token($event_id, current_slot());
+  $to = $postedCodeValid
+    ? BASE_URL.'/public/upload.php?event='.$event_id.'&code='.rawurlencode($postedCode)
+    : BASE_URL.'/public/upload.php?event='.$event_id.'&t='.rawurlencode($redirectToken);
   if($okCount>0){ flash('ok',$okCount.' dosya yüklendi. Teşekkürler!'); header('Location:'.$to); exit; }
   if($errors){ flash('err',implode('<br>',array_map('h',$errors))); header('Location:'.$to); exit; }
 }
@@ -485,6 +506,9 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
       <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
       <input type="hidden" name="do" value="upload">
       <input type="hidden" name="t" value="<?=h($token)?>">
+      <?php if($permaCode !== ''): ?>
+        <input type="hidden" name="code" value="<?=h($permaCode)?>">
+      <?php endif; ?>
       <div>
         <label class="form-label">Adınız</label>
         <input class="form-control" name="guest_name" placeholder="Ad Soyad" required <?= !$token_ok?'disabled':'' ?>>

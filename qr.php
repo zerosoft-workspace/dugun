@@ -34,7 +34,8 @@ $st3=pdo()->prepare(
 $st3->execute([$code]);
 $dq=$st3->fetch();
 if ($dq && $dq['ev_id']){
-  $dest = public_upload_url((int)$dq['ev_id']);
+  $eventId = (int)$dq['ev_id'];
+  $dest = BASE_URL.'/public/upload.php?event='.$eventId.'&code='.rawurlencode($dq['code']);
   redirect($dest);
 }
 
