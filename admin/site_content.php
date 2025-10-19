@@ -900,12 +900,40 @@ while (count($leadFormBullets) < 3) {
           <div class="card card-lite content-pane" data-pane="media">
             <?php
               $siteLogoCurrent = $content['site_logo'] ?? $defaults['site_logo'];
+              if (!site_content_asset_exists($siteLogoCurrent)) {
+                $siteLogoCurrent = $defaults['site_logo'];
+              }
               $heroMainImage = $content['hero_image_main'] ?? $defaults['hero_image_main'];
+              if (!site_content_asset_exists($heroMainImage)) {
+                $heroMainImage = $defaults['hero_image_main'];
+              }
               $heroSecondaryImage = $content['hero_image_secondary'] ?? $defaults['hero_image_secondary'];
+              if (!site_content_asset_exists($heroSecondaryImage)) {
+                $heroSecondaryImage = $defaults['hero_image_secondary'];
+              }
               $aboutImageCurrent = $content['about_image'] ?? $defaults['about_image'];
+              if (!site_content_asset_exists($aboutImageCurrent)) {
+                $aboutImageCurrent = $defaults['about_image'];
+              }
               $dealerImageCurrent = $content['dealer_showcase_image'] ?? $defaults['dealer_showcase_image'];
+              if (!site_content_asset_exists($dealerImageCurrent)) {
+                $dealerImageCurrent = $defaults['dealer_showcase_image'];
+              }
               $galleryImages = $content['gallery_images'] ?? $defaults['gallery_images'];
               if (!is_array($galleryImages)) {
+                $galleryImages = $defaults['gallery_images'];
+              }
+              $galleryImages = array_values(array_filter($galleryImages, function ($image) {
+                if (!is_string($image)) {
+                  return false;
+                }
+                $image = trim($image);
+                if ($image === '') {
+                  return false;
+                }
+                return site_content_asset_exists($image);
+              }));
+              if (!$galleryImages) {
                 $galleryImages = $defaults['gallery_images'];
               }
             ?>

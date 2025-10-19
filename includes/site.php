@@ -255,6 +255,43 @@ function site_settings_update(array $data): void {
   }
 }
 
+function site_content_asset_exists(?string $path): bool {
+  $path = trim((string)$path);
+  if ($path === '') {
+    return false;
+  }
+  if (strncasecmp($path, 'data:', 5) === 0) {
+    return true;
+  }
+  if (preg_match('~^(?:https?:)?//~i', $path)) {
+    return true;
+  }
+
+  $normalized = ltrim($path, '/');
+  if ($normalized === '') {
+    return false;
+  }
+
+  $normalized = explode('?', $normalized, 2)[0];
+  $normalized = str_replace('\\', '/', $normalized);
+  if (strpos($normalized, '..') !== false) {
+    return false;
+  }
+
+  $root = realpath(__DIR__.'/..');
+  if (!$root) {
+    return false;
+  }
+
+  $full = realpath($root.'/'.$normalized);
+  if ($full !== false && strpos($full, $root) === 0 && is_file($full)) {
+    return true;
+  }
+
+  $candidate = $root.'/'.$normalized;
+  return is_file($candidate);
+}
+
 function site_public_content(): array {
   $defaults = site_content_defaults();
   $content = site_settings_all();
@@ -268,31 +305,31 @@ function site_public_content(): array {
   unset($content['default_dealer_referral_code']);
 
   $logo = trim((string)($content['site_logo'] ?? ''));
-  if ($logo === '') {
+  if ($logo === '' || !site_content_asset_exists($logo)) {
     $logo = $defaults['site_logo'];
   }
   $content['site_logo'] = $logo;
 
   $heroMain = trim((string)($content['hero_image_main'] ?? ''));
-  if ($heroMain === '') {
+  if ($heroMain === '' || !site_content_asset_exists($heroMain)) {
     $heroMain = $defaults['hero_image_main'];
   }
   $content['hero_image_main'] = $heroMain;
 
   $heroSecondary = trim((string)($content['hero_image_secondary'] ?? ''));
-  if ($heroSecondary === '') {
+  if ($heroSecondary === '' || !site_content_asset_exists($heroSecondary)) {
     $heroSecondary = $defaults['hero_image_secondary'];
   }
   $content['hero_image_secondary'] = $heroSecondary;
 
   $aboutImage = trim((string)($content['about_image'] ?? ''));
-  if ($aboutImage === '') {
+  if ($aboutImage === '' || !site_content_asset_exists($aboutImage)) {
     $aboutImage = $defaults['about_image'];
   }
   $content['about_image'] = $aboutImage;
 
   $dealerShowcase = trim((string)($content['dealer_showcase_image'] ?? ''));
-  if ($dealerShowcase === '') {
+  if ($dealerShowcase === '' || !site_content_asset_exists($dealerShowcase)) {
     $dealerShowcase = $defaults['dealer_showcase_image'];
   }
   $content['dealer_showcase_image'] = $dealerShowcase;
@@ -321,7 +358,10 @@ function site_public_content(): array {
       return false;
     }
     $val = trim($item);
-    return $val !== '';
+    if ($val === '') {
+      return false;
+    }
+    return site_content_asset_exists($val);
   }));
   if (!$content['gallery_images']) {
     $content['gallery_images'] = $defaults['gallery_images'];
