@@ -323,23 +323,23 @@ unset($_SESSION['lead_success']);
             <?php if (!empty($pkg['description'])): ?>
               <p class="muted small mb-4"><?=nl2br(h($pkg['description']))?></p>
             <?php endif; ?>
-            <?php if ($packagesHighlights): ?>
-              <ul class="small text-muted mb-0">
-                <?php foreach ($packagesHighlights as $highlight):
+            <?php
+              $packageHighlights = [];
+              if ($packagesHighlights) {
+                foreach ($packagesHighlights as $highlight) {
                   $highlight = trim((string)$highlight);
                   if ($highlight === '') {
                     continue;
                   }
-                ?>
+                  $packageHighlights[] = $highlight;
+                }
+              }
+            ?>
+            <?php if ($packageHighlights): ?>
+              <ul class="small text-muted mb-0">
+                <?php foreach ($packageHighlights as $highlight): ?>
                   <li><?=h($highlight)?></li>
                 <?php endforeach; ?>
-                <?php if ($pkg['cashback_rate'] > 0): ?>
-                  <li>Referans koduyla %<?=number_format($pkg['cashback_rate'] * 100, 0)?> cashback</li>
-                <?php endif; ?>
-              </ul>
-            <?php elseif ($pkg['cashback_rate'] > 0): ?>
-              <ul class="small text-muted mb-0">
-                <li>Referans koduyla %<?=number_format($pkg['cashback_rate'] * 100, 0)?> cashback</li>
               </ul>
             <?php endif; ?>
           </div>
