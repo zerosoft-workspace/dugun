@@ -1288,6 +1288,19 @@ function dealer_create_topup_request(int $dealer_id, int $amount_cents): array {
   $user_address = $dealer['company'] ?: '—';
   $user_phone = $dealer['phone'] ?: '—';
 
+  $paytrConfig = site_payment_config();
+  $merchantId = trim((string)($paytrConfig['merchant_id'] ?? ''));
+  $merchantKey = trim((string)($paytrConfig['merchant_key'] ?? ''));
+  $merchantSalt = trim((string)($paytrConfig['merchant_salt'] ?? ''));
+  $testMode = (int)($paytrConfig['test_mode'] ?? 1) === 1;
+
+  if (empty($paytrConfig['enabled'])) {
+    throw new RuntimeException('Online ödeme sistemi şu anda pasif. Lütfen yönetici ile iletişime geçin.');
+  }
+  if ($merchantId === '' || $merchantKey === '' || $merchantSalt === '') {
+    throw new RuntimeException('PAYTR ayarları eksik. Yönetim panelinden ödeme anahtarlarını güncelleyin.');
+  }
+
   $ip = $_SERVER['HTTP_CF_CONNECTING_IP']
      ?? $_SERVER['HTTP_X_FORWARDED_FOR']
      ?? $_SERVER['REMOTE_ADDR']
@@ -1310,7 +1323,6 @@ function dealer_create_topup_request(int $dealer_id, int $amount_cents): array {
   $no_installment = 0;
   $max_installment = 0;
   $currency = 'TL';
-  $testMode = paytr_is_test_mode();
   $status = $testMode ? DEALER_TOPUP_STATUS_AWAITING_REVIEW : DEALER_TOPUP_STATUS_PENDING;
   $token = null;
   $reference = null;
@@ -1328,12 +1340,12 @@ function dealer_create_topup_request(int $dealer_id, int $amount_cents): array {
     $payload['note'] = 'Ödeme test modunda otomatik onaylandı.';
     $reference = 'TEST-'.$merchantOid;
   } else {
-    $test = (int)PAYTR_TEST_MODE;
-    $hash_str = PAYTR_MERCHANT_ID . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
-    $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . PAYTR_MERCHANT_SALT, PAYTR_MERCHANT_KEY, true));
+    $test = $testMode ? 1 : 0;
+    $hash_str = $merchantId . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
+    $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . $merchantSalt, $merchantKey, true));
 
     $post = [
-      'merchant_id'         => PAYTR_MERCHANT_ID,
+      'merchant_id'         => $merchantId,
       'user_ip'             => $ip,
       'merchant_oid'        => $merchantOid,
       'email'               => $email,

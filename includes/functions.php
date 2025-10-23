@@ -16,8 +16,74 @@ function format_currency(int $cents, string $suffix = ' TL'): string {
   return number_format($value, 2, ',', '.').$suffix;
 }
 
+function site_payment_config(bool $refresh = false): array {
+  static $cache = null;
+  if ($cache !== null && !$refresh) {
+    return $cache;
+  }
+
+  $config = [
+    'enabled'      => false,
+    'merchant_id'  => defined('PAYTR_MERCHANT_ID') ? (string)PAYTR_MERCHANT_ID : '',
+    'merchant_key' => defined('PAYTR_MERCHANT_KEY') ? (string)PAYTR_MERCHANT_KEY : '',
+    'merchant_salt'=> defined('PAYTR_MERCHANT_SALT') ? (string)PAYTR_MERCHANT_SALT : '',
+    'test_mode'    => defined('PAYTR_TEST_MODE') ? (int)PAYTR_TEST_MODE : 1,
+  ];
+
+  $settings = [];
+  try {
+    if (function_exists('pdo') && table_exists('site_settings')) {
+      $keys = ['paytr_enabled', 'paytr_merchant_id', 'paytr_merchant_key', 'paytr_merchant_salt', 'paytr_test_mode'];
+      $placeholders = implode(',', array_fill(0, count($keys), '?'));
+      $st = pdo()->prepare("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ($placeholders)");
+      $st->execute($keys);
+      while ($row = $st->fetch()) {
+        $settings[$row['setting_key']] = (string)$row['setting_value'];
+      }
+    }
+  } catch (Throwable $e) {
+    // Veritabanı erişimi başarısızsa ortam değişkenleri kullanılmaya devam eder.
+  }
+
+  if (!empty($settings['paytr_merchant_id'])) {
+    $config['merchant_id'] = trim($settings['paytr_merchant_id']);
+  }
+  if (!empty($settings['paytr_merchant_key'])) {
+    $config['merchant_key'] = trim($settings['paytr_merchant_key']);
+  }
+  if (!empty($settings['paytr_merchant_salt'])) {
+    $config['merchant_salt'] = trim($settings['paytr_merchant_salt']);
+  }
+  if (array_key_exists('paytr_test_mode', $settings) && $settings['paytr_test_mode'] !== '') {
+    $config['test_mode'] = (int)$settings['paytr_test_mode'] === 1 ? 1 : 0;
+  }
+
+  if (array_key_exists('paytr_enabled', $settings) && $settings['paytr_enabled'] !== '') {
+    $config['enabled'] = (int)$settings['paytr_enabled'] === 1;
+  } else {
+    $config['enabled'] = ($config['merchant_id'] !== '' && $config['merchant_key'] !== '' && $config['merchant_salt'] !== '');
+  }
+
+  return $cache = $config;
+}
+
+function paytr_credentials(): array {
+  $config = site_payment_config();
+  return [
+    'merchant_id'   => $config['merchant_id'],
+    'merchant_key'  => $config['merchant_key'],
+    'merchant_salt' => $config['merchant_salt'],
+  ];
+}
+
+function paytr_is_enabled(): bool {
+  $config = site_payment_config();
+  return !empty($config['enabled']);
+}
+
 function paytr_is_test_mode(): bool {
-  return defined('PAYTR_TEST_MODE') && (int)PAYTR_TEST_MODE === 1;
+  $config = site_payment_config();
+  return (int)$config['test_mode'] === 1;
 }
 
 function money_to_cents(string $input): int {

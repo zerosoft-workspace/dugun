@@ -180,6 +180,15 @@ function site_content_defaults(): array {
     'footer_company' => 'Zerosoft Teknoloji',
     'footer_disclaimer_left' => '© '.$year.' Zerosoft Teknoloji',
     'footer_disclaimer_right' => 'Developed by Zerosoft — BİKARE Dijital Etkinlik Platformu',
+    'paytr_enabled' => (
+      defined('PAYTR_MERCHANT_ID') && PAYTR_MERCHANT_ID !== '' &&
+      defined('PAYTR_MERCHANT_KEY') && PAYTR_MERCHANT_KEY !== '' &&
+      defined('PAYTR_MERCHANT_SALT') && PAYTR_MERCHANT_SALT !== ''
+    ) ? '1' : '0',
+    'paytr_merchant_id' => defined('PAYTR_MERCHANT_ID') ? (string)PAYTR_MERCHANT_ID : '',
+    'paytr_merchant_key' => defined('PAYTR_MERCHANT_KEY') ? (string)PAYTR_MERCHANT_KEY : '',
+    'paytr_merchant_salt' => defined('PAYTR_MERCHANT_SALT') ? (string)PAYTR_MERCHANT_SALT : '',
+    'paytr_test_mode' => defined('PAYTR_TEST_MODE') ? ((int)PAYTR_TEST_MODE === 1 ? '1' : '0') : '1',
     'smtp_host' => '',
     'smtp_port' => '',
     'smtp_user' => '',
@@ -303,6 +312,7 @@ function site_public_content(): array {
   }
 
   unset($content['default_dealer_referral_code']);
+  unset($content['paytr_enabled'], $content['paytr_merchant_id'], $content['paytr_merchant_key'], $content['paytr_merchant_salt'], $content['paytr_test_mode']);
 
   $logo = trim((string)($content['site_logo'] ?? ''));
   if ($logo === '' || !site_content_asset_exists($logo)) {
@@ -810,6 +820,19 @@ function site_ensure_order_paytr_token(int $order_id): array {
   }
   $dealer = $order['dealer_id'] ? dealer_get((int)$order['dealer_id']) : null;
 
+  $paytrConfig = site_payment_config();
+  $merchantId = trim((string)($paytrConfig['merchant_id'] ?? ''));
+  $merchantKey = trim((string)($paytrConfig['merchant_key'] ?? ''));
+  $merchantSalt = trim((string)($paytrConfig['merchant_salt'] ?? ''));
+  $testMode = (int)($paytrConfig['test_mode'] ?? 1) === 1;
+
+  if (empty($paytrConfig['enabled'])) {
+    throw new RuntimeException('Online ödeme sistemi geçici olarak pasif durumda. Lütfen bizimle iletişime geçin.');
+  }
+  if ($merchantId === '' || $merchantKey === '' || $merchantSalt === '') {
+    throw new RuntimeException('PAYTR ayarları eksik. Lütfen yönetici panelinden ödeme anahtarlarını kontrol edin.');
+  }
+
   if ($order['status'] === SITE_ORDER_STATUS_COMPLETED && $order['event_id']) {
     return [
       'order' => $order,
@@ -824,8 +847,6 @@ function site_ensure_order_paytr_token(int $order_id): array {
   $user_name = mb_substr($order['customer_name'], 0, 64, 'UTF-8');
   $user_address = 'Online Sipariş';
   $user_phone = $order['customer_phone'] ?: '—';
-
-  $testMode = paytr_is_test_mode();
 
   $ip = $_SERVER['HTTP_CF_CONNECTING_IP']
      ?? $_SERVER['HTTP_X_FORWARDED_FOR']
@@ -925,12 +946,12 @@ function site_ensure_order_paytr_token(int $order_id): array {
   $no_installment = 0;
   $max_installment = 0;
   $currency = 'TL';
-  $test = (int)PAYTR_TEST_MODE;
-  $hash_str = PAYTR_MERCHANT_ID . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
-  $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . PAYTR_MERCHANT_SALT, PAYTR_MERCHANT_KEY, true));
+  $test = $testMode ? 1 : 0;
+  $hash_str = $merchantId . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
+  $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . $merchantSalt, $merchantKey, true));
 
   $post = [
-    'merchant_id'          => PAYTR_MERCHANT_ID,
+    'merchant_id'          => $merchantId,
     'user_ip'              => $ip,
     'merchant_oid'         => $merchantOid,
     'email'                => $email,

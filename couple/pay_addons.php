@@ -149,7 +149,20 @@ if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) { $ip = '1.2.3.4'; }
 $oid = 'EV'.$event_id.'PKT'.strtoupper(bin2hex(random_bytes(8)));
 $oid = substr(preg_replace('/[^A-Za-z0-9]/','', $oid), 0, 64);
 
-if (paytr_is_test_mode()) {
+$paytrConfig = site_payment_config();
+if (empty($paytrConfig['enabled'])) {
+  exit('Online ödeme sistemi geçici olarak pasif. Lütfen yönetici ile iletişime geçin.');
+}
+$creds = paytr_credentials();
+$merchantId = trim($creds['merchant_id']);
+$merchantKey = trim($creds['merchant_key']);
+$merchantSalt = trim($creds['merchant_salt']);
+if ($merchantId === '' || $merchantKey === '' || $merchantSalt === '') {
+  exit('PAYTR ayarları eksik. Yönetici panelinden ödeme anahtarlarını kontrol edin.');
+}
+$testMode = paytr_is_test_mode();
+
+if ($testMode) {
   $merchant_oid = 'TEST-'.$oid;
   $now = now();
   $itemsJson = safe_json_encode($items);
@@ -177,11 +190,11 @@ if (paytr_is_test_mode()) {
 }
 
 // PayTR parametreleri
-$no_installment=0; $max_installment=0; $currency='TL'; $test=(int)PAYTR_TEST_MODE;
+$no_installment=0; $max_installment=0; $currency='TL'; $test=$testMode ? 1 : 0;
 
 // HASH
-$hash_str    = PAYTR_MERCHANT_ID . $ip . $oid . $email . $totalKurus . $user_basket . $no_installment . $max_installment . $currency . $test;
-$paytr_token = base64_encode(hash_hmac('sha256', $hash_str . PAYTR_MERCHANT_SALT, PAYTR_MERCHANT_KEY, true));
+$hash_str    = $merchantId . $ip . $oid . $email . $totalKurus . $user_basket . $no_installment . $max_installment . $currency . $test;
+$paytr_token = base64_encode(hash_hmac('sha256', $hash_str . $merchantSalt, $merchantKey, true));
 
 if ($DEBUG) {
   header('Content-Type: text/plain; charset=utf-8');
@@ -199,7 +212,7 @@ if ($DEBUG) {
 
 // Token isteği
 $post = [
-  'merchant_id'       => PAYTR_MERCHANT_ID,
+  'merchant_id'       => $merchantId,
   'user_ip'           => $ip,
   'merchant_oid'      => $oid,
   'email'             => $email,

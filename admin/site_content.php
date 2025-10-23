@@ -69,6 +69,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     'footer_disclaimer_right' => trim($_POST['footer_disclaimer_right'] ?? ''),
   ];
 
+  $payload['paytr_enabled'] = !empty($_POST['paytr_enabled']) ? '1' : '0';
+  $payload['paytr_merchant_id'] = trim($_POST['paytr_merchant_id'] ?? '');
+  $payload['paytr_merchant_key'] = trim($_POST['paytr_merchant_key'] ?? '');
+  $payload['paytr_merchant_salt'] = trim($_POST['paytr_merchant_salt'] ?? '');
+  $testModeInput = $_POST['paytr_test_mode'] ?? '';
+  $payload['paytr_test_mode'] = $testModeInput === '0' ? '0' : '1';
+
   $smtpPort = trim($_POST['smtp_port'] ?? '');
   if ($smtpPort !== '' && !ctype_digit($smtpPort)) {
     $smtpPort = '';
@@ -457,7 +464,18 @@ while (count($leadFormBullets) < 3) {
   $leadFormBullets[] = '';
 }
 
-?><!doctype html>
+$paytrEnabledSetting = (int)($content['paytr_enabled'] ?? '0') === 1;
+$paytrTestModeSetting = (int)($content['paytr_test_mode'] ?? '1') === 1;
+$paytrConfigLive = site_payment_config(true);
+$paytrActiveNow = !empty($paytrConfigLive['enabled']);
+$paytrModeNow = (int)($paytrConfigLive['test_mode'] ?? 1) === 1;
+$paytrStatusBadge = $paytrActiveNow ? 'text-bg-success' : 'text-bg-warning';
+$paytrStatusText = $paytrActiveNow ? 'Aktif' : 'Pasif';
+$paytrModeText = $paytrModeNow ? 'Test Modu' : 'Canlı Mod';
+$paytrCurrentId = trim((string)($paytrConfigLive['merchant_id'] ?? ''));
+
+?>
+<!doctype html>
 <html lang="tr">
 <head>
   <meta charset="utf-8">
@@ -509,6 +527,7 @@ while (count($leadFormBullets) < 3) {
             <button type="button" class="pane-button" data-pane-target="media"><i class="bi bi-images"></i>Görsel İçerikler</button>
             <button type="button" class="pane-button" data-pane-target="cta"><i class="bi bi-bullseye"></i>Çağrı Alanı</button>
             <button type="button" class="pane-button" data-pane-target="sales"><i class="bi bi-shop"></i>Satış Ayarları</button>
+            <button type="button" class="pane-button" data-pane-target="payment"><i class="bi bi-credit-card-2-front"></i>Ödeme Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="smtp"><i class="bi bi-envelope-paper"></i>SMTP Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="faq"><i class="bi bi-chat-dots"></i>Sıkça Sorulanlar</button>
             <button type="button" class="pane-button" data-pane-target="footer"><i class="bi bi-columns-gap"></i>Footer İçeriği</button>
@@ -1100,6 +1119,65 @@ while (count($leadFormBullets) < 3) {
                   }
                 }
               ?>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="payment">
+            <div class="card-section border-bottom">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">Ödeme Ayarları</h5>
+                  <p class="text-muted mb-0">PayTR entegrasyon anahtarlarını girin ve çevrimiçi ödemeleri yönetin.</p>
+                </div>
+                <i class="bi bi-credit-card-2-front" style="font-size:1.5rem;color:var(--admin-brand);"></i>
+              </div>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="badge <?=$paytrStatusBadge?>">Durum: <?=$paytrStatusText?></span>
+                <span class="badge text-bg-info-subtle text-info-emphasis">Mod: <?=$paytrModeText?></span>
+                <?php if ($paytrCurrentId !== ''): ?>
+                  <span class="badge text-bg-light text-secondary">Aktif Merchant ID: <?=h($paytrCurrentId)?></span>
+                <?php endif; ?>
+              </div>
+              <?php if (!$paytrActiveNow): ?>
+                <div class="alert alert-warning mt-3 mb-0" role="alert">
+                  Online ödeme şu anda ziyaretçilere kapalı. Anahtarları güncelleyip durumu aktifleştirdiğinizde sipariş sayfası PayTR üzerinden tahsilat almaya başlar.
+                </div>
+              <?php endif; ?>
+            </div>
+            <div class="card-section">
+              <div class="row g-3">
+                <div class="col-12">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" value="1" id="paytr_enabled" name="paytr_enabled" <?=$paytrEnabledSetting ? 'checked' : ''?>>
+                    <label class="form-check-label" for="paytr_enabled">Online ödemeyi aktifleştir</label>
+                  </div>
+                  <div class="form-text">Anahtar alanlarını boş bırakırsanız mevcut .env değerleri kullanılmaya devam eder.</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">PayTR Merchant ID</label>
+                  <input type="text" class="form-control" name="paytr_merchant_id" value="<?=h($content['paytr_merchant_id'] ?? '')?>" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">PayTR Merchant Key</label>
+                  <input type="text" class="form-control" name="paytr_merchant_key" value="<?=h($content['paytr_merchant_key'] ?? '')?>" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">PayTR Merchant Salt</label>
+                  <input type="text" class="form-control" name="paytr_merchant_salt" value="<?=h($content['paytr_merchant_salt'] ?? '')?>" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Çalışma Modu</label>
+                  <select class="form-select" name="paytr_test_mode">
+                    <option value="1" <?=$paytrTestModeSetting ? 'selected' : ''?>>Test Modu (Sandbox)</option>
+                    <option value="0" <?=!$paytrTestModeSetting ? 'selected' : ''?>>Canlı Mod (Gerçek Tahsilat)</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <div class="alert alert-info mb-0 small" role="alert">
+                    PayTR test modunda ödemeler otomatik onaylanır. Canlı moda geçmeden önce PayTR panelinizde mağaza ayarlarınızı ve izinlerinizi doğrulayın.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

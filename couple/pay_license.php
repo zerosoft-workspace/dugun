@@ -15,20 +15,21 @@ $LICENSE_PLANS = [
 ];
 
 // ---- PAYTR Config ----
-// Bunları config.php'ye eklemelisiniz:
-//   define('PAYTR_MERCHANT_ID',  '...');
-//   define('PAYTR_MERCHANT_KEY', '...');
-//   define('PAYTR_MERCHANT_SALT','...');
-// Opsiyonel:
-//   define('PAYTR_TEST_MODE', 0);
-$MERCHANT_ID  = defined('PAYTR_MERCHANT_ID')  ? PAYTR_MERCHANT_ID  : null;
-$MERCHANT_KEY = defined('PAYTR_MERCHANT_KEY') ? PAYTR_MERCHANT_KEY : null;
-$MERCHANT_SALT= defined('PAYTR_MERCHANT_SALT')? PAYTR_MERCHANT_SALT: null;
-$TEST_MODE    = defined('PAYTR_TEST_MODE')    ? (int)PAYTR_TEST_MODE: 0;
+// Anahtarlar yönetici panelindeki Site İçerikleri > Ödeme Ayarları bölümünden güncellenir.
+$paytrConfig = site_payment_config();
+$MERCHANT_ID   = trim((string)($paytrConfig['merchant_id'] ?? ''));
+$MERCHANT_KEY  = trim((string)($paytrConfig['merchant_key'] ?? ''));
+$MERCHANT_SALT = trim((string)($paytrConfig['merchant_salt'] ?? ''));
+$TEST_MODE     = (int)($paytrConfig['test_mode'] ?? 1);
 
-if (!$MERCHANT_ID || !$MERCHANT_KEY || !$MERCHANT_SALT) {
+if (empty($paytrConfig['enabled'])) {
+  http_response_code(503);
+  exit('Online ödeme sistemi geçici olarak pasif. Lütfen yöneticinizle iletişime geçin.');
+}
+
+if ($MERCHANT_ID === '' || $MERCHANT_KEY === '' || $MERCHANT_SALT === '') {
   http_response_code(500);
-  exit('PAYTR ayarları eksik. Lütfen config.php içine PAYTR_MERCHANT_ID / KEY / SALT ekleyin.');
+  exit('PAYTR ayarları eksik. Yönetim panelinden ödeme anahtarlarını kontrol edin.');
 }
 
 // ---- Etkinlik / Müşteri Bilgileri ----
