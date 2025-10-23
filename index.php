@@ -203,7 +203,27 @@ unset($_SESSION['lead_success']);
   .contact-card .btn-outline-secondary:hover{background:var(--brand);color:#fff;border-color:var(--brand);}
   [data-theme="dark"] .contact-card .btn-outline-secondary{color:#f8fafc;border-color:rgba(148,163,184,0.35);background:rgba(148,163,184,0.12);}
   [data-theme="dark"] .contact-card .btn-outline-secondary:hover{background:rgba(56,189,248,0.24);color:#04121f;border-color:rgba(56,189,248,0.45);}
+  .btn-cta{border:none;border-radius:999px;padding:14px 34px;font-weight:700;background:linear-gradient(135deg,#38bdf8,#0ea5b5);color:#031525;box-shadow:0 20px 40px -18px rgba(14,165,181,0.65);transition:transform .18s ease,box-shadow .18s ease,opacity .18s ease;}
+  .btn-cta:hover,.btn-cta:focus{color:#031525;transform:translateY(-2px);box-shadow:0 26px 55px -22px rgba(14,165,181,0.72);opacity:.95;}
+  [data-theme="dark"] .btn-cta{background:linear-gradient(135deg,#38bdf8,#0ea5b5);color:#031525;box-shadow:0 28px 60px -30px rgba(8,47,73,0.85);}
+  [data-theme="dark"] .btn-cta:hover,[data-theme="dark"] .btn-cta:focus{color:#031525;box-shadow:0 32px 70px -32px rgba(8,47,73,0.9);}
+  .faq-surface{background:var(--card);border-radius:32px;padding:48px;box-shadow:0 42px 120px -68px rgba(15,118,110,0.35);position:relative;overflow:hidden;}
+  .faq-surface::before{content:"";position:absolute;inset:-160px auto auto -120px;width:320px;height:320px;background:radial-gradient(circle at center,rgba(14,165,181,0.18),transparent 70%);}
+  .faq-surface::after{content:"";position:absolute;inset:auto -140px -120px auto;width:260px;height:260px;background:radial-gradient(circle at center,rgba(59,130,246,0.18),transparent 70%);}
+  [data-theme="dark"] .faq-surface{background:rgba(15,23,42,0.92);border:1px solid var(--border);box-shadow:0 60px 140px -80px rgba(8,47,73,0.85);}
+  [data-theme="dark"] .faq-surface::before{background:radial-gradient(circle at center,rgba(56,189,248,0.16),transparent 70%);}
+  [data-theme="dark"] .faq-surface::after{background:radial-gradient(circle at center,rgba(14,165,181,0.16),transparent 70%);}
+  .faq-surface .accordion{position:relative;z-index:1;}
+  .faq-surface .accordion-item{border:none;border-radius:20px;margin-bottom:12px;overflow:hidden;box-shadow:0 18px 50px -28px rgba(15,118,110,0.25);}
+  .faq-surface .accordion-item:last-child{margin-bottom:0;}
+  [data-theme="dark"] .faq-surface .accordion-item{background:rgba(15,23,42,0.82);box-shadow:0 28px 70px -42px rgba(8,47,73,0.8);}
+  .faq-surface .accordion-button{font-weight:600;padding:18px 24px;border:none;box-shadow:none;}
+  .faq-surface .accordion-button:not(.collapsed){background:rgba(14,165,181,0.12);color:var(--brand);box-shadow:none;}
+  [data-theme="dark"] .faq-surface .accordion-button:not(.collapsed){background:rgba(56,189,248,0.18);color:#38bdf8;}
+  .faq-surface .accordion-button:focus{box-shadow:none;border:none;}
+  .faq-surface .accordion-body{padding:0 24px 18px;color:var(--muted);}
   .cta-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  [data-theme="dark"] .site-navbar .navbar-brand img{filter:brightness(0) invert(1);}
   .navbar-toggler{border:none;box-shadow:none;}
   [data-theme="dark"] .navbar-toggler{filter:invert(1);}
   footer{background:var(--brand);color:#f0fdfa;padding:48px 0 40px;margin-top:48px;}
@@ -222,7 +242,7 @@ unset($_SESSION['lead_success']);
   .footer-nav a:hover{color:#0f172a;}
   [data-theme="dark"] .footer-nav a:hover{color:#38bdf8;}
   @media(max-width:992px){.hero{padding:72px 28px;}.hero-visual img:nth-child(2){display:none;}}
-  @media(max-width:768px){.form-section{padding:32px;}}
+  @media(max-width:768px){.form-section{padding:32px;}.faq-surface{padding:32px 24px;}}
 </style>
 </head><body>
 <?php site_public_header('home', $content); ?>
@@ -471,14 +491,16 @@ unset($_SESSION['lead_success']);
   </section>
 
   <section id="sss" class="mb-5">
-    <div class="row g-4">
-      <div class="col-lg-5">
-        <h2 class="fw-bold">Sıkça sorulan sorular</h2>
-        <p class="muted">BİKARE ile ilgili merak ettiğiniz konuları sizin için derledik. Daha fazlası için bizimle iletişime geçebilirsiniz.</p>
-      </div>
-      <div class="col-lg-7">
-        <?php if ($faqItems): ?>
-          <div class="accordion" id="faqAccordion">
+    <div class="faq-surface">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-5 position-relative" style="z-index:1;">
+          <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Yanınızdayız</span>
+          <h2 class="fw-bold mt-3">Sıkça Sorulan Sorular</h2>
+          <p class="muted mb-0">BİKARE ile ilgili merak ettiğiniz konuları sizin için derledik. Yanıt bulamadığınızda ekibimiz sadece bir mesaj uzağınızda.</p>
+        </div>
+        <div class="col-lg-7">
+          <?php if ($faqItems): ?>
+            <div class="accordion" id="faqAccordion">
             <?php foreach ($faqItems as $i => $faq):
               $headingId = 'faqHeading'.$i;
               $collapseId = 'faqCollapse'.$i;
@@ -493,10 +515,11 @@ unset($_SESSION['lead_success']);
                 </div>
               </div>
             <?php endforeach; ?>
-          </div>
-        <?php else: ?>
-          <div class="alert alert-info">Henüz sıkça sorulan soru eklenmedi.</div>
-        <?php endif; ?>
+            </div>
+          <?php else: ?>
+            <div class="alert alert-info">Henüz sıkça sorulan soru eklenmedi.</div>
+          <?php endif; ?>
+        </div>
       </div>
     </div>
   </section>
@@ -546,7 +569,7 @@ unset($_SESSION['lead_success']);
               <p><?=nl2br(h($content['contact_cta_text']))?></p>
             <?php endif; ?>
             <?php if ($contactCtaButtonUrl && !empty($content['contact_cta_button_label'])): ?>
-              <a class="btn btn-light text-dark fw-semibold" href="<?=h($contactCtaButtonUrl)?>"><?=h($content['contact_cta_button_label'])?></a>
+              <a class="btn btn-cta" href="<?=h($contactCtaButtonUrl)?>"><?=h($content['contact_cta_button_label'])?></a>
             <?php endif; ?>
           </div>
         </div>
