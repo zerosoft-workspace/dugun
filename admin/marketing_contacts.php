@@ -8,6 +8,7 @@ require_once __DIR__.'/../includes/sms.php';
 require_once __DIR__.'/partials/ui.php';
 
 require_admin();
+require_admin_permission('marketing');
 install_schema();
 
 function format_local_datetime(?string $value): string {

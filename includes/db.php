@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240705_01');
+  define('APP_SCHEMA_VERSION', '20240709_01');
 }
 
 function pdo(): PDO {
@@ -226,12 +226,32 @@ function install_schema(){
     password_hash VARCHAR(255) NOT NULL,
     name VARCHAR(190) NOT NULL,
     role ENUM('superadmin','admin') NOT NULL DEFAULT 'admin',
+    admin_role_id INT NULL,
     reset_code VARCHAR(64) NULL,
     reset_expires DATETIME NULL,
     last_login_at DATETIME NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS admin_roles(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(190) NOT NULL,
+    slug VARCHAR(190) NOT NULL UNIQUE,
+    permissions_json TEXT NULL,
+    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('users', 'admin_role_id')) {
+    pdo()->exec("ALTER TABLE users ADD admin_role_id INT NULL AFTER role");
+  }
+  try {
+    pdo()->exec("ALTER TABLE users ADD INDEX idx_users_admin_role (admin_role_id)");
+  } catch (Throwable $e) {
+    // index already exists
+  }
 
   /* venues */
   pdo()->exec("CREATE TABLE IF NOT EXISTS venues(

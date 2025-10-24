@@ -8,6 +8,7 @@ require_once __DIR__.'/../includes/representative_crm.php';
 require_once __DIR__.'/partials/ui.php';
 
 require_admin();
+require_admin_permission('crm');
 install_schema();
 
 $rawStatusOptions = representative_crm_status_options();

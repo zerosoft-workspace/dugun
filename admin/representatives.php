@@ -8,6 +8,7 @@ require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/partials/ui.php';
 
 require_admin();
+require_admin_permission('representatives');
 install_schema();
 
 $action = $_POST['do'] ?? '';

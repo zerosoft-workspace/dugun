@@ -537,29 +537,38 @@ CSS;
   function admin_layout_start(string $active = '', string $title = '', string $subtitle = '', ?string $heroIcon = null): void {
     $me = admin_user();
     $links = [
-      'dashboard' => ['href' => BASE_URL.'/admin/dashboard.php', 'label' => 'Genel Bakış', 'icon' => 'bi-speedometer2'],
-      'campaigns' => ['href' => BASE_URL.'/admin/campaigns.php', 'label' => 'Kampanyalar', 'icon' => 'bi-megaphone'],
-      'venues'    => ['href' => BASE_URL.'/admin/venues.php', 'label' => 'Salon Yönetimi', 'icon' => 'bi-building'],
-      'users'     => ['href' => BASE_URL.'/admin/users.php', 'label' => 'Etkinlikler', 'icon' => 'bi-calendar3'],
-      'dealers'   => ['href' => BASE_URL.'/admin/dealers.php', 'label' => 'Bayiler', 'icon' => 'bi-shop'],
-      'listings' => ['href' => BASE_URL.'/admin/listings.php', 'label' => 'Anlaşmalı Şirketler', 'icon' => 'bi-card-list'],
-      'representatives' => ['href' => BASE_URL.'/admin/representatives.php', 'label' => 'Temsilciler', 'icon' => 'bi-person-badge'],
-      'crm' => ['href' => BASE_URL.'/admin/representative_crm.php', 'label' => 'Temsilci CRM', 'icon' => 'bi-kanban'],
-      'finance' => ['href' => BASE_URL.'/admin/finance.php', 'label' => 'Finans', 'icon' => 'bi-wallet2'],
-      'analytics' => ['href' => BASE_URL.'/admin/representative_analytics.php', 'label' => 'Analizler', 'icon' => 'bi-graph-up'],
-      'marketing' => ['href' => BASE_URL.'/admin/marketing_contacts.php', 'label' => 'Pazarlama', 'icon' => 'bi-envelope-paper'],
+      'dashboard' => ['href' => BASE_URL.'/admin/dashboard.php', 'label' => 'Genel Bakış', 'icon' => 'bi-speedometer2', 'permission' => 'dashboard'],
+      'campaigns' => ['href' => BASE_URL.'/admin/campaigns.php', 'label' => 'Kampanyalar', 'icon' => 'bi-megaphone', 'permission' => 'campaigns'],
+      'venues'    => ['href' => BASE_URL.'/admin/venues.php', 'label' => 'Salon Yönetimi', 'icon' => 'bi-building', 'permission' => 'venues'],
+      'users'     => ['href' => BASE_URL.'/admin/users.php', 'label' => 'Etkinlikler', 'icon' => 'bi-calendar3', 'permission' => 'users'],
+      'dealers'   => ['href' => BASE_URL.'/admin/dealers.php', 'label' => 'Bayiler', 'icon' => 'bi-shop', 'permission' => 'dealers'],
+      'listings' => ['href' => BASE_URL.'/admin/listings.php', 'label' => 'Anlaşmalı Şirketler', 'icon' => 'bi-card-list', 'permission' => 'listings'],
+      'representatives' => ['href' => BASE_URL.'/admin/representatives.php', 'label' => 'Temsilciler', 'icon' => 'bi-person-badge', 'permission' => 'representatives'],
+      'crm' => ['href' => BASE_URL.'/admin/representative_crm.php', 'label' => 'Temsilci CRM', 'icon' => 'bi-kanban', 'permission' => 'crm'],
+      'finance' => ['href' => BASE_URL.'/admin/finance.php', 'label' => 'Finans', 'icon' => 'bi-wallet2', 'permission' => 'finance'],
+      'analytics' => ['href' => BASE_URL.'/admin/representative_analytics.php', 'label' => 'Analizler', 'icon' => 'bi-graph-up', 'permission' => 'analytics'],
+      'marketing' => ['href' => BASE_URL.'/admin/marketing_contacts.php', 'label' => 'Pazarlama', 'icon' => 'bi-envelope-paper', 'permission' => 'marketing'],
+      'packages' => ['href' => BASE_URL.'/admin/dealer_packages.php', 'label' => 'Paketler', 'icon' => 'bi-boxes', 'permission' => 'packages'],
+      'order_campaigns' => ['href' => BASE_URL.'/admin/order_campaigns.php', 'label' => 'Sosyal Sorumluluk Kampanyaları', 'icon' => 'bi-heart-fill', 'permission' => 'order_campaigns'],
+      'order_addons' => ['href' => BASE_URL.'/admin/order_addons.php', 'label' => 'Ek Hizmetler', 'icon' => 'bi-stars', 'permission' => 'order_addons'],
+      'site'     => ['href' => BASE_URL.'/admin/site_content.php', 'label' => 'Site İçerikleri', 'icon' => 'bi-sliders', 'permission' => 'site'],
+      'team'     => ['href' => BASE_URL.'/admin/team.php', 'label' => 'Yönetici Ekibi', 'icon' => 'bi-people', 'superadmin_only' => true],
     ];
-    if (is_superadmin()) {
-      $links['packages'] = ['href' => BASE_URL.'/admin/dealer_packages.php', 'label' => 'Paketler', 'icon' => 'bi-boxes'];
-      $links['team']     = ['href' => BASE_URL.'/admin/team.php', 'label' => 'Yönetici Ekibi', 'icon' => 'bi-people'];
-      $links['site']     = ['href' => BASE_URL.'/admin/site_content.php', 'label' => 'Site İçerikleri', 'icon' => 'bi-sliders'];
-      $links['order_campaigns'] = ['href' => BASE_URL.'/admin/order_campaigns.php', 'label' => 'Sosyal Sorumluluk Kampanyaları', 'icon' => 'bi-heart-fill'];
-      $links['order_addons'] = ['href' => BASE_URL.'/admin/order_addons.php', 'label' => 'Ek Hizmetler', 'icon' => 'bi-stars'];
-    }
 
     $displayName = $me['name'] ?? $me['email'] ?? '';
     $initial = $displayName ? mb_strtoupper(mb_substr($displayName, 0, 1, 'UTF-8'), 'UTF-8') : 'A';
-    $roleLabel = is_superadmin() ? 'Süperadmin' : 'Admin';
+    if (is_superadmin()) {
+      $roleLabel = 'Süperadmin';
+    } else {
+      $roleLabel = 'Admin';
+      $roleId = $me['role_id'] ?? null;
+      if ($roleId) {
+        $roles = admin_roles_all();
+        if (isset($roles[$roleId])) {
+          $roleLabel = $roles[$roleId]['name'];
+        }
+      }
+    }
 
     $supportEmail = defined('SITE_SUPPORT_EMAIL') && SITE_SUPPORT_EMAIL ? SITE_SUPPORT_EMAIL : 'destek@zerosoft.com.tr';
 
@@ -571,6 +580,12 @@ CSS;
     echo '</div>';
     echo '<nav class="sidebar-nav">';
     foreach ($links as $key => $link) {
+      if (!empty($link['superadmin_only']) && !is_superadmin()) {
+        continue;
+      }
+      if (!is_superadmin() && !empty($link['permission']) && !admin_has_permission($link['permission'])) {
+        continue;
+      }
       $cls = 'sidebar-link'.($active === $key ? ' active' : '');
       echo '<a class="'.$cls.'" href="'.h($link['href']).'" title="'.h($link['label']).'"><i class="bi '.$link['icon'].'"></i><span class="sidebar-label">'.h($link['label']).'</span></a>';
     }

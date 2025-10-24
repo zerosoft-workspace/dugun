@@ -8,6 +8,7 @@ require_once __DIR__.'/../includes/dealers.php';
 require_once __DIR__.'/partials/ui.php';
 
 require_admin();
+require_admin_permission('dashboard');
 install_schema();
 
 $me    = admin_user();
