@@ -11,6 +11,21 @@ function h($v){ return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'); }
 function redirect($url, $code=302){ header("Location: $url", true, $code); exit; }
 function now(){ return date('Y-m-d H:i:s'); }
 
+function table_supports_force_password_reset(string $table): bool {
+  static $cache = [];
+  if (array_key_exists($table, $cache)) {
+    return $cache[$table];
+  }
+  if (!function_exists('column_exists')) {
+    return $cache[$table] = false;
+  }
+  try {
+    return $cache[$table] = column_exists($table, 'force_password_reset');
+  } catch (Throwable $e) {
+    return $cache[$table] = false;
+  }
+}
+
 function format_currency(int $cents, string $suffix = ' TL'): string {
   $value = $cents / 100;
   return number_format($value, 2, ',', '.').$suffix;

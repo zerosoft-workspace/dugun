@@ -30,12 +30,14 @@ function dealer_login(string $email, string $password): bool {
     }
   }
 
+  $supportsForceReset = table_supports_force_password_reset('dealers');
+
   $_SESSION['dealer'] = [
     'id'    => (int)$dealer['id'],
     'email' => $dealer['email'],
     'name'  => $dealer['name'],
     'since' => time(),
-    'force_reset' => (int)($dealer['force_password_reset'] ?? 0),
+    'force_reset' => $supportsForceReset ? (int)($dealer['force_password_reset'] ?? 0) : 0,
   ];
   dealer_update_last_login((int)$dealer['id']);
   return true;
@@ -127,12 +129,14 @@ function dealer_refresh_session(int $dealer_id): void {
     dealer_logout();
     return;
   }
+  $supportsForceReset = table_supports_force_password_reset('dealers');
+
   $_SESSION['dealer'] = [
     'id'    => (int)$dealer['id'],
     'email' => $dealer['email'],
     'name'  => $dealer['name'],
     'since' => time(),
-    'force_reset' => (int)($dealer['force_password_reset'] ?? 0),
+    'force_reset' => $supportsForceReset ? (int)($dealer['force_password_reset'] ?? 0) : 0,
   ];
 }
 
@@ -143,6 +147,10 @@ function dealer_can_manage_events(array $dealer): bool {
 
 function dealer_session_requires_password_change(): bool {
   if (!dealer_user()) {
+    return false;
+  }
+  if (!table_supports_force_password_reset('dealers')) {
+    $_SESSION['dealer']['force_reset'] = 0;
     return false;
   }
   if (!isset($_SESSION['dealer']['force_reset'])) {

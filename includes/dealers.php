@@ -617,6 +617,9 @@ function dealer_update_last_login(int $dealer_id): void {
 }
 
 function dealer_mark_password_needs_reset(int $dealer_id): void {
+  if (!table_supports_force_password_reset('dealers')) {
+    return;
+  }
   $now = now();
   pdo()->prepare("UPDATE dealers SET force_password_reset=1, password_set_at=NULL, updated_at=? WHERE id=?")
       ->execute([$now, $dealer_id]);
@@ -626,6 +629,9 @@ function dealer_mark_password_needs_reset(int $dealer_id): void {
 }
 
 function dealer_mark_password_changed(int $dealer_id): void {
+  if (!table_supports_force_password_reset('dealers')) {
+    return;
+  }
   $now = now();
   pdo()->prepare("UPDATE dealers SET force_password_reset=0, password_set_at=?, updated_at=? WHERE id=?")
       ->execute([$now, $now, $dealer_id]);

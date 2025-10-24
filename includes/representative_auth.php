@@ -32,12 +32,14 @@ function representative_login(string $email, string $password): bool {
     }
   }
 
+  $supportsForceReset = table_supports_force_password_reset('dealer_representatives');
+
   $_SESSION['representative'] = [
     'id' => (int)$rep['id'],
     'email' => $rep['email'],
     'name' => $rep['name'],
     'since' => time(),
-    'force_reset' => (int)($rep['force_password_reset'] ?? 0),
+    'force_reset' => $supportsForceReset ? (int)($rep['force_password_reset'] ?? 0) : 0,
   ];
   representative_record_login((int)$rep['id']);
   return true;
@@ -129,17 +131,23 @@ function representative_refresh_session(int $representative_id): void {
     representative_logout();
     return;
   }
+  $supportsForceReset = table_supports_force_password_reset('dealer_representatives');
+
   $_SESSION['representative'] = [
     'id' => (int)$rep['id'],
     'email' => $rep['email'],
     'name' => $rep['name'],
     'since' => time(),
-    'force_reset' => (int)($rep['force_password_reset'] ?? 0),
+    'force_reset' => $supportsForceReset ? (int)($rep['force_password_reset'] ?? 0) : 0,
   ];
 }
 
 function representative_session_requires_password_change(): bool {
   if (!representative_user()) {
+    return false;
+  }
+  if (!table_supports_force_password_reset('dealer_representatives')) {
+    $_SESSION['representative']['force_reset'] = 0;
     return false;
   }
   if (!isset($_SESSION['representative']['force_reset'])) {

@@ -271,8 +271,14 @@ if ($action === 'reset_password') {
     flash('err', 'Kullanıcı bulunamadı.');
     redirect($_SERVER['REQUEST_URI']);
   }
-  pdo()->prepare("UPDATE users SET password_hash=?, password_set_at=NULL, force_password_reset=1, updated_at=? WHERE id=?")
-      ->execute([password_hash($pass, PASSWORD_DEFAULT), now(), $userId]);
+  $supportsForceReset = table_supports_force_password_reset('users');
+  if ($supportsForceReset) {
+    pdo()->prepare("UPDATE users SET password_hash=?, password_set_at=NULL, force_password_reset=1, updated_at=? WHERE id=?")
+        ->execute([password_hash($pass, PASSWORD_DEFAULT), now(), $userId]);
+  } else {
+    pdo()->prepare("UPDATE users SET password_hash=?, password_set_at=NULL, updated_at=? WHERE id=?")
+        ->execute([password_hash($pass, PASSWORD_DEFAULT), now(), $userId]);
+  }
   admin_mark_password_needs_reset($userId);
   if ($userId === ($me['id'] ?? 0)) {
     flash('ok', 'Şifreniz güncellendi.');
