@@ -194,6 +194,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
       ];
       json_ok(['comment' => $payload]);
 
+    case 'guest_register':
+      $name = trim((string)($_POST['name'] ?? ''));
+      $emailInput = (string)($_POST['email'] ?? '');
+      $email = guest_profile_normalize_email($emailInput);
+      $marketing = isset($_POST['marketing']) && $_POST['marketing'] === '1';
+      if ($name === '' || mb_strlen($name) < 2) {
+        json_fail('input', 'Lütfen adınızı ve soyadınızı yazın.');
+      }
+      if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        json_fail('input', 'Geçerli bir e-posta adresi yazın.');
+      }
+      try {
+        $createdProfile = guest_profile_upsert($event_id, $name, $email, $marketing);
+      } catch (Throwable $e) {
+        json_fail('error', 'Misafir kaydı oluşturulamadı. Lütfen daha sonra tekrar deneyin.');
+      }
+      if (!$createdProfile) {
+        json_fail('error', 'Misafir kaydı oluşturulamadı. Lütfen daha sonra tekrar deneyin.');
+      }
+
+      $status = 'pending';
+      $message = 'Doğrulama bağlantısı e-posta adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.';
+
+      if ((int)$createdProfile['is_verified'] === 1) {
+        if (!empty($createdProfile['password_hash'])) {
+          $status = 'verified';
+          $message = 'Bu e-posta ile daha önce giriş yapmışsınız. Misafir girişi sayfasından şifrenizle devam edebilirsiniz.';
+        } else {
+          $status = 'needs_password';
+          $message = 'E-posta adresiniz doğrulandı. Şifrenizi belirlemek için doğrulama e-postasındaki bağlantıyı kullanabilir veya Misafir Girişi sayfasındaki “Şifremi unuttum” bağlantısından ilerleyebilirsiniz.';
+        }
+      } else {
+        $sent = false;
+        try {
+          $sent = guest_profile_send_verification($createdProfile, $ev);
+        } catch (Throwable $e) {
+          $sent = false;
+        }
+        if (!$sent) {
+          $status = 'pending_retry';
+          $message = 'Doğrulama e-postası şu anda gönderilemedi. Lütfen birkaç dakika sonra tekrar deneyin.';
+        }
+      }
+
+      json_ok([
+        'status' => $status,
+        'message' => $message,
+      ]);
+
     case 'load_conversation':
       $profile = ensure_profile($profile);
       $otherId = (int)($_POST['profile_id'] ?? 0);
@@ -499,7 +548,10 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
           <a class="small text-decoration-none fw-semibold" href="<?=BASE_URL?>/public/guest_logout.php?event=<?=$event_id?>">Çıkış Yap</a>
         </div>
       <?php else: ?>
-        <a class="btn btn-zs-outline" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
+        <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
+          <a class="btn btn-zs-outline" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
+          <button class="btn btn-zs" type="button" data-bs-toggle="modal" data-bs-target="#guestRegisterModal">Misafir Kaydı Oluştur</button>
+        </div>
       <?php endif; ?>
     </div>
     <form method="post" enctype="multipart/form-data" id="upForm" class="vstack gap-3">
@@ -532,15 +584,15 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
     </form>
   </div>
 
-  <?php if($profile): ?>
-    <div class="note-card mb-4">
-      <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
-        <div>
-          <h5 class="mb-1">Etkinlik sahibine mesaj gönder</h5>
-          <div class="smallmuted">Güzel dileklerinizi veya teşekkürlerinizi iletebilirsiniz.</div>
-        </div>
-        <button class="btn btn-zs-outline" type="button" data-bs-toggle="offcanvas" data-bs-target="#messagesPanel">Misafirlerle Mesajlaş</button>
+  <div class="note-card mb-4">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+      <div>
+        <h5 class="mb-1">Etkinlik sahibine mesaj gönder</h5>
+        <div class="smallmuted">Güzel dileklerinizi veya teşekkürlerinizi iletebilirsiniz.</div>
       </div>
+      <button class="btn btn-zs-outline" type="button" data-bs-toggle="offcanvas" data-bs-target="#messagesPanel">Misafirlerle Mesajlaş</button>
+    </div>
+    <?php if($profile): ?>
       <form id="hostNoteForm" class="vstack gap-3">
         <textarea name="note" rows="3" placeholder="Mesajınızı yazın..."></textarea>
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
@@ -548,8 +600,18 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
           <button class="btn btn-zs" type="submit">Mesajı Gönder</button>
         </div>
       </form>
-    </div>
-  <?php endif; ?>
+    <?php else: ?>
+      <div class="alert alert-light border d-flex flex-column flex-md-row align-items-md-center gap-3 mb-0" style="border-radius:18px;">
+        <div>
+          Misafir hesabınızla giriş yaptıktan sonra etkinlik sahibine özel mesaj gönderebilirsiniz.
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-sm btn-zs-outline" href="<?=BASE_URL?>/public/guest_login.php">Giriş Yap</a>
+          <button class="btn btn-sm btn-zs" type="button" data-bs-toggle="modal" data-bs-target="#guestRegisterModal">Kayıt Ol</button>
+        </div>
+      </div>
+    <?php endif; ?>
+  </div>
 
   <div class="row g-4 mb-4 align-items-stretch">
     <div class="col-xl-7">
@@ -729,28 +791,75 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
   </div>
 </div>
 
-<?php if($profile): ?>
+<div class="modal fade" id="guestRegisterModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:24px; border:none;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Misafir Kaydı Oluştur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <p class="smallmuted">Etkinlik sahibi tarafından davet edildiyseniz adınızı ve e-posta adresinizi yazarak panel erişimi talep edebilirsiniz. Doğrulama bağlantısı e-posta adresinize gönderilir.</p>
+        <form id="guestRegisterForm" class="vstack gap-3">
+          <div>
+            <label class="form-label">Ad Soyad</label>
+            <input type="text" class="form-control" name="name" placeholder="Adınız Soyadınız" required>
+          </div>
+          <div>
+            <label class="form-label">E-posta</label>
+            <input type="email" class="form-control" name="email" placeholder="ornek@eposta.com" required>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="1" id="guestRegisterMarketing" name="marketing">
+            <label class="form-check-label small" for="guestRegisterMarketing">
+              BİKARE'nin etkinlik ve kampanya duyurularını e-posta ile almak istiyorum.
+            </label>
+          </div>
+          <div id="guestRegisterStatus" class="alert d-none" role="alert"></div>
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-zs-outline" data-bs-dismiss="modal">Vazgeç</button>
+            <button type="submit" class="btn btn-zs" id="guestRegisterSubmit">Kayıt Ol</button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <div class="smallmuted">Zaten hesabınız var mı? <a class="text-decoration-none" href="<?=BASE_URL?>/public/guest_login.php">Misafir girişi yapın.</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="offcanvas offcanvas-end offcanvas-bikare" tabindex="-1" id="messagesPanel">
   <div class="offcanvas-header">
     <h5 class="offcanvas-title">Mesajlar</h5>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
   </div>
   <div class="offcanvas-body d-flex flex-column gap-3">
-    <div>
-      <div class="smallmuted mb-2">Misafir listesi</div>
-      <div id="chatUsers" class="d-flex flex-column gap-1"></div>
-    </div>
-    <div>
-      <div class="smallmuted mb-2" id="chatHeading">Mesaj seçilmedi</div>
-      <div class="chat-window" id="chatWindow"></div>
-    </div>
-    <form id="chatForm" class="chat-form vstack gap-2">
-      <textarea id="chatMessage" rows="2" placeholder="Mesajınızı yazın..." required></textarea>
-      <button class="btn btn-zs" type="submit">Gönder</button>
-    </form>
+    <?php if($profile): ?>
+      <div>
+        <div class="smallmuted mb-2">Misafir listesi</div>
+        <div id="chatUsers" class="d-flex flex-column gap-1"></div>
+      </div>
+      <div>
+        <div class="smallmuted mb-2" id="chatHeading">Mesaj seçilmedi</div>
+        <div class="chat-window" id="chatWindow"></div>
+      </div>
+      <form id="chatForm" class="chat-form vstack gap-2">
+        <textarea id="chatMessage" rows="2" placeholder="Mesajınızı yazın..." required></textarea>
+        <button class="btn btn-zs" type="submit">Gönder</button>
+      </form>
+    <?php else: ?>
+      <div class="alert alert-light border" style="border-radius:18px;">
+        <h6 class="fw-semibold">Mesajlaşmak için giriş yapın</h6>
+        <p class="mb-3 smallmuted">Diğer misafirlerle sohbet etmek için hesabınızı doğrulayıp giriş yapmanız gerekir.</p>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-zs" href="<?=BASE_URL?>/public/guest_login.php">Giriş Yap</a>
+          <button class="btn btn-zs-outline" type="button" data-bs-toggle="modal" data-bs-target="#guestRegisterModal" data-bs-dismiss="offcanvas">Kayıt Ol</button>
+        </div>
+      </div>
+    <?php endif; ?>
   </div>
 </div>
-<?php endif; ?>
 
 <?php if($wheelEntries): ?>
   <button class="spin-trigger" type="button" data-bs-toggle="modal" data-bs-target="#wheelModal"><i class="bi bi-record-circle me-2"></i>Çarkı Çevir</button>
@@ -794,6 +903,93 @@ fm?.addEventListener('submit',e=>{ const name=fm.querySelector('[name=guest_name
 
 const csrfMeta=document.querySelector('meta[name="csrf"]');
 const csrfToken=csrfMeta?csrfMeta.content:'';
+const registerModalEl=document.getElementById('guestRegisterModal');
+const registerForm=document.getElementById('guestRegisterForm');
+const registerStatus=document.getElementById('guestRegisterStatus');
+const registerSubmit=document.getElementById('guestRegisterSubmit');
+const registerDefaultLabel=registerSubmit?registerSubmit.textContent:'Kayıt Ol';
+
+function clearRegisterStatus(){
+  if(!registerStatus) return;
+  registerStatus.textContent='';
+  registerStatus.classList.add('d-none');
+  registerStatus.classList.remove('alert-success','alert-danger','alert-warning');
+}
+
+function setRegisterStatus(kind,message){
+  if(!registerStatus) return;
+  registerStatus.textContent=message;
+  registerStatus.classList.remove('d-none');
+  registerStatus.classList.remove('alert-success','alert-danger','alert-warning');
+  registerStatus.classList.add('alert-'+kind);
+}
+
+registerForm?.addEventListener('submit',ev=>{
+  ev.preventDefault();
+  const nameInput=registerForm.querySelector('input[name="name"]');
+  const emailInput=registerForm.querySelector('input[name="email"]');
+  const marketingInput=registerForm.querySelector('input[name="marketing"]');
+  const name=(nameInput?.value||'').trim();
+  const email=(emailInput?.value||'').trim();
+  clearRegisterStatus();
+  if(!name || name.length<2){
+    setRegisterStatus('danger','Adınızı ve soyadınızı yazın.');
+    nameInput?.focus();
+    return;
+  }
+  if(!email){
+    setRegisterStatus('danger','Geçerli bir e-posta adresi yazın.');
+    emailInput?.focus();
+    return;
+  }
+  if(registerSubmit){
+    registerSubmit.disabled=true;
+    registerSubmit.textContent='Gönderiliyor...';
+  }
+  const payload=new URLSearchParams({ajax:'1',action:'guest_register',csrf:csrfToken,name,email});
+  if(marketingInput?.checked){
+    payload.append('marketing','1');
+  }
+  fetch(window.location.href,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest'},body:payload})
+    .then(r=>r.json())
+    .then(data=>{
+      if(!data.ok) throw new Error(data.message||'Bir hata oluştu');
+      const status=data.status||'pending';
+      let kind='success';
+      if(status==='pending_retry'){ kind='warning'; }
+      setRegisterStatus(kind, data.message || 'Talebiniz alındı.');
+      registerForm.reset();
+    })
+    .catch(err=>{
+      setRegisterStatus('danger', err.message || 'Kayıt sırasında bir sorun oluştu.');
+    })
+    .finally(()=>{
+      if(registerSubmit){
+        registerSubmit.disabled=false;
+        registerSubmit.textContent=registerDefaultLabel;
+      }
+    });
+});
+
+if(registerModalEl){
+  registerModalEl.addEventListener('shown.bs.modal',()=>{
+    clearRegisterStatus();
+    if(registerForm){
+      registerForm.reset();
+    }
+    registerSubmit?.removeAttribute('disabled');
+    registerSubmit && (registerSubmit.textContent=registerDefaultLabel);
+    const nameInput=registerForm?.querySelector('input[name="name"]');
+    setTimeout(()=>{ nameInput?.focus(); },120);
+  });
+  registerModalEl.addEventListener('hidden.bs.modal',()=>{
+    clearRegisterStatus();
+    registerForm?.reset();
+    registerSubmit?.removeAttribute('disabled');
+    registerSubmit && (registerSubmit.textContent=registerDefaultLabel);
+  });
+}
+
 const galleryModal=document.getElementById('uploadModal');
 const modalTitle=document.getElementById('modalTitle');
 const modalMedia=document.getElementById('modalMedia');

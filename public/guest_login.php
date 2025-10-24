@@ -287,12 +287,13 @@ function portal_tab_link(string $tab, array $params = []): string {
               </div>
               <button type="submit" class="btn btn-brand mt-2"><?=$copy['button']?></button>
             </form>
-            <div class="muted-tip">Doğrulama bağlantısındaki şifre oluşturma adımını tamamladıktan sonra panel erişiminiz aktifleşir.</div>
+            <div class="muted-tip">Doğrulama bağlantısındaki şifre oluşturma adımını tamamladıktan sonra panel erişiminiz aktifleşir.<br>Birden fazla etkinliğe davetliyseniz girişten sonra listeden etkinliğinizi seçebilirsiniz.</div>
           <?php else: ?>
             <div class="d-flex justify-content-between align-items-center">
               <h2 class="h5 fw-semibold mb-0">Etkinlik Seçin</h2>
               <a class="small text-decoration-none" href="<?=h(portal_tab_link('guest', ['reset' => 1]))?>">Başka bir hesapla giriş yap</a>
             </div>
+            <p class="small text-muted mt-2 mb-0">Aynı şifre ile davet edildiğiniz tüm etkinlikleri buradan yönetebilirsiniz.</p>
             <div class="option-grid mt-3">
               <?php foreach ($guestChoices as $profileId => $event): ?>
                 <?php
