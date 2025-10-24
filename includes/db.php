@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240709_01');
+  define('APP_SCHEMA_VERSION', '20240709_02');
 }
 
 function pdo(): PDO {
@@ -1389,6 +1389,62 @@ function install_schema(){
     FOREIGN KEY (recipient_profile_id) REFERENCES guest_profiles(id) ON DELETE SET NULL,
     FOREIGN KEY (recipient_upload_id) REFERENCES uploads(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  /* marketing broadcasts */
+  $broadcastJson = supports_json() ? 'JSON' : 'LONGTEXT';
+  pdo()->exec("CREATE TABLE IF NOT EXISTS marketing_broadcasts(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    channel VARCHAR(32) NOT NULL,
+    audience_key VARCHAR(64) NULL,
+    title VARCHAR(255) NOT NULL,
+    body MEDIUMTEXT NULL,
+    attachments $broadcastJson NULL,
+    created_by_admin_id INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_marketing_channel (channel, created_at),
+    INDEX idx_marketing_audience (audience_key),
+    FOREIGN KEY (created_by_admin_id) REFERENCES users(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS marketing_broadcast_targets(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    broadcast_id INT NOT NULL,
+    target_name VARCHAR(255) NULL,
+    target_email VARCHAR(190) NULL,
+    target_phone VARCHAR(32) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    detail TEXT NULL,
+    sent_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_marketing_targets_broadcast (broadcast_id),
+    INDEX idx_marketing_targets_status (broadcast_id, status),
+    FOREIGN KEY (broadcast_id) REFERENCES marketing_broadcasts(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (table_exists('marketing_broadcasts')) {
+    if (!column_exists('marketing_broadcasts', 'audience_key')) {
+      try { pdo()->exec("ALTER TABLE marketing_broadcasts ADD audience_key VARCHAR(64) NULL AFTER channel"); } catch (Throwable $e) {}
+    }
+    if (!column_exists('marketing_broadcasts', 'attachments')) {
+      try {
+        $broadcastJson = supports_json() ? 'JSON' : 'LONGTEXT';
+        pdo()->exec("ALTER TABLE marketing_broadcasts ADD attachments $broadcastJson NULL AFTER body");
+      } catch (Throwable $e) {}
+    }
+    if (!column_exists('marketing_broadcasts', 'created_by_admin_id')) {
+      try { pdo()->exec("ALTER TABLE marketing_broadcasts ADD created_by_admin_id INT NULL AFTER attachments"); } catch (Throwable $e) {}
+      try { pdo()->exec("ALTER TABLE marketing_broadcasts ADD CONSTRAINT fk_marketing_broadcast_admin FOREIGN KEY (created_by_admin_id) REFERENCES users(id) ON DELETE SET NULL"); } catch (Throwable $e) {}
+    }
+  }
+
+  if (table_exists('marketing_broadcast_targets')) {
+    if (!column_exists('marketing_broadcast_targets', 'detail')) {
+      try { pdo()->exec("ALTER TABLE marketing_broadcast_targets ADD detail TEXT NULL AFTER status"); } catch (Throwable $e) {}
+    }
+    if (!column_exists('marketing_broadcast_targets', 'sent_at')) {
+      try { pdo()->exec("ALTER TABLE marketing_broadcast_targets ADD sent_at DATETIME NULL AFTER detail"); } catch (Throwable $e) {}
+    }
+  }
 
   /* qr_codes */
   pdo()->exec("CREATE TABLE IF NOT EXISTS qr_codes(
