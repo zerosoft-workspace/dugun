@@ -75,6 +75,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $payload['paytr_merchant_salt'] = trim($_POST['paytr_merchant_salt'] ?? '');
   $testModeInput = $_POST['paytr_test_mode'] ?? '';
   $payload['paytr_test_mode'] = $testModeInput === '0' ? '0' : '1';
+  $payload['whatsapp_api_enabled'] = !empty($_POST['whatsapp_api_enabled']) ? '1' : '0';
+  $payload['whatsapp_api_url'] = trim($_POST['whatsapp_api_url'] ?? '');
+  $payload['whatsapp_api_token'] = trim($_POST['whatsapp_api_token'] ?? '');
+  $payload['whatsapp_api_sender'] = trim($_POST['whatsapp_api_sender'] ?? '');
 
   $smtpPort = trim($_POST['smtp_port'] ?? '');
   if ($smtpPort !== '' && !ctype_digit($smtpPort)) {
@@ -473,6 +477,13 @@ $paytrStatusBadge = $paytrActiveNow ? 'text-bg-success' : 'text-bg-warning';
 $paytrStatusText = $paytrActiveNow ? 'Aktif' : 'Pasif';
 $paytrModeText = $paytrModeNow ? 'Test Modu' : 'Canlı Mod';
 $paytrCurrentId = trim((string)($paytrConfigLive['merchant_id'] ?? ''));
+$whatsappEnabledSetting = (int)($content['whatsapp_api_enabled'] ?? '0') === 1;
+$whatsappConfigLive = site_whatsapp_config(true);
+$whatsappActiveNow = whatsapp_is_enabled();
+$whatsappStatusBadge = $whatsappActiveNow ? 'text-bg-success' : 'text-bg-warning';
+$whatsappStatusText = $whatsappActiveNow ? 'Aktif' : 'Pasif';
+$whatsappCurrentUrl = trim((string)($whatsappConfigLive['api_url'] ?? ''));
+$whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
 
 ?>
 <!doctype html>
@@ -528,6 +539,7 @@ $paytrCurrentId = trim((string)($paytrConfigLive['merchant_id'] ?? ''));
             <button type="button" class="pane-button" data-pane-target="cta"><i class="bi bi-bullseye"></i>Çağrı Alanı</button>
             <button type="button" class="pane-button" data-pane-target="sales"><i class="bi bi-shop"></i>Satış Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="payment"><i class="bi bi-credit-card-2-front"></i>Ödeme Ayarları</button>
+            <button type="button" class="pane-button" data-pane-target="whatsapp"><i class="bi bi-whatsapp"></i>WhatsApp API</button>
             <button type="button" class="pane-button" data-pane-target="smtp"><i class="bi bi-envelope-paper"></i>SMTP Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="faq"><i class="bi bi-chat-dots"></i>Sıkça Sorulanlar</button>
             <button type="button" class="pane-button" data-pane-target="footer"><i class="bi bi-columns-gap"></i>Footer İçeriği</button>
@@ -1175,6 +1187,61 @@ $paytrCurrentId = trim((string)($paytrConfigLive['merchant_id'] ?? ''));
                 <div class="col-12">
                   <div class="alert alert-info mb-0 small" role="alert">
                     PayTR test modunda ödemeler otomatik onaylanır. Canlı moda geçmeden önce PayTR panelinizde mağaza ayarlarınızı ve izinlerinizi doğrulayın.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card card-lite content-pane" data-pane="whatsapp">
+            <div class="card-section border-bottom">
+              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+                <div>
+                  <h5 class="fw-bold mb-1">WhatsApp API</h5>
+                  <p class="text-muted mb-0">Pazarlama panelinden toplu WhatsApp gönderimi yapabilmek için servis bilgilerinizi girin.</p>
+                </div>
+                <i class="bi bi-whatsapp" style="font-size:1.6rem;color:#25d366;"></i>
+              </div>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="badge <?=$whatsappStatusBadge?>">Durum: <?=$whatsappStatusText?></span>
+                <?php if ($whatsappCurrentUrl !== ''): ?>
+                  <span class="badge text-bg-light text-secondary">Aktif URL: <?=h(mb_strimwidth($whatsappCurrentUrl, 0, 42, '…', 'UTF-8'))?></span>
+                <?php endif; ?>
+                <?php if ($whatsappCurrentSender !== ''): ?>
+                  <span class="badge text-bg-success-subtle text-success-emphasis">Gönderen: <?=h($whatsappCurrentSender)?></span>
+                <?php endif; ?>
+              </div>
+              <?php if (!$whatsappActiveNow): ?>
+                <div class="alert alert-warning mt-3 mb-0" role="alert">
+                  WhatsApp entegrasyonu şu anda pasif. Bilgileri kaydedip aktifleştirdiğinizde mesajlar otomatik olarak API üzerinden gönderilir.
+                </div>
+              <?php endif; ?>
+            </div>
+            <div class="card-section">
+              <div class="row g-3">
+                <div class="col-12">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" value="1" id="whatsapp_api_enabled" name="whatsapp_api_enabled" <?=$whatsappEnabledSetting ? 'checked' : ''?>>
+                    <label class="form-check-label" for="whatsapp_api_enabled">WhatsApp API entegrasyonunu aktifleştir</label>
+                  </div>
+                  <div class="form-text">URL ve token alanları doldurulduğunda pazarlama ekranından seçilen kişilere anında gönderim yapılır.</div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">API URL</label>
+                  <input type="text" class="form-control" name="whatsapp_api_url" value="<?=h($content['whatsapp_api_url'] ?? '')?>" placeholder="https://api.ornek.com/messages">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">API Erişim Token</label>
+                  <input type="text" class="form-control" name="whatsapp_api_token" value="<?=h($content['whatsapp_api_token'] ?? '')?>" autocomplete="off" spellcheck="false">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Gönderici Kimliği / Numara</label>
+                  <input type="text" class="form-control" name="whatsapp_api_sender" value="<?=h($content['whatsapp_api_sender'] ?? '')?>" placeholder="90XXXXXXXXXX">
+                  <div class="form-text">API'nizin beklediği WhatsApp iş numarası veya kanal kimliğini girin.</div>
+                </div>
+                <div class="col-12">
+                  <div class="alert alert-info mb-0 small" role="alert">
+                    Sunucu, istekleri JSON olarak gönderir: <code>{"to":"905XXXXXXXXX","message":"Merhaba","media":[{"filename":"dosya.jpg","mime_type":"image/jpeg","content":"BASE64"}]}</code>. Servisiniz farklı alanlar bekliyorsa bu verileri karşılayacak şekilde adapte edin.
                   </div>
                 </div>
               </div>

@@ -82,6 +82,61 @@ function site_payment_config(bool $refresh = false): array {
   return $cache = $config;
 }
 
+function site_whatsapp_config(bool $refresh = false): array {
+  static $cache = null;
+  if ($cache !== null && !$refresh) {
+    return $cache;
+  }
+
+  $config = [
+    'enabled'  => false,
+    'api_url'  => defined('WHATSAPP_API_URL') ? (string)WHATSAPP_API_URL : '',
+    'api_token'=> defined('WHATSAPP_API_TOKEN') ? (string)WHATSAPP_API_TOKEN : '',
+    'sender'   => defined('WHATSAPP_API_SENDER') ? (string)WHATSAPP_API_SENDER : '',
+  ];
+
+  $settings = [];
+  try {
+    if (function_exists('pdo') && table_exists('site_settings')) {
+      $keys = ['whatsapp_api_enabled', 'whatsapp_api_url', 'whatsapp_api_token', 'whatsapp_api_sender'];
+      $placeholders = implode(',', array_fill(0, count($keys), '?'));
+      $st = pdo()->prepare("SELECT setting_key, setting_value FROM site_settings WHERE setting_key IN ($placeholders)");
+      $st->execute($keys);
+      while ($row = $st->fetch()) {
+        $settings[$row['setting_key']] = (string)$row['setting_value'];
+      }
+    }
+  } catch (Throwable $e) {
+    // Varsayılan çevresel değerlerle devam edilir.
+  }
+
+  if (array_key_exists('whatsapp_api_url', $settings) && $settings['whatsapp_api_url'] !== '') {
+    $config['api_url'] = trim($settings['whatsapp_api_url']);
+  }
+  if (array_key_exists('whatsapp_api_token', $settings) && $settings['whatsapp_api_token'] !== '') {
+    $config['api_token'] = trim($settings['whatsapp_api_token']);
+  }
+  if (array_key_exists('whatsapp_api_sender', $settings)) {
+    $config['sender'] = trim($settings['whatsapp_api_sender']);
+  }
+
+  if (array_key_exists('whatsapp_api_enabled', $settings) && $settings['whatsapp_api_enabled'] !== '') {
+    $config['enabled'] = (int)$settings['whatsapp_api_enabled'] === 1;
+  } else {
+    $config['enabled'] = ($config['api_url'] !== '' && $config['api_token'] !== '');
+  }
+
+  return $cache = $config;
+}
+
+function whatsapp_is_enabled(): bool {
+  $config = site_whatsapp_config();
+  if (empty($config['enabled'])) {
+    return false;
+  }
+  return trim((string)$config['api_url']) !== '' && trim((string)$config['api_token']) !== '';
+}
+
 function paytr_credentials(): array {
   $config = site_payment_config();
   return [

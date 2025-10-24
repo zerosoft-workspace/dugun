@@ -5,6 +5,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/../includes/sms.php';
+require_once __DIR__.'/../includes/whatsapp.php';
 require_once __DIR__.'/partials/ui.php';
 
 require_admin();
@@ -956,8 +957,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $cleanupUploads = function () use (&$attachments): void {
       foreach ($attachments as $file) {
-        $path = __DIR__.'/../uploads/'.($file['path'] ?? '');
-        if (is_string($path) && $path !== '' && file_exists($path)) {
+        $relative = isset($file['path']) ? (string)$file['path'] : '';
+        $path = __DIR__.'/../uploads/'.ltrim($relative, '/');
+        if ($relative !== '' && is_file($path)) {
           @unlink($path);
         }
       }
@@ -974,42 +976,128 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       $cleanupUploads();
       flash('err', 'Gönderilecek telefon numarası bulunamadı.');
     } else {
-      $recipientLogs = [];
+      $normalizedMap = [];
+      $skippedNumbers = [];
       foreach ($targets as $original) {
         $normalized = sms_normalize_number($original);
         if ($normalized === '') {
-          $recipientLogs[] = [
-            'name'   => null,
-            'phone'  => $original,
-            'status' => 'skipped',
-            'detail' => 'Geçersiz numara',
-          ];
+          $skippedNumbers[] = $original;
           continue;
         }
-        $contact = $phoneLookup[$normalized] ?? $phoneLookup[normalize_phone($original)] ?? null;
-        $recipientLogs[] = [
-          'name'   => $contact['name'] ?? null,
-          'email'  => $contact['email'] ?? null,
-          'phone'  => $normalized,
-          'status' => 'pending',
-          'detail' => 'WhatsApp gönderimi bekleniyor',
-        ];
+        if (!isset($normalizedMap[$normalized])) {
+          $contact = $phoneLookup[$normalized] ?? $phoneLookup[normalize_phone($original)] ?? null;
+          $normalizedMap[$normalized] = [
+            'original' => $original,
+            'name'     => $contact['name'] ?? null,
+            'email'    => $contact['email'] ?? null,
+          ];
+        }
       }
 
-      $broadcastId = marketing_log_broadcast('whatsapp', $selected, $title, $message, $attachments, $recipientLogs);
-      if ($broadcastId) {
-        $redirectTo = marketing_broadcast_url($selected, $search, $broadcastId);
-        $summary = count($recipientLogs).' kişi kampanya listesine eklendi.';
-        if ($attachments !== []) {
-          $summary .= ' '.count($attachments).' medya dosyası yüklendi.';
-        }
-        flash('ok', 'WhatsApp kampanyası kaydedildi. '.$summary);
-        if ($uploadErrors !== []) {
-          flash('info', implode(' ', $uploadErrors));
-        }
-      } else {
+      if ($normalizedMap === []) {
         $cleanupUploads();
-        flash('err', 'WhatsApp kampanyası kaydedilemedi. Lütfen daha sonra tekrar deneyin.');
+        $messageText = 'Gönderilecek geçerli telefon numarası bulunamadı.';
+        if ($skippedNumbers !== []) {
+          $messageText .= ' Geçersiz: '.summarize_list($skippedNumbers).'.';
+        }
+        flash('err', $messageText);
+      } else {
+        $configError = whatsapp_config_error();
+        if ($configError !== null) {
+          $cleanupUploads();
+          flash('err', 'WhatsApp API yapılandırması eksik: '.$configError);
+        } else {
+          $validNumbers = array_keys($normalizedMap);
+          $sendResult = whatsapp_send_bulk($validNumbers, $message, $attachments);
+          $deliveryResults = is_array($sendResult['results'] ?? null) ? $sendResult['results'] : [];
+
+          $recipientLogs = [];
+          $sentCount = 0;
+          $failedCount = 0;
+          $failedNumbers = [];
+
+          foreach ($normalizedMap as $normalized => $info) {
+            $delivery = $deliveryResults[$normalized] ?? null;
+            $status = ($delivery && ($delivery['status'] ?? '') === 'sent') ? 'sent' : 'failed';
+            $detail = is_array($delivery) && isset($delivery['detail']) ? trim((string)$delivery['detail']) : '';
+            if ($status === 'sent') {
+              $sentCount++;
+              if ($detail === '') {
+                $detail = 'WhatsApp mesajı gönderildi';
+              }
+            } else {
+              $failedCount++;
+              $failedNumbers[] = $info['original'];
+              if ($detail === '') {
+                $detail = 'WhatsApp mesajı gönderilemedi';
+              }
+            }
+            $recipientLogs[] = [
+              'name'    => $info['name'] ?? null,
+              'email'   => $info['email'] ?? null,
+              'phone'   => $info['original'],
+              'status'  => $status,
+              'detail'  => $detail,
+              'sent_at' => $status === 'sent' ? now() : null,
+            ];
+          }
+
+          foreach ($skippedNumbers as $number) {
+            $recipientLogs[] = [
+              'name'   => null,
+              'phone'  => $number,
+              'status' => 'skipped',
+              'detail' => 'Geçersiz numara',
+            ];
+          }
+
+          $summaryParts = [];
+          if ($sentCount > 0) {
+            $summaryParts[] = $sentCount.' numaraya WhatsApp mesajı gönderildi.';
+          }
+          if ($failedCount > 0) {
+            $failedList = unique_values($failedNumbers, true);
+            if ($failedList !== []) {
+              $summaryParts[] = $failedCount.' numaraya gönderilemedi: '.summarize_list($failedList).'.';
+            } else {
+              $summaryParts[] = $failedCount.' numaraya gönderilemedi.';
+            }
+          }
+          if ($skippedNumbers !== []) {
+            $summaryParts[] = count($skippedNumbers).' numara geçersiz olduğu için atlandı: '.summarize_list($skippedNumbers).'.';
+          }
+          $serviceErrors = array_unique(array_map('trim', is_array($sendResult['errors'] ?? null) ? $sendResult['errors'] : []));
+          $serviceErrors = array_values(array_filter($serviceErrors, function ($val) {
+            return $val !== '';
+          }));
+          if ($serviceErrors !== []) {
+            $summaryParts[] = 'Servis mesajı: '.implode(' ', $serviceErrors);
+          }
+
+          $summary = implode(' ', $summaryParts);
+
+          if ($recipientLogs !== []) {
+            $broadcastId = marketing_log_broadcast('whatsapp', $selected, $title, $message, $attachments, $recipientLogs);
+            if ($broadcastId) {
+              $redirectTo = marketing_broadcast_url($selected, $search, $broadcastId);
+            }
+          }
+
+          if ($sentCount > 0 && $failedCount === 0) {
+            flash('ok', 'WhatsApp kampanyası gönderildi. '.$summary);
+          } elseif ($sentCount > 0) {
+            flash('ok', 'WhatsApp kampanyası kısmen gönderildi. '.$summary);
+          } else {
+            flash('err', 'WhatsApp mesajları gönderilemedi. '.$summary);
+          }
+
+          if (!empty($sendResult['attachment_errors'])) {
+            flash('info', implode(' ', (array)$sendResult['attachment_errors']));
+          }
+          if ($uploadErrors !== []) {
+            flash('info', implode(' ', $uploadErrors));
+          }
+        }
       }
     }
   } elseif ($action === 'update_target_status') {

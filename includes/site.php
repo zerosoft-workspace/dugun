@@ -189,6 +189,10 @@ function site_content_defaults(): array {
     'paytr_merchant_key' => defined('PAYTR_MERCHANT_KEY') ? (string)PAYTR_MERCHANT_KEY : '',
     'paytr_merchant_salt' => defined('PAYTR_MERCHANT_SALT') ? (string)PAYTR_MERCHANT_SALT : '',
     'paytr_test_mode' => defined('PAYTR_TEST_MODE') ? ((int)PAYTR_TEST_MODE === 1 ? '1' : '0') : '1',
+    'whatsapp_api_enabled' => whatsapp_is_enabled() ? '1' : '0',
+    'whatsapp_api_url' => defined('WHATSAPP_API_URL') ? (string)WHATSAPP_API_URL : '',
+    'whatsapp_api_token' => defined('WHATSAPP_API_TOKEN') ? (string)WHATSAPP_API_TOKEN : '',
+    'whatsapp_api_sender' => defined('WHATSAPP_API_SENDER') ? (string)WHATSAPP_API_SENDER : '',
     'smtp_host' => '',
     'smtp_port' => '',
     'smtp_user' => '',
@@ -313,6 +317,7 @@ function site_public_content(): array {
 
   unset($content['default_dealer_referral_code']);
   unset($content['paytr_enabled'], $content['paytr_merchant_id'], $content['paytr_merchant_key'], $content['paytr_merchant_salt'], $content['paytr_test_mode']);
+  unset($content['whatsapp_api_enabled'], $content['whatsapp_api_url'], $content['whatsapp_api_token'], $content['whatsapp_api_sender']);
 
   $logo = trim((string)($content['site_logo'] ?? ''));
   if ($logo === '' || !site_content_asset_exists($logo)) {
