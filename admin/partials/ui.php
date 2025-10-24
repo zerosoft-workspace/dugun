@@ -552,6 +552,7 @@ CSS;
       'order_campaigns' => ['href' => BASE_URL.'/admin/order_campaigns.php', 'label' => 'Sosyal Sorumluluk Kampanyaları', 'icon' => 'bi-heart-fill', 'permission' => 'order_campaigns'],
       'order_addons' => ['href' => BASE_URL.'/admin/order_addons.php', 'label' => 'Ek Hizmetler', 'icon' => 'bi-stars', 'permission' => 'order_addons'],
       'site'     => ['href' => BASE_URL.'/admin/site_content.php', 'label' => 'Site İçerikleri', 'icon' => 'bi-sliders', 'permission' => 'site'],
+      'password' => ['href' => BASE_URL.'/admin/password.php', 'label' => 'Şifre & Güvenlik', 'icon' => 'bi-shield-lock'],
       'team'     => ['href' => BASE_URL.'/admin/team.php', 'label' => 'Yönetici Ekibi', 'icon' => 'bi-people', 'superadmin_only' => true],
     ];
 
@@ -608,6 +609,7 @@ CSS;
     echo '<div class="toolbar-user">';
     echo '<div class="avatar">'.h($initial).'</div>';
     echo '<span><strong>'.h($displayName).'</strong><small>'.h($roleLabel).'</small></span>';
+    echo '<a class="ms-2 text-decoration-none" href="'.h(BASE_URL.'/admin/password.php').'" title="Şifre Değiştir"><i class="bi bi-shield-lock"></i></a>';
     echo '<a class="ms-2 text-decoration-none text-danger" href="'.h(BASE_URL.'/admin/login.php?logout=1').'" title="Çıkış Yap"><i class="bi bi-box-arrow-right"></i></a>';
     echo '</div>';
     echo '</div>';

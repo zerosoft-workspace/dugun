@@ -518,8 +518,8 @@ function representative_create(array $data): int {
   $hash = password_hash($password, PASSWORD_DEFAULT);
 
   $pdo = pdo();
-  $pdo->prepare('INSERT INTO dealer_representatives (dealer_id, assigned_at, name, email, phone, password_hash, commission_rate, status, created_at, updated_at)
-                 VALUES (NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?)')
+  $pdo->prepare('INSERT INTO dealer_representatives (dealer_id, assigned_at, name, email, phone, password_hash, password_set_at, force_password_reset, commission_rate, status, created_at, updated_at)
+                 VALUES (NULL, NULL, ?, ?, ?, ?, NULL, 1, ?, ?, ?, ?)')
       ->execute([
         $name,
         $email,
@@ -622,8 +622,29 @@ function representative_update_password(int $representative_id, string $plainPas
     throw new InvalidArgumentException('Şifre boş olamaz.');
   }
   $hash = password_hash($plainPassword, PASSWORD_DEFAULT);
-  pdo()->prepare('UPDATE dealer_representatives SET password_hash=?, updated_at=? WHERE id=?')
+  pdo()->prepare('UPDATE dealer_representatives SET password_hash=?, password_set_at=NULL, force_password_reset=1, updated_at=? WHERE id=?')
       ->execute([$hash, now(), (int)$representative_id]);
+  if (!empty($_SESSION['representative']['id']) && (int)$_SESSION['representative']['id'] === $representative_id) {
+    $_SESSION['representative']['force_reset'] = 1;
+  }
+}
+
+function representative_mark_password_needs_reset(int $representative_id): void {
+  $now = now();
+  pdo()->prepare('UPDATE dealer_representatives SET force_password_reset=1, password_set_at=NULL, updated_at=? WHERE id=?')
+      ->execute([$now, (int)$representative_id]);
+  if (!empty($_SESSION['representative']['id']) && (int)$_SESSION['representative']['id'] === $representative_id) {
+    $_SESSION['representative']['force_reset'] = 1;
+  }
+}
+
+function representative_mark_password_changed(int $representative_id): void {
+  $now = now();
+  pdo()->prepare('UPDATE dealer_representatives SET force_password_reset=0, password_set_at=?, updated_at=? WHERE id=?')
+      ->execute([$now, $now, (int)$representative_id]);
+  if (!empty($_SESSION['representative']['id']) && (int)$_SESSION['representative']['id'] === $representative_id) {
+    $_SESSION['representative']['force_reset'] = 0;
+  }
 }
 
 function representative_record_login(int $representative_id): void {

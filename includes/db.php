@@ -224,11 +224,13 @@ function install_schema(){
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(190) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    password_set_at DATETIME NULL,
     name VARCHAR(190) NOT NULL,
     role ENUM('superadmin','admin') NOT NULL DEFAULT 'admin',
     admin_role_id INT NULL,
     reset_code VARCHAR(64) NULL,
     reset_expires DATETIME NULL,
+    force_password_reset TINYINT(1) NOT NULL DEFAULT 0,
     last_login_at DATETIME NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
@@ -246,6 +248,12 @@ function install_schema(){
 
   if (!column_exists('users', 'admin_role_id')) {
     pdo()->exec("ALTER TABLE users ADD admin_role_id INT NULL AFTER role");
+  }
+  if (!column_exists('users', 'password_set_at')) {
+    pdo()->exec("ALTER TABLE users ADD password_set_at DATETIME NULL AFTER password_hash");
+  }
+  if (!column_exists('users', 'force_password_reset')) {
+    pdo()->exec("ALTER TABLE users ADD force_password_reset TINYINT(1) NOT NULL DEFAULT 0 AFTER reset_expires");
   }
   try {
     pdo()->exec("ALTER TABLE users ADD INDEX idx_users_admin_role (admin_role_id)");
@@ -280,11 +288,14 @@ function install_schema(){
     status VARCHAR(16) NOT NULL DEFAULT 'pending',
     license_expires_at DATETIME NULL,
     password_hash VARCHAR(255) NULL,
+    password_set_at DATETIME NULL,
     approved_at DATETIME NULL,
     last_login_at DATETIME NULL,
+    login_count INT NOT NULL DEFAULT 0,
     balance_cents INT NOT NULL DEFAULT 0,
     reset_code VARCHAR(64) NULL,
     reset_expires DATETIME NULL,
+    force_password_reset TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -323,6 +334,15 @@ function install_schema(){
   }
   if (!column_exists('dealers', 'tax_document_path')) {
     pdo()->exec("ALTER TABLE dealers ADD tax_document_path VARCHAR(255) NULL AFTER invoice_email");
+  }
+  if (!column_exists('dealers', 'password_set_at')) {
+    pdo()->exec("ALTER TABLE dealers ADD password_set_at DATETIME NULL AFTER password_hash");
+  }
+  if (!column_exists('dealers', 'login_count')) {
+    pdo()->exec("ALTER TABLE dealers ADD login_count INT NOT NULL DEFAULT 0 AFTER last_login_at");
+  }
+  if (!column_exists('dealers', 'force_password_reset')) {
+    pdo()->exec("ALTER TABLE dealers ADD force_password_reset TINYINT(1) NOT NULL DEFAULT 0 AFTER reset_expires");
   }
   try {
     pdo()->exec("ALTER TABLE dealers ADD UNIQUE KEY uniq_dealer_code (code)");
@@ -646,8 +666,10 @@ function install_schema(){
     email VARCHAR(190) NOT NULL UNIQUE,
     phone VARCHAR(64) NULL,
     password_hash VARCHAR(255) NOT NULL,
+    password_set_at DATETIME NULL,
     reset_code VARCHAR(64) NULL,
     reset_expires DATETIME NULL,
+    force_password_reset TINYINT(1) NOT NULL DEFAULT 0,
     commission_rate DECIMAL(5,2) NOT NULL DEFAULT 10.00,
     status VARCHAR(16) NOT NULL DEFAULT 'active',
     last_login_at DATETIME NULL,
@@ -663,6 +685,12 @@ function install_schema(){
   }
   if (!column_exists('dealer_representatives', 'reset_expires')) {
     pdo()->exec("ALTER TABLE dealer_representatives ADD reset_expires DATETIME NULL AFTER reset_code");
+  }
+  if (!column_exists('dealer_representatives', 'password_set_at')) {
+    pdo()->exec("ALTER TABLE dealer_representatives ADD password_set_at DATETIME NULL AFTER password_hash");
+  }
+  if (!column_exists('dealer_representatives', 'force_password_reset')) {
+    pdo()->exec("ALTER TABLE dealer_representatives ADD force_password_reset TINYINT(1) NOT NULL DEFAULT 0 AFTER reset_expires");
   }
   try {
     pdo()->exec("ALTER TABLE dealer_representatives MODIFY reset_code VARCHAR(64) NULL");
@@ -1507,3 +1535,14 @@ try {
     }
   }
 
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_login_logs(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    logged_at DATETIME NOT NULL,
+    ip_address VARCHAR(45) NULL,
+    user_agent VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_dealer_login_logs_dealer (dealer_id),
+    INDEX idx_dealer_login_logs_logged_at (logged_at),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");

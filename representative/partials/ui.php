@@ -488,6 +488,7 @@ CSS;
     echo '<a class="rep-nav-link'.($activeNav === 'dashboard' ? ' active' : '').'" href="dashboard.php"><i class="bi bi-grid"></i><span>Ana Sayfa</span></a>';
     echo '<a class="rep-nav-link'.($activeNav === 'crm' ? ' active' : '').'" href="crm.php"><i class="bi bi-kanban"></i><span>CRM</span></a>';
     echo '<a class="rep-nav-link'.($activeNav === 'commissions' ? ' active' : '').'" href="commissions.php"><i class="bi bi-cash-coin"></i><span>Komisyonlar</span></a>';
+    echo '<a class="rep-nav-link'.($activeNav === 'password' ? ' active' : '').'" href="password.php"><i class="bi bi-shield-lock"></i><span>Şifre &amp; Güvenlik</span></a>';
     echo '</nav>';
     echo '<div class="rep-sidebar-meta">';
     echo '<div>'.h(date('d.m.Y')).' itibarıyla güncel.</div>';
@@ -526,6 +527,7 @@ CSS;
     }
     echo '</div>';
     echo '</div>';
+    echo '<a class="btn btn-outline-primary" href="password.php" style="display:inline-flex;align-items:center;gap:.4rem;"><i class="bi bi-shield-lock"></i><span>Şifre Değiştir</span></a>';
     echo '<a class="rep-logout" href="'.h($logoutUrl).'"><i class="bi bi-box-arrow-right"></i><span>Çıkış Yap</span></a>';
     echo '</div>';
     echo '</header>';

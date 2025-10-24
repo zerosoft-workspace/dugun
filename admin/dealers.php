@@ -84,6 +84,7 @@ if ($action === 'create') {
         ->execute([$hash, now(), now(), $dealerId]);
     $dealer = dealer_get($dealerId);
     dealer_send_welcome_mail($dealer, $plain);
+    dealer_mark_password_needs_reset($dealerId);
   }
 
   flash('ok', 'Bayi kaydedildi.');
@@ -145,6 +146,7 @@ if ($action === 'update') {
         ->execute([$hash, now(), now(), $dealerId]);
     $dealer = dealer_get($dealerId);
     dealer_send_welcome_mail($dealer, $plain);
+    dealer_mark_password_needs_reset($dealerId);
   }
 
   flash('ok','Bilgiler güncellendi.');
@@ -190,6 +192,7 @@ if ($action === 'send_password') {
       ->execute([$hash, now(), now(), $dealerId]);
   $dealer = dealer_get($dealerId);
   dealer_send_welcome_mail($dealer, $plain);
+  dealer_mark_password_needs_reset($dealerId);
   flash('ok','Yeni şifre e-posta ile gönderildi.');
   redirect($_SERVER['PHP_SELF'].'?id='.$dealerId);
 }
@@ -389,6 +392,8 @@ if ($selectedDealer) {
   foreach ($cashbackPending as $row) {
     $cashbackPendingAmount += max(0, (int)$row['cashback_amount']);
   }
+  $loginSummary = dealer_login_activity_summary($selectedId);
+  $recentLoginLogs = dealer_recent_login_logs($selectedId, 6);
   $topupRequests = dealer_topups_for_dealer($selectedId);
 } else {
   $walletBalance = 0;
@@ -399,6 +404,8 @@ if ($selectedDealer) {
   $cashbackPending = [];
   $cashbackPendingCount = 0;
   $cashbackPendingAmount = 0;
+  $loginSummary = ['total' => 0, 'last_login_at' => null, 'last_30_days' => 0, 'last_7_days' => 0];
+  $recentLoginLogs = [];
   $topupRequests = [];
   $representative = null;
   $representativeTotals = [
@@ -799,6 +806,74 @@ if ($selectedDealer && !array_filter($dealersList, fn($row) => (int)$row['id'] =
               <div class="text-uppercase text-muted small fw-semibold">Lisans Bitişi</div>
               <div class="dealer-meta mb-0"><?=h(date('d.m.Y H:i', strtotime($selectedDealer['license_expires_at'])))?></div>
             </div>
+            <?php endif; ?>
+          </div>
+          <div class="mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
+              <h6 class="mb-0 text-uppercase text-muted small fw-semibold">Giriş Aktivitesi</h6>
+              <span class="badge-soft-lg"><span>Toplam</span> <?=h((string)($loginSummary['total'] ?? 0))?></span>
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-md-4">
+                <div class="p-3 border rounded-3 h-100 bg-light-subtle">
+                  <div class="text-muted text-uppercase small fw-semibold mb-1">Son Giriş</div>
+                  <div class="fw-semibold">
+                    <?php if (!empty($loginSummary['last_login_at'])): ?>
+                      <?=h(date('d.m.Y H:i', strtotime($loginSummary['last_login_at'])))?>
+                    <?php else: ?>
+                      <span class="text-muted">Henüz giriş yapılmadı</span>
+                    <?php endif; ?>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="p-3 border rounded-3 h-100">
+                  <div class="text-muted text-uppercase small fw-semibold mb-1">Son 7 Gün</div>
+                  <div class="display-6 fs-3 mb-0 fw-semibold"><?=h((string)($loginSummary['last_7_days'] ?? 0))?></div>
+                  <div class="text-muted small">giriş</div>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="p-3 border rounded-3 h-100">
+                  <div class="text-muted text-uppercase small fw-semibold mb-1">Son 30 Gün</div>
+                  <div class="display-6 fs-3 mb-0 fw-semibold"><?=h((string)($loginSummary['last_30_days'] ?? 0))?></div>
+                  <div class="text-muted small">giriş</div>
+                </div>
+              </div>
+            </div>
+            <?php if (!empty($recentLoginLogs)): ?>
+              <div class="table-responsive small">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th scope="col">Tarih</th>
+                      <th scope="col">IP</th>
+                      <th scope="col">Tarayıcı</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <?php foreach ($recentLoginLogs as $log): ?>
+                      <tr>
+                        <td><?= $log['logged_at'] ? h(date('d.m.Y H:i', strtotime($log['logged_at']))) : '<span class="text-muted">-</span>' ?></td>
+                        <td><?= $log['ip_address'] ? h($log['ip_address']) : '<span class="text-muted">-</span>' ?></td>
+                        <td>
+                          <?php
+                            $ua = $log['user_agent'] ?? '';
+                            if ($ua !== '') {
+                              $ua = mb_strimwidth($ua, 0, 70, '…', 'UTF-8');
+                              echo h($ua);
+                            } else {
+                              echo '<span class="text-muted">-</span>';
+                            }
+                          ?>
+                        </td>
+                      </tr>
+                    <?php endforeach; ?>
+                  </tbody>
+                </table>
+              </div>
+            <?php else: ?>
+              <p class="text-muted small mb-0">Bu bayi için henüz giriş kaydı bulunmuyor.</p>
             <?php endif; ?>
           </div>
           <?php $dealerDocUrl = dealer_tax_document_url($selectedDealer['tax_document_path'] ?? null); ?>

@@ -595,8 +595,89 @@ function dealer_send_welcome_mail(array $dealer, string $plain_password): void {
 }
 
 function dealer_update_last_login(int $dealer_id): void {
-  pdo()->prepare("UPDATE dealers SET last_login_at=?, updated_at=? WHERE id=?")
-      ->execute([now(), now(), $dealer_id]);
+  $now = now();
+  $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+  $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+
+  pdo()->prepare("UPDATE dealers SET last_login_at=?, login_count=login_count+1, updated_at=? WHERE id=?")
+      ->execute([$now, $now, $dealer_id]);
+
+  try {
+    $stmt = pdo()->prepare("INSERT INTO dealer_login_logs (dealer_id, logged_at, ip_address, user_agent, created_at) VALUES (?,?,?,?,?)");
+    $stmt->execute([
+      $dealer_id,
+      $now,
+      $ip ? substr($ip, 0, 45) : null,
+      $userAgent ? substr($userAgent, 0, 255) : null,
+      $now,
+    ]);
+  } catch (Throwable $e) {
+    // logging best-effort
+  }
+}
+
+function dealer_mark_password_needs_reset(int $dealer_id): void {
+  $now = now();
+  pdo()->prepare("UPDATE dealers SET force_password_reset=1, password_set_at=NULL, updated_at=? WHERE id=?")
+      ->execute([$now, $dealer_id]);
+  if (!empty($_SESSION['dealer']['id']) && (int)$_SESSION['dealer']['id'] === $dealer_id) {
+    $_SESSION['dealer']['force_reset'] = 1;
+  }
+}
+
+function dealer_mark_password_changed(int $dealer_id): void {
+  $now = now();
+  pdo()->prepare("UPDATE dealers SET force_password_reset=0, password_set_at=?, updated_at=? WHERE id=?")
+      ->execute([$now, $now, $dealer_id]);
+  if (!empty($_SESSION['dealer']['id']) && (int)$_SESSION['dealer']['id'] === $dealer_id) {
+    $_SESSION['dealer']['force_reset'] = 0;
+  }
+}
+
+function dealer_recent_login_logs(int $dealer_id, int $limit = 10): array {
+  $limit = max(1, min((int)$limit, 100));
+  $sql = "SELECT logged_at, ip_address, user_agent FROM dealer_login_logs WHERE dealer_id=? ORDER BY logged_at DESC LIMIT $limit";
+  $st = pdo()->prepare($sql);
+  $st->execute([$dealer_id]);
+  $rows = $st->fetchAll();
+  foreach ($rows as &$row) {
+    $row['logged_at'] = $row['logged_at'] ?? null;
+    $row['ip_address'] = $row['ip_address'] ?? null;
+    $row['user_agent'] = $row['user_agent'] ?? null;
+  }
+  return $rows;
+}
+
+function dealer_login_counts_since(int $dealer_id, DateTimeInterface $since): int {
+  $sql = "SELECT COUNT(*) FROM dealer_login_logs WHERE dealer_id=? AND logged_at >= ?";
+  $st = pdo()->prepare($sql);
+  $st->execute([$dealer_id, $since->format('Y-m-d H:i:s')]);
+  return (int)$st->fetchColumn();
+}
+
+function dealer_login_activity_summary(int $dealer_id): array {
+  $summary = [
+    'total' => 0,
+    'last_login_at' => null,
+    'last_30_days' => 0,
+    'last_7_days' => 0,
+  ];
+
+  $st = pdo()->prepare("SELECT login_count, last_login_at FROM dealers WHERE id=? LIMIT 1");
+  $st->execute([$dealer_id]);
+  if ($row = $st->fetch()) {
+    $summary['total'] = (int)($row['login_count'] ?? 0);
+    $summary['last_login_at'] = $row['last_login_at'] ?? null;
+  }
+
+  try {
+    $summary['last_7_days'] = dealer_login_counts_since($dealer_id, new DateTimeImmutable('-7 days'));
+    $summary['last_30_days'] = dealer_login_counts_since($dealer_id, new DateTimeImmutable('-30 days'));
+  } catch (Throwable $e) {
+    // ignore
+  }
+
+  return $summary;
 }
 
 function dealer_license_warning(array $dealer): ?string {

@@ -477,6 +477,7 @@ CSS;
       'dashboard' => ['href' => BASE_URL.'/dealer/dashboard.php', 'label' => 'Genel Bakış', 'icon' => 'bi-speedometer2'],
       'billing'   => ['href' => BASE_URL.'/dealer/billing.php', 'label' => 'Bakiye & Paketler', 'icon' => 'bi-wallet2'],
       'listings'  => ['href' => BASE_URL.'/dealer/listings.php', 'label' => 'İlanlar', 'icon' => 'bi-card-text'],
+      'password'  => ['href' => BASE_URL.'/dealer/password.php', 'label' => 'Şifre & Güvenlik', 'icon' => 'bi-shield-lock'],
     ];
 
     echo '<nav class="sidebar-nav">';
@@ -515,6 +516,7 @@ CSS;
     echo '<div class="toolbar-user">';
     echo '<div class="avatar">'.h($initial).'</div>';
     echo '<span><strong>'.h($dealerName).'</strong><small>Bayi Yetkilisi</small></span>';
+    echo '<a class="ms-1 text-decoration-none" href="'.h(BASE_URL.'/dealer/password.php').'" title="Şifre Değiştir"><i class="bi bi-shield-lock"></i></a>';
     echo '<a class="ms-1 text-decoration-none text-danger" href="'.h(BASE_URL.'/dealer/login.php?logout=1').'" title="Çıkış Yap"><i class="bi bi-box-arrow-right"></i></a>';
     echo '</div>';
     echo '</div>';

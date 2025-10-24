@@ -22,11 +22,22 @@ function representative_login(string $email, string $password): bool {
   if (empty($rep['password_hash']) || !password_verify($password, $rep['password_hash'])) {
     return false;
   }
+  if (password_needs_rehash($rep['password_hash'], PASSWORD_DEFAULT)) {
+    try {
+      $rehash = password_hash($password, PASSWORD_DEFAULT);
+      pdo()->prepare('UPDATE dealer_representatives SET password_hash=?, updated_at=? WHERE id=?')
+          ->execute([$rehash, now(), (int)$rep['id']]);
+    } catch (Throwable $e) {
+      // ignore rehash issues
+    }
+  }
+
   $_SESSION['representative'] = [
     'id' => (int)$rep['id'],
     'email' => $rep['email'],
     'name' => $rep['name'],
     'since' => time(),
+    'force_reset' => (int)($rep['force_password_reset'] ?? 0),
   ];
   representative_record_login((int)$rep['id']);
   return true;
@@ -88,8 +99,10 @@ function representative_complete_password_reset(string $email, string $code, str
   }
 
   $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+  $now = now();
   pdo()->prepare("UPDATE dealer_representatives SET password_hash=?, reset_code=NULL, reset_expires=NULL, updated_at=? WHERE id=?")
-      ->execute([$hash, now(), (int)$rep['id']]);
+      ->execute([$hash, $now, (int)$rep['id']]);
+  representative_mark_password_changed((int)$rep['id']);
 
   return true;
 }
@@ -107,6 +120,7 @@ function representative_require_login(string $login_url = '/representative/login
     $back = urlencode($_SERVER['REQUEST_URI'] ?? '/representative/dashboard.php');
     redirect($login_url.'?next='.$back);
   }
+  representative_require_password_change_if_needed();
 }
 
 function representative_refresh_session(int $representative_id): void {
@@ -120,5 +134,34 @@ function representative_refresh_session(int $representative_id): void {
     'email' => $rep['email'],
     'name' => $rep['name'],
     'since' => time(),
+    'force_reset' => (int)($rep['force_password_reset'] ?? 0),
   ];
+}
+
+function representative_session_requires_password_change(): bool {
+  if (!representative_user()) {
+    return false;
+  }
+  if (!isset($_SESSION['representative']['force_reset'])) {
+    $id = (int)($_SESSION['representative']['id'] ?? 0);
+    if ($id > 0) {
+      $st = pdo()->prepare('SELECT force_password_reset FROM dealer_representatives WHERE id=? LIMIT 1');
+      $st->execute([$id]);
+      $_SESSION['representative']['force_reset'] = (int)$st->fetchColumn();
+    } else {
+      $_SESSION['representative']['force_reset'] = 0;
+    }
+  }
+  return ((int)($_SESSION['representative']['force_reset'] ?? 0)) === 1;
+}
+
+function representative_require_password_change_if_needed(): void {
+  if (!representative_session_requires_password_change()) {
+    return;
+  }
+  $script = $_SERVER['SCRIPT_NAME'] ?? '';
+  if (strpos($script, '/representative/password.php') !== false) {
+    return;
+  }
+  redirect('password.php');
 }

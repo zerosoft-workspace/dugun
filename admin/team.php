@@ -68,10 +68,11 @@ if ($action === 'create') {
     if ($st->fetch()) {
       flash('err', 'Bu e-posta ile kayıtlı bir yönetici zaten var.');
     } else {
-      pdo()->prepare("INSERT INTO users (email,password_hash,name,role,admin_role_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?)")
+      pdo()->prepare("INSERT INTO users (email,password_hash,password_set_at,name,role,admin_role_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)")
           ->execute([
             $email,
             password_hash($pass, PASSWORD_DEFAULT),
+            now(),
             $name,
             $role,
             $role === 'superadmin' ? null : $adminRoleId,
@@ -270,8 +271,9 @@ if ($action === 'reset_password') {
     flash('err', 'Kullanıcı bulunamadı.');
     redirect($_SERVER['REQUEST_URI']);
   }
-  pdo()->prepare("UPDATE users SET password_hash=?, updated_at=? WHERE id=?")
+  pdo()->prepare("UPDATE users SET password_hash=?, password_set_at=NULL, force_password_reset=1, updated_at=? WHERE id=?")
       ->execute([password_hash($pass, PASSWORD_DEFAULT), now(), $userId]);
+  admin_mark_password_needs_reset($userId);
   if ($userId === ($me['id'] ?? 0)) {
     flash('ok', 'Şifreniz güncellendi.');
   } else {

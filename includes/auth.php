@@ -231,7 +231,7 @@ function admin_refresh_session(bool $force = false): void {
     if ($id <= 0) {
       return;
     }
-    $st = pdo()->prepare("SELECT id, email, name, role, admin_role_id FROM users WHERE id=? LIMIT 1");
+    $st = pdo()->prepare("SELECT id, email, name, role, admin_role_id, force_password_reset FROM users WHERE id=? LIMIT 1");
     $st->execute([$id]);
     $user = $st->fetch();
     if (!$user) {
@@ -260,6 +260,7 @@ function admin_refresh_session(bool $force = false): void {
     $_SESSION['admin']['role'] = $user['role'];
     $_SESSION['admin']['role_id'] = $user['admin_role_id'] ? (int)$user['admin_role_id'] : null;
     $_SESSION['admin']['permissions'] = $permissions;
+    $_SESSION['admin']['force_reset'] = (int)($user['force_password_reset'] ?? ($_SESSION['admin']['force_reset'] ?? 0));
   } catch (Throwable $e) {
     // oturum güncellenemedi, sessizce devam et
   }
@@ -277,6 +278,52 @@ function admin_has_permission(string $permission): bool {
   admin_refresh_session();
   $perms = $_SESSION['admin']['permissions'] ?? [];
   return in_array($permission, $perms, true);
+}
+
+function admin_mark_password_needs_reset(int $userId): void {
+  $now = now();
+  pdo()->prepare("UPDATE users SET force_password_reset=1, password_set_at=NULL, updated_at=? WHERE id=?")
+      ->execute([$now, $userId]);
+  if (!empty($_SESSION['admin']['id']) && (int)$_SESSION['admin']['id'] === $userId) {
+    $_SESSION['admin']['force_reset'] = 1;
+  }
+}
+
+function admin_mark_password_changed(int $userId): void {
+  $now = now();
+  pdo()->prepare("UPDATE users SET force_password_reset=0, password_set_at=?, updated_at=? WHERE id=?")
+      ->execute([$now, $now, $userId]);
+  if (!empty($_SESSION['admin']['id']) && (int)$_SESSION['admin']['id'] === $userId) {
+    $_SESSION['admin']['force_reset'] = 0;
+  }
+}
+
+function admin_session_requires_password_change(): bool {
+  if (!is_admin_logged_in()) {
+    return false;
+  }
+  if (!isset($_SESSION['admin']['force_reset'])) {
+    $id = (int)($_SESSION['admin']['id'] ?? 0);
+    if ($id > 0) {
+      $st = pdo()->prepare("SELECT force_password_reset FROM users WHERE id=? LIMIT 1");
+      $st->execute([$id]);
+      $_SESSION['admin']['force_reset'] = (int)$st->fetchColumn();
+    } else {
+      $_SESSION['admin']['force_reset'] = 0;
+    }
+  }
+  return ((int)($_SESSION['admin']['force_reset'] ?? 0)) === 1;
+}
+
+function admin_require_password_change_if_needed(): void {
+  if (!admin_session_requires_password_change()) {
+    return;
+  }
+  $script = $_SERVER['SCRIPT_NAME'] ?? '';
+  if (strpos($script, '/admin/password.php') !== false) {
+    return;
+  }
+  redirect(BASE_URL.'/admin/password.php');
 }
 
 function require_admin_permission(string $permission, string $redirect = '/admin/dashboard.php'): void {
@@ -297,12 +344,22 @@ function admin_login(string $email, string $password): bool {
   $email = trim($email);
   if ($email === '' || $password === '') return false;
 
-  $st = pdo()->prepare("SELECT id, email, password_hash, name, role, admin_role_id FROM users WHERE email = ? LIMIT 1");
+  $st = pdo()->prepare("SELECT id, email, password_hash, name, role, admin_role_id, force_password_reset FROM users WHERE email = ? LIMIT 1");
   $st->execute([$email]);
   $u = $st->fetch();
   if (!$u) return false;
 
   if (!password_verify($password, $u['password_hash'])) return false;
+
+  if (password_needs_rehash($u['password_hash'], PASSWORD_DEFAULT)) {
+    try {
+      $rehash = password_hash($password, PASSWORD_DEFAULT);
+      pdo()->prepare("UPDATE users SET password_hash=?, updated_at=? WHERE id=?")
+          ->execute([$rehash, now(), (int)$u['id']]);
+    } catch (Throwable $e) {
+      // ignore rehash errors
+    }
+  }
 
   pdo()->prepare("UPDATE users SET last_login_at=?, updated_at=? WHERE id=?")
       ->execute([now(), now(), (int)$u['id']]);
@@ -316,6 +373,7 @@ function admin_login(string $email, string $password): bool {
     'role_id' => !empty($u['admin_role_id']) ? (int)$u['admin_role_id'] : null,
     'permissions' => [],
     'since' => time(),
+    'force_reset' => (int)($u['force_password_reset'] ?? 0),
   ];
   ensure_admin_roles_seeded();
   admin_refresh_session(true);
@@ -378,8 +436,10 @@ function admin_complete_password_reset(string $email, string $code, string $newP
   }
 
   $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+  $now = now();
   pdo()->prepare("UPDATE users SET password_hash=?, reset_code=NULL, reset_expires=NULL, updated_at=? WHERE id=?")
-      ->execute([$hash, now(), (int)$user['id']]);
+      ->execute([$hash, $now, (int)$user['id']]);
+  admin_mark_password_changed((int)$user['id']);
 
   return true;
 }
@@ -464,6 +524,7 @@ function require_admin(string $login_url = '/admin/login.php'): void {
   }
   ensure_admin_roles_seeded();
   admin_refresh_session();
+  admin_require_password_change_if_needed();
 }
 // Geriye dönük uyumluluk: Eski kodlarda require_login() geçiyorsa destekle
 if (!function_exists('require_login')) {
@@ -481,7 +542,7 @@ if (!function_exists('require_login')) {
 function ensure_first_admin(string $email, string $password, string $name='Yönetici'): void {
   $cnt = (int)pdo()->query("SELECT COUNT(*) FROM users")->fetchColumn();
   if ($cnt === 0) {
-    $st = pdo()->prepare("INSERT INTO users (email, password_hash, name, role, created_at, updated_at) VALUES (?,?,?,?,NOW(),NOW())");
-    $st->execute([$email, password_hash($password, PASSWORD_DEFAULT), $name, 'superadmin']);
+    $st = pdo()->prepare("INSERT INTO users (email, password_hash, password_set_at, name, role, created_at, updated_at) VALUES (?,?,?,?,?,NOW(),NOW())");
+    $st->execute([$email, password_hash($password, PASSWORD_DEFAULT), now(), $name, 'superadmin']);
   }
 }
