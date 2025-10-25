@@ -275,7 +275,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     site_content_delete_asset($siteLogo);
     $siteLogo = '';
   }
-  if (!empty($_FILES['site_logo'])) {
+  if (!empty($_FILES['site_logo']) && (int)($_FILES['site_logo']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
     $uploaded = site_content_store_upload($_FILES['site_logo'], $siteLogo ?: null);
     if ($uploaded) {
       $siteLogo = $uploaded;
@@ -288,7 +288,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     site_content_delete_asset($heroMain);
     $heroMain = '';
   }
-  if (!empty($_FILES['hero_image_main'])) {
+  if (!empty($_FILES['hero_image_main']) && (int)($_FILES['hero_image_main']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
     $uploaded = site_content_store_upload($_FILES['hero_image_main'], $heroMain ?: null);
     if ($uploaded) {
       $heroMain = $uploaded;
@@ -301,7 +301,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     site_content_delete_asset($heroSecondary);
     $heroSecondary = '';
   }
-  if (!empty($_FILES['hero_image_secondary'])) {
+  if (!empty($_FILES['hero_image_secondary']) && (int)($_FILES['hero_image_secondary']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
     $uploaded = site_content_store_upload($_FILES['hero_image_secondary'], $heroSecondary ?: null);
     if ($uploaded) {
       $heroSecondary = $uploaded;
@@ -314,7 +314,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     site_content_delete_asset($aboutImage);
     $aboutImage = '';
   }
-  if (!empty($_FILES['about_image'])) {
+  if (!empty($_FILES['about_image']) && (int)($_FILES['about_image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
     $uploaded = site_content_store_upload($_FILES['about_image'], $aboutImage ?: null);
     if ($uploaded) {
       $aboutImage = $uploaded;
@@ -327,7 +327,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     site_content_delete_asset($dealerImage);
     $dealerImage = '';
   }
-  if (!empty($_FILES['dealer_showcase_image'])) {
+  if (!empty($_FILES['dealer_showcase_image']) && (int)($_FILES['dealer_showcase_image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
     $uploaded = site_content_store_upload($_FILES['dealer_showcase_image'], $dealerImage ?: null);
     if ($uploaded) {
       $dealerImage = $uploaded;
@@ -511,9 +511,12 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
     .btn-add-row{border-radius:12px;}
     .media-preview{border-radius:18px;background:#f8fafc;padding:1rem;border:1px solid rgba(148,163,184,.25);display:flex;flex-direction:column;gap:.75rem;}
     .media-preview img{border-radius:14px;width:100%;height:220px;object-fit:cover;box-shadow:0 14px 35px rgba(15,118,110,.18);}
+    .media-preview .btn-outline-danger{border-radius:12px;}
+    .media-preview .btn-outline-danger i{margin-right:.35rem;}
     .media-gallery-grid{display:grid;gap:1rem;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));}
     .media-gallery-item{background:#f8fafc;border-radius:16px;padding:.75rem;border:1px solid rgba(148,163,184,.25);display:flex;flex-direction:column;gap:.5rem;}
     .media-gallery-item img{border-radius:12px;width:100%;height:120px;object-fit:cover;box-shadow:0 12px 28px rgba(15,118,110,.15);}
+    .media-gallery-item .btn{border-radius:12px;}
     @media (max-width: 991px){
       .settings-shell{gap:1rem;}
     }
@@ -522,7 +525,7 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
 <body class="admin-body">
 <?php admin_layout_start('site', 'Site İçerikleri', 'Landing sayfanızdaki blokları düzenleyin ve hızlıca yayınlayın.'); ?>
     <?php flash_box(); ?>
-    <form method="post" class="settings-shell" novalidate enctype="multipart/form-data">
+    <form method="post" id="siteContentForm" class="settings-shell" novalidate enctype="multipart/form-data">
       <div class="row g-4 align-items-start">
         <div class="col-lg-4">
           <div class="pane-nav">
@@ -991,13 +994,16 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
                     <?php else: ?>
                       <div class="text-muted small">Şu anda varsayılan yazı tabanlı logo kullanılıyor.</div>
                     <?php endif; ?>
-                    <input type="file" name="site_logo" class="form-control" accept="image/*">
-                    <?php if (!empty($content['site_logo'])): ?>
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="site_logo_remove" value="1" id="removeSiteLogo">
-                        <label class="form-check-label" for="removeSiteLogo">Yüklü logoyu kaldır</label>
-                      </div>
-                    <?php endif; ?>
+                    <input type="hidden" name="site_logo_remove" value="0">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <input type="file" name="site_logo" class="form-control" accept="image/*">
+                      <?php if (!empty($content['site_logo'])): ?>
+                        <button type="button" class="btn btn-outline-danger btn-sm js-remove-asset" data-remove-field="site_logo_remove" data-confirm="Site logosunu silmek istediğinize emin misiniz?">
+                          <i class="bi bi-trash3"></i>
+                          Görseli Sil
+                        </button>
+                      <?php endif; ?>
+                    </div>
                   </div>
                 </div>
                 <div class="col-md-6">
@@ -1007,13 +1013,16 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
                       <p class="text-muted small mb-0">Önerilen boyut: 1200x900px. JPG veya WEBP formatında yükleyin.</p>
                     </div>
                     <img src="<?=h($heroMainImage)?>" alt="Hero görseli 1" loading="lazy">
-                    <input type="file" name="hero_image_main" class="form-control" accept="image/*">
-                    <?php if (!empty($content['hero_image_main'])): ?>
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="hero_image_main_remove" value="1" id="removeHeroMain">
-                        <label class="form-check-label" for="removeHeroMain">Yüklü görseli kaldır</label>
-                      </div>
-                    <?php endif; ?>
+                    <input type="hidden" name="hero_image_main_remove" value="0">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <input type="file" name="hero_image_main" class="form-control" accept="image/*">
+                      <?php if (!empty($content['hero_image_main'])): ?>
+                        <button type="button" class="btn btn-outline-danger btn-sm js-remove-asset" data-remove-field="hero_image_main_remove" data-confirm="Bu hero görselini silmek istediğinize emin misiniz?">
+                          <i class="bi bi-trash3"></i>
+                          Görseli Sil
+                        </button>
+                      <?php endif; ?>
+                    </div>
                   </div>
                 </div>
                 <div class="col-md-6">
@@ -1023,13 +1032,16 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
                       <p class="text-muted small mb-0">Hero bölümündeki ikinci görsel. Önerilen boyut: 900x900px.</p>
                     </div>
                     <img src="<?=h($heroSecondaryImage)?>" alt="Hero görseli 2" loading="lazy">
-                    <input type="file" name="hero_image_secondary" class="form-control" accept="image/*">
-                    <?php if (!empty($content['hero_image_secondary'])): ?>
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="hero_image_secondary_remove" value="1" id="removeHeroSecondary">
-                        <label class="form-check-label" for="removeHeroSecondary">Yüklü görseli kaldır</label>
-                      </div>
-                    <?php endif; ?>
+                    <input type="hidden" name="hero_image_secondary_remove" value="0">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <input type="file" name="hero_image_secondary" class="form-control" accept="image/*">
+                      <?php if (!empty($content['hero_image_secondary'])): ?>
+                        <button type="button" class="btn btn-outline-danger btn-sm js-remove-asset" data-remove-field="hero_image_secondary_remove" data-confirm="Bu hero görselini silmek istediğinize emin misiniz?">
+                          <i class="bi bi-trash3"></i>
+                          Görseli Sil
+                        </button>
+                      <?php endif; ?>
+                    </div>
                   </div>
                 </div>
                 <div class="col-12">
@@ -1039,13 +1051,16 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
                       <p class="text-muted small mb-0">"Hakkımızda" bölümünde kullanılan görsel. Önerilen boyut: 1200x900px.</p>
                     </div>
                     <img src="<?=h($aboutImageCurrent)?>" alt="Hakkımızda görseli" loading="lazy">
-                    <input type="file" name="about_image" class="form-control" accept="image/*">
-                    <?php if (!empty($content['about_image'])): ?>
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="about_image_remove" value="1" id="removeAboutImage">
-                        <label class="form-check-label" for="removeAboutImage">Yüklü görseli kaldır</label>
-                      </div>
-                    <?php endif; ?>
+                    <input type="hidden" name="about_image_remove" value="0">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <input type="file" name="about_image" class="form-control" accept="image/*">
+                      <?php if (!empty($content['about_image'])): ?>
+                        <button type="button" class="btn btn-outline-danger btn-sm js-remove-asset" data-remove-field="about_image_remove" data-confirm="Hakkımızda görselini silmek istediğinize emin misiniz?">
+                          <i class="bi bi-trash3"></i>
+                          Görseli Sil
+                        </button>
+                      <?php endif; ?>
+                    </div>
                   </div>
                 </div>
                 <div class="col-12">
@@ -1055,13 +1070,16 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
                       <p class="text-muted small mb-0">"Bayi Ağı" bölümünde kullanılan tanıtım görseli. Önerilen boyut: 1200x900px.</p>
                     </div>
                     <img src="<?=h($dealerImageCurrent)?>" alt="Bayi paneli görseli" loading="lazy">
-                    <input type="file" name="dealer_showcase_image" class="form-control" accept="image/*">
-                    <?php if (!empty($content['dealer_showcase_image'])): ?>
-                      <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="dealer_showcase_image_remove" value="1" id="removeDealerImage">
-                        <label class="form-check-label" for="removeDealerImage">Yüklü görseli kaldır</label>
-                      </div>
-                    <?php endif; ?>
+                    <input type="hidden" name="dealer_showcase_image_remove" value="0">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                      <input type="file" name="dealer_showcase_image" class="form-control" accept="image/*">
+                      <?php if (!empty($content['dealer_showcase_image'])): ?>
+                        <button type="button" class="btn btn-outline-danger btn-sm js-remove-asset" data-remove-field="dealer_showcase_image_remove" data-confirm="Bayi paneli görselini silmek istediğinize emin misiniz?">
+                          <i class="bi bi-trash3"></i>
+                          Görseli Sil
+                        </button>
+                      <?php endif; ?>
+                    </div>
                   </div>
                 </div>
                 <div class="col-12">
@@ -1074,10 +1092,10 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
                       <?php if (!is_string($image) || trim($image) === '') { continue; } ?>
                       <div class="media-gallery-item">
                         <img src="<?=h($image)?>" alt="Galeri görseli <?=h((string)($idx + 1))?>" loading="lazy">
-                        <div class="form-check">
-                          <input class="form-check-input" type="checkbox" name="gallery_remove[]" value="<?=h($image)?>" id="galleryRemove<?=$idx?>">
-                          <label class="form-check-label small" for="galleryRemove<?=$idx?>">Görseli kaldır</label>
-                        </div>
+                        <button type="button" class="btn btn-outline-danger btn-sm w-100 js-remove-gallery" data-remove-value="<?=h($image)?>" data-confirm="Bu galeri görselini silmek istediğinize emin misiniz?">
+                          <i class="bi bi-trash3"></i>
+                          Görseli Sil
+                        </button>
                       </div>
                     <?php endforeach; ?>
                     <?php if (!$galleryImages): ?>
@@ -1485,6 +1503,7 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 (function(){
+  const form = document.getElementById('siteContentForm');
   const panes = document.querySelectorAll('.content-pane');
   const buttons = document.querySelectorAll('[data-pane-target]');
   const activate = (id) => {
@@ -1544,6 +1563,50 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
       }
     });
   });
+
+  if (form) {
+    const selectorForField = (name) => '[name="' + name.replace(/([\\[\\]])/g, '\\$1') + '"]';
+
+    form.querySelectorAll('.js-remove-asset').forEach(button => {
+      button.addEventListener('click', () => {
+        const fieldName = button.dataset.removeField || '';
+        if (!fieldName) {
+          return;
+        }
+        const input = form.querySelector(selectorForField(fieldName));
+        if (!input) {
+          return;
+        }
+        const message = button.dataset.confirm || 'Bu görseli silmek istediğinize emin misiniz?';
+        if (!window.confirm(message)) {
+          return;
+        }
+        input.value = '1';
+        button.disabled = true;
+        form.submit();
+      });
+    });
+
+    form.querySelectorAll('.js-remove-gallery').forEach(button => {
+      button.addEventListener('click', () => {
+        const value = button.dataset.removeValue || '';
+        if (value === '') {
+          return;
+        }
+        const message = button.dataset.confirm || 'Bu görseli silmek istediğinize emin misiniz?';
+        if (!window.confirm(message)) {
+          return;
+        }
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = 'gallery_remove[]';
+        hidden.value = value;
+        form.appendChild(hidden);
+        button.disabled = true;
+        form.submit();
+      });
+    });
+  }
 })();
 </script>
 </body>
