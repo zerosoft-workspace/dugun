@@ -38,6 +38,7 @@ if (!function_exists('admin_base_styles')) {
         min-height:100vh;
         display:flex;
         background:var(--admin-bg);
+        position:relative;
       }
 
       .admin-sidebar {
@@ -154,9 +155,14 @@ if (!function_exists('admin_base_styles')) {
 
       .admin-workspace {
         flex:1;
+        min-width:0;
         display:flex;
         flex-direction:column;
         position:relative;
+      }
+
+      .admin-sidebar-backdrop {
+        display:none;
       }
 
       .admin-toolbar {
@@ -165,6 +171,7 @@ if (!function_exists('admin_base_styles')) {
         justify-content:space-between;
         gap:16px;
         padding:22px 32px 18px;
+        flex-wrap:wrap;
       }
 
       .toolbar-left {
@@ -172,6 +179,7 @@ if (!function_exists('admin_base_styles')) {
         align-items:center;
         gap:16px;
         flex:1;
+        min-width:0;
       }
 
       .sidebar-toggle {
@@ -195,8 +203,9 @@ if (!function_exists('admin_base_styles')) {
         align-items:center;
         gap:10px;
         box-shadow:0 18px 40px -24px rgba(15,23,42,.45);
-        flex:1;
+        flex:1 1 360px;
         max-width:520px;
+        min-width:220px;
       }
 
       .toolbar-search input {
@@ -210,6 +219,8 @@ if (!function_exists('admin_base_styles')) {
         display:flex;
         align-items:center;
         gap:18px;
+        flex-wrap:wrap;
+        justify-content:flex-end;
       }
 
       .toolbar-right [data-theme-toggle-anchor] {
@@ -243,6 +254,7 @@ if (!function_exists('admin_base_styles')) {
         border-radius:999px;
         padding:8px 14px 8px 8px;
         box-shadow:0 18px 40px -24px rgba(15,23,42,.45);
+        max-width:100%;
       }
 
       .toolbar-user .avatar {
@@ -263,6 +275,8 @@ if (!function_exists('admin_base_styles')) {
         line-height:1.2;
         font-size:.85rem;
         color:var(--admin-ink);
+        min-width:0;
+        max-width:200px;
       }
 
       .toolbar-user small {
@@ -332,6 +346,7 @@ if (!function_exists('admin_base_styles')) {
         border:1px solid rgba(15,23,42,.06);
         box-shadow:0 28px 45px -30px rgba(15,23,42,.35);
         padding:24px 26px;
+        width:100%;
       }
 
       .admin-section-title {
@@ -460,45 +475,168 @@ if (!function_exists('admin_base_styles')) {
         padding-left:22px;
       }
 
-      body.sidebar-collapsed .toolbar-search {
-        max-width:420px;
-      }
-
-      body.sidebar-collapsed .toolbar-user span strong {
-        max-width:140px;
-      }
-
       @media (max-width: 991px) {
         .admin-sidebar {
           position:fixed;
           inset:0 auto 0 0;
           transform:translateX(-105%);
-          width:250px;
+          width:260px;
+          max-width:82vw;
           box-shadow:25px 0 60px -40px rgba(15,23,42,.85);
+          z-index:1035;
+          overflow-y:auto;
+          -webkit-overflow-scrolling:touch;
         }
 
         body.sidebar-open .admin-sidebar {
           transform:none;
         }
 
-        body.sidebar-open::after {
-          content:'';
+        .admin-sidebar-backdrop {
+          display:block;
           position:fixed;
           inset:0;
           background:rgba(15,23,42,.45);
-          z-index:1025;
+          z-index:1030;
+          opacity:0;
+          pointer-events:none;
+          transition:opacity .2s ease;
+        }
+
+        body.sidebar-open .admin-sidebar-backdrop {
+          opacity:1;
+          pointer-events:auto;
+        }
+
+        body.sidebar-open {
+          overflow:hidden;
         }
 
         .admin-toolbar {
           padding:18px 20px 16px;
+          gap:12px;
         }
 
         .toolbar-left {
-          gap:10px;
+          gap:12px;
+          width:100%;
+          justify-content:space-between;
         }
 
         .toolbar-search {
           display:none;
+        }
+
+        .toolbar-right {
+          width:100%;
+          justify-content:space-between;
+        }
+
+        .toolbar-user {
+          width:100%;
+          justify-content:space-between;
+          gap:16px;
+          padding-right:12px;
+        }
+
+        .toolbar-user span {
+          flex:1;
+          max-width:none;
+        }
+      }
+
+      @media (max-width: 1200px) {
+        .toolbar-search {
+          flex-basis:100%;
+          order:3;
+          max-width:none;
+        }
+
+        .toolbar-right {
+          flex:1 1 100%;
+          justify-content:flex-end;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .admin-hero {
+          padding:0 20px 22px;
+        }
+
+        .admin-hero-card {
+          padding:22px;
+        }
+
+        .admin-hero-card-with-icon {
+          flex-direction:column;
+          align-items:flex-start;
+        }
+
+        .admin-hero-icon {
+          width:58px;
+          height:58px;
+        }
+
+        .toolbar-right {
+          gap:12px;
+        }
+
+        .toolbar-chip {
+          width:100%;
+          justify-content:space-between;
+        }
+
+        .toolbar-user {
+          flex-wrap:wrap;
+          align-items:flex-start;
+        }
+      }
+
+      @media (max-width: 576px) {
+        .admin-toolbar {
+          padding:16px;
+        }
+
+        .toolbar-left {
+          justify-content:flex-start;
+        }
+
+        .toolbar-chip {
+          order:2;
+        }
+
+        .toolbar-right {
+          flex-direction:column;
+          align-items:stretch;
+        }
+
+        .toolbar-user {
+          flex-direction:column;
+          align-items:stretch;
+          gap:10px;
+        }
+
+        .toolbar-user .avatar {
+          width:38px;
+          height:38px;
+        }
+
+        .card-lite {
+          padding:20px;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .admin-main-inner .table-responsive,
+        .admin-main-inner table.table {
+          width:100%;
+          overflow-x:auto;
+          display:block;
+          -webkit-overflow-scrolling:touch;
+        }
+
+        .admin-main-inner table.table {
+          min-width:640px;
         }
       }
 
@@ -596,6 +734,7 @@ CSS;
     echo 'Zerosoft ekibi ile iletişime geçmek için <a class="text-white text-decoration-none fw-semibold" href="mailto:'.h($supportEmail).'">'.h($supportEmail).'</a> adresine yazabilirsiniz.';
     echo '</div>';
     echo '</aside>';
+    echo '<div class="admin-sidebar-backdrop" data-sidebar-toggle></div>';
 
     echo '<div class="admin-workspace">';
     echo '<header class="admin-toolbar">';
