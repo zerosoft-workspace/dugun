@@ -30,7 +30,6 @@ $selectedCity = $cityFilter !== '' ? $cityFilter : '';
 $districtOptions = ($selectedCity && isset($locations[$selectedCity])) ? $locations[$selectedCity] : [];
 
 $pageStyles = <<<'CSS'
-<style>
   :root {
     --ink:#0f172a;
     --muted:#64748b;
@@ -153,7 +152,6 @@ $pageStyles = <<<'CSS'
     .listing-media { width:100%; min-height:220px; }
     .detail-link { margin-left:0; }
   }
-</style>
 CSS;
 ?>
 <!doctype html>
@@ -165,8 +163,9 @@ CSS;
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <?=theme_head_assets()?>
-  <?=login_header_styles()?>
-  <?=$pageStyles?>
+  <style>
+    <?=login_header_styles() . PHP_EOL . $pageStyles?>
+  </style>
 </head>
 <body>
 <?php site_public_header('partners'); ?>
