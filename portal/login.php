@@ -159,12 +159,16 @@ $tabInput = htmlspecialchars($tab, ENT_QUOTES, 'UTF-8');
     .feature-list span{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.18);font-size:1rem;}
     .visual-footer{font-size:.84rem;color:rgba(255,255,255,.75);max-width:360px;margin-top:2.8rem;}
     .auth-form{flex:.95;padding:3.2rem;display:flex;flex-direction:column;gap:2rem;justify-content:center;}
-    .entry-hub{display:flex;flex-direction:column;gap:.9rem;background:#f6feff;border-radius:22px;padding:1.1rem 1.2rem;border:1px solid rgba(14,165,181,.18);box-shadow:0 18px 46px -32px rgba(14,165,181,.55);}
-    .entry-hub__row{display:flex;flex-wrap:wrap;gap:.8rem;align-items:center;}
-    .switcher{display:inline-flex;align-items:center;gap:.6rem;background:#ecfbfd;padding:.45rem;border-radius:999px;border:1px solid rgba(14,165,181,.18);box-shadow:0 12px 32px -24px rgba(14,165,181,.45);}
-    .switcher a{padding:.55rem 1.4rem;border-radius:999px;font-weight:600;color:var(--muted);text-decoration:none;transition:all .2s ease;white-space:nowrap;}
-    .switcher a.is-active{background:linear-gradient(135deg,#0ea5b5,#0b8b98);color:#fff;box-shadow:0 18px 32px -20px rgba(14,165,181,.6);}
-    .switcher a:hover{color:var(--ink);}
+    .entry-hub{display:flex;flex-direction:column;gap:1rem;background:#f6feff;border-radius:22px;padding:1.35rem 1.4rem;border:1px solid rgba(14,165,181,.18);box-shadow:0 24px 56px -36px rgba(14,165,181,.45);}
+    .entry-hub__tabs{position:relative;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:#fff;border-radius:18px;padding:.35rem;border:1px solid rgba(14,165,181,.16);box-shadow:0 22px 44px -38px rgba(15,118,110,.4);overflow:hidden;}
+    .entry-hub__tabs::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;box-shadow:inset 0 1px 0 rgba(255,255,255,.9);}    
+    .entry-hub__tabs a{position:relative;display:flex;align-items:center;justify-content:center;padding:.7rem 1.1rem;border-radius:14px;font-weight:600;font-size:.95rem;color:var(--muted);text-decoration:none;transition:color .2s ease,transform .2s ease;min-width:0;}
+    .entry-hub__tabs a span{position:relative;z-index:1;}
+    .entry-hub__tabs a::before{content:"";position:absolute;inset:.1rem;border-radius:12px;background:transparent;transition:background .25s ease,box-shadow .25s ease;}
+    .entry-hub__tabs a.is-active{color:#fff;}
+    .entry-hub__tabs a.is-active::before{background:linear-gradient(135deg,#0ea5b5,#0b8b98);box-shadow:0 18px 32px -20px rgba(14,165,181,.55);}
+    .entry-hub__tabs a:hover{color:var(--ink);}
+    .entry-hub__note{color:var(--muted);font-size:.9rem;line-height:1.55;margin:0;}
     .brand{font-weight:800;font-size:1.7rem;letter-spacing:.18rem;margin-bottom:.2rem;text-transform:uppercase;}
     .brand span{display:block;font-size:.95rem;font-weight:600;color:var(--muted);margin-top:.35rem;letter-spacing:0;text-transform:none;}
     .form-note{color:var(--muted);font-size:.94rem;line-height:1.6;max-width:480px;}
@@ -211,13 +215,11 @@ $tabInput = htmlspecialchars($tab, ENT_QUOTES, 'UTF-8');
     </aside>
     <section class="auth-form">
       <div class="entry-hub">
-        <div class="entry-hub__row">
-          <nav class="switcher">
-            <a class="<?= $tab === 'dealer' ? 'is-active' : '' ?>" href="<?=h($dealerTabUrl)?>">Bayi Girişi</a>
-            <a class="<?= $tab === 'representative' ? 'is-active' : '' ?>" href="<?=h($repTabUrl)?>">Temsilci Girişi</a>
-          </nav>
-        </div>
-        <p class="form-note mb-0 small">Bayi veya temsilci olarak giriş yapmak için yukarıdaki sekmelerden seçim yapabilirsiniz.</p>
+        <nav class="entry-hub__tabs" aria-label="Panel seçimi">
+          <a class="<?= $tab === 'dealer' ? 'is-active' : '' ?>" href="<?=h($dealerTabUrl)?>"><span>Bayi Girişi</span></a>
+          <a class="<?= $tab === 'representative' ? 'is-active' : '' ?>" href="<?=h($repTabUrl)?>"><span>Temsilci Girişi</span></a>
+        </nav>
+        <p class="entry-hub__note">Bayi veya temsilci olarak giriş yapmak için yukarıdaki sekmelerden seçim yapabilirsiniz.</p>
       </div>
       <div>
         <div class="brand">BİKARE <span><?= $portal === 'dealer' ? 'Bayi Paneli' : 'Temsilci Paneli' ?></span></div>
