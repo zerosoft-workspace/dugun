@@ -230,7 +230,12 @@ function portal_tab_link(string $tab, array $params = []): string {
     .footer-links a{color:var(--brand);text-decoration:none;}
     .footer-links a:hover{text-decoration:underline;color:var(--brand-dark);}
     .muted-tip{font-size:.85rem;color:var(--muted);}
-    @media(max-width:992px){body{padding:1.5rem;} .auth-shell{flex-direction:column;} .auth-visual{padding:2.6rem;} .auth-form{padding:2.4rem;}}
+    @media(max-width:992px){
+      body{padding:1.5rem;}
+      .auth-shell{flex-direction:column;}
+      .auth-form{order:-1;padding:2.4rem;}
+      .auth-visual{padding:2.6rem;}
+    }
     @media(max-width:576px){.auth-form{padding:2rem;} .visual-title{font-size:1.75rem;}}
   </style>
 </head>

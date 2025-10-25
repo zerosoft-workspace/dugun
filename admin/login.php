@@ -110,7 +110,12 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
     .back-link{font-weight:600;text-decoration:none;color:var(--brand);}
     .back-link:hover{text-decoration:underline;color:var(--brand-dark);}
     .first-run-badge{display:inline-flex;align-items:center;gap:.45rem;background:rgba(14,165,181,.12);color:var(--brand-dark);padding:.4rem .9rem;border-radius:999px;font-weight:600;font-size:.85rem;}
-    @media (max-width: 992px){body{padding:1.5rem;} .auth-shell{flex-direction:column;} .auth-visual{min-height:260px;padding:2.6rem;} .auth-form{padding:2.4rem;} }
+    @media (max-width: 992px){
+      body{padding:1.5rem;}
+      .auth-shell{flex-direction:column;}
+      .auth-form{order:-1;padding:2.4rem;}
+      .auth-visual{min-height:260px;padding:2.6rem;}
+    }
     @media (max-width: 576px){.auth-form{padding:2rem;} .visual-title{font-size:1.6rem;} }
   </style>
 </head>

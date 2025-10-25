@@ -181,7 +181,12 @@ $tabInput = htmlspecialchars($tab, ENT_QUOTES, 'UTF-8');
     .form-footer a{color:var(--brand);text-decoration:none;font-weight:600;}
     .form-footer a:hover{text-decoration:underline;color:var(--brand-dark);}
     .alert{border-radius:14px;font-weight:500;}
-    @media(max-width:992px){body{padding:1.5rem;} .auth-shell{flex-direction:column;} .auth-visual{padding:2.6rem;} .auth-form{padding:2.6rem 2.4rem;}}
+    @media(max-width:992px){
+      body{padding:1.5rem;}
+      .auth-shell{flex-direction:column;}
+      .auth-form{order:-1;padding:2.6rem 2.4rem;}
+      .auth-visual{padding:2.6rem;}
+    }
     @media(max-width:576px){.auth-form{padding:2.2rem;} .visual-title{font-size:1.75rem;}}
   </style>
 </head>
