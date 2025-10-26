@@ -1100,7 +1100,15 @@ a:hover{ text-decoration:none; }
 (function(){
   const stage=document.getElementById('pvStage'), box=document.getElementById('scaleBox');
   function fit(){ if(!stage||!box) return; const W=stage.clientWidth, S=W/960; box.style.setProperty('--s',S); stage.style.height=(540*S)+'px'; }
-  window.addEventListener('resize',fit,{passive:true}); new ResizeObserver(fit).observe(stage); fit();
+  window.addEventListener('resize',fit,{passive:true});
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(fit);
+    if (stage) ro.observe(stage);
+  } else {
+    window.addEventListener('orientationchange',fit,{passive:true});
+    setInterval(fit, 400);
+  }
+  fit();
 })();
 
 const fontMap = <?=safe_json_encode($fontConfigForJs)?>;
