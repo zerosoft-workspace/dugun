@@ -18,6 +18,9 @@ $content = site_public_content();
 $defaults = site_content_defaults();
 $faqItems = $content['faq_items'];
 $footerNav = $content['footer_nav_links'];
+$metaTitle = trim((string)($content['seo_meta_title'] ?? ''));
+$metaDescription = trim((string)($content['seo_meta_description'] ?? ''));
+$metaKeywords = trim((string)($content['seo_meta_keywords'] ?? ''));
 $heroBadge = trim((string)($content['hero_badge'] ?? ''));
 $heroTitle = trim((string)($content['hero_title'] ?? ''));
 $heroText = trim((string)($content['hero_text'] ?? ''));
@@ -83,6 +86,13 @@ $ctaBannerTitle = trim((string)($content['cta_banner_title'] ?? ''));
 $ctaBannerText = trim((string)($content['cta_banner_text'] ?? ''));
 $ctaBannerButtonLabel = trim((string)($content['cta_banner_button_label'] ?? ''));
 $ctaBannerButtonUrl = site_resolve_button_url($content['cta_banner_button_url'] ?? '') ?? '';
+$blogBadge = trim((string)($content['blog_section_badge'] ?? ''));
+$blogTitle = trim((string)($content['blog_section_title'] ?? ''));
+$blogText = trim((string)($content['blog_section_text'] ?? ''));
+$blogPosts = $content['blog_posts'] ?? [];
+if (!is_array($blogPosts) || !$blogPosts) {
+  $blogPosts = $defaults['blog_posts'];
+}
 $leadFormTitle = trim((string)($content['lead_form_title'] ?? ''));
 $leadFormText = trim((string)($content['lead_form_text'] ?? ''));
 $leadFormBullets = $content['lead_form_bullets'] ?? [];
@@ -108,7 +118,18 @@ unset($_SESSION['lead_success']);
 ?>
 <!doctype html><html lang="tr"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?=h(APP_NAME)?> — Dijital Etkinlik Deneyiminiz</title>
+<?php $documentTitle = $metaTitle !== '' ? $metaTitle : (APP_NAME.' — Dijital Etkinlik Deneyiminiz'); ?>
+<title><?=h($documentTitle)?></title>
+<?php if ($metaDescription !== ''): ?>
+<meta name="description" content="<?=h($metaDescription)?>">
+<meta property="og:description" content="<?=h($metaDescription)?>">
+<?php endif; ?>
+<?php if ($metaKeywords !== ''): ?>
+<meta name="keywords" content="<?=h($metaKeywords)?>">
+<?php endif; ?>
+<meta property="og:title" content="<?=h($documentTitle)?>">
+<meta property="og:type" content="website">
+<meta property="og:url" content="<?=h(BASE_URL.'/index.php')?>">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <?=theme_head_assets()?>
 <style>
@@ -166,6 +187,13 @@ unset($_SESSION['lead_success']);
   [data-theme="dark"] .testimonial{background:var(--card);border:1px solid var(--border);box-shadow:0 34px 90px -58px rgba(8,47,73,0.88);}
   .testimonial::before{content:'“';position:absolute;top:-16px;left:24px;font-size:5rem;color:rgba(14,165,181,0.2);}
   [data-theme="dark"] .testimonial::before{color:rgba(56,189,248,0.24);}
+  .blog-section{border-radius:32px;background:rgba(255,255,255,0.92);padding:48px;box-shadow:0 32px 90px -60px rgba(15,118,110,0.22);}
+  [data-theme="dark"] .blog-section{background:rgba(15,23,42,0.86);border:1px solid rgba(148,163,184,0.24);box-shadow:0 40px 120px -64px rgba(8,47,73,0.9);}
+  .blog-card{border-radius:24px;background:#fff;padding:32px;height:100%;display:flex;flex-direction:column;gap:1.25rem;box-shadow:0 24px 70px -55px rgba(15,118,110,0.18);}
+  [data-theme="dark"] .blog-card{background:var(--card);border:1px solid var(--border);box-shadow:0 30px 90px -60px rgba(8,47,73,0.88);}
+  .blog-card .badge{align-self:flex-start;}
+  .blog-card__link{color:var(--brand);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;}
+  .blog-card__link:hover{color:var(--brand-dark);text-decoration:underline;}
   .cta-section{border-radius:32px;background:linear-gradient(135deg,#0ea5b5,#6366f1);color:#fff;padding:48px;}
   [data-theme="dark"] .cta-section{background:linear-gradient(135deg,rgba(56,189,248,0.18),rgba(14,116,198,0.42));backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,0.2);}
   .form-section{border-radius:28px;background:#fff;box-shadow:0 32px 90px rgba(15,118,110,0.2);padding:48px;}
@@ -489,6 +517,45 @@ unset($_SESSION['lead_success']);
       <?php endforeach; ?>
     </div>
   </section>
+
+  <?php if ($blogPosts): ?>
+  <section id="blog" class="mb-5">
+    <div class="blog-section">
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4 mb-4">
+        <div>
+          <?php if ($blogBadge !== ''): ?><span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold"><?=h($blogBadge)?></span><?php endif; ?>
+          <?php if ($blogTitle !== ''): ?><h2 class="fw-bold mt-3 mb-2"><?=h($blogTitle)?></h2><?php endif; ?>
+          <?php if ($blogText !== ''): ?><p class="muted mb-0"><?=nl2br(h($blogText))?></p><?php endif; ?>
+        </div>
+      </div>
+      <div class="row g-4">
+        <?php foreach ($blogPosts as $post):
+          $postTitle = trim((string)($post['title'] ?? ''));
+          $postDescription = trim((string)($post['description'] ?? ''));
+          $postUrl = trim((string)($post['url'] ?? ''));
+          if ($postTitle === '' || $postUrl === '') {
+            continue;
+          }
+        ?>
+          <div class="col-md-4">
+            <div class="blog-card h-100">
+              <div>
+                <h5 class="fw-bold mb-2"><?=h($postTitle)?></h5>
+                <?php if ($postDescription !== ''): ?><p class="muted mb-0"><?=nl2br(h($postDescription))?></p><?php endif; ?>
+              </div>
+              <div class="mt-auto">
+                <a class="blog-card__link" href="<?=h($postUrl)?>" target="_blank" rel="noopener">
+                  Devamını oku
+                  <i class="bi bi-arrow-up-right"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </section>
+  <?php endif; ?>
 
   <section id="sss" class="mb-5">
     <div class="faq-surface">

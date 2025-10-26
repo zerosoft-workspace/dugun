@@ -13,6 +13,17 @@ function site_public_header(string $active = 'home', ?array $content = null): vo
   if ($content === null) {
     $content = site_public_content();
   }
+  $blogPosts = $content['blog_posts'] ?? [];
+  if (is_array($blogPosts) && !empty($blogPosts)) {
+    $links = [
+      'home' => $links['home'],
+      'features' => $links['features'],
+      'packages' => $links['packages'],
+      'blog' => ['label' => 'Blog', 'url' => BASE_URL.'/index.php#blog'],
+      'partners' => $links['partners'],
+      'contact' => $links['contact'],
+    ];
+  }
   $logo = trim((string)($content['site_logo'] ?? ''));
   echo '<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom shadow-sm py-3 site-navbar sticky-top">';
   echo '<div class="container">';

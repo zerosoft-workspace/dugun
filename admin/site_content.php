@@ -67,6 +67,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     'footer_company' => trim($_POST['footer_company'] ?? ''),
     'footer_disclaimer_left' => trim($_POST['footer_disclaimer_left'] ?? ''),
     'footer_disclaimer_right' => trim($_POST['footer_disclaimer_right'] ?? ''),
+    'seo_meta_title' => trim($_POST['seo_meta_title'] ?? ''),
+    'seo_meta_description' => trim($_POST['seo_meta_description'] ?? ''),
+    'seo_meta_keywords' => trim($_POST['seo_meta_keywords'] ?? ''),
+    'blog_section_badge' => trim($_POST['blog_section_badge'] ?? ''),
+    'blog_section_title' => trim($_POST['blog_section_title'] ?? ''),
+    'blog_section_text' => trim($_POST['blog_section_text'] ?? ''),
   ];
 
   $payload['paytr_enabled'] = !empty($_POST['paytr_enabled']) ? '1' : '0';
@@ -159,6 +165,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $heroMetrics = $defaults['hero_metrics'];
   }
   $payload['hero_metrics'] = $heroMetrics;
+
+  $blogPosts = [];
+  $blogTitles = $_POST['blog_title'] ?? [];
+  $blogDescriptions = $_POST['blog_description'] ?? [];
+  $blogUrls = $_POST['blog_url'] ?? [];
+  foreach ($blogTitles as $idx => $title) {
+    $title = trim((string)$title);
+    $description = trim((string)($blogDescriptions[$idx] ?? ''));
+    $url = trim((string)($blogUrls[$idx] ?? ''));
+    if ($title === '' && $description === '' && $url === '') {
+      continue;
+    }
+    if ($title === '' || $url === '') {
+      continue;
+    }
+    $blogPosts[] = [
+      'title' => $title,
+      'description' => $description,
+      'url' => $url,
+    ];
+  }
+  if (!$blogPosts) {
+    $blogPosts = $defaults['blog_posts'];
+  }
+  $payload['blog_posts'] = array_slice($blogPosts, 0, 9);
 
   $aboutFeatures = [];
   $aboutFeatureTitles = $_POST['about_feature_title'] ?? [];
@@ -436,6 +467,11 @@ if (!is_array($leadFormBullets)) {
   $leadFormBullets = $defaults['lead_form_bullets'];
 }
 $leadFormBullets = array_values($leadFormBullets);
+$blogPosts = $content['blog_posts'] ?? $defaults['blog_posts'];
+if (!is_array($blogPosts)) {
+  $blogPosts = $defaults['blog_posts'];
+}
+$blogPosts = array_values($blogPosts);
 
 while (count($faqItems) < 4) {
   $faqItems[] = ['question' => '', 'answer' => ''];
@@ -466,6 +502,9 @@ while (count($testimonials) < 2) {
 }
 while (count($leadFormBullets) < 3) {
   $leadFormBullets[] = '';
+}
+while (count($blogPosts) < 3) {
+  $blogPosts[] = ['title' => '', 'description' => '', 'url' => ''];
 }
 
 $paytrEnabledSetting = (int)($content['paytr_enabled'] ?? '0') === 1;
@@ -538,12 +577,14 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
             <button type="button" class="pane-button" data-pane-target="dealer"><i class="bi bi-people"></i>Bayi &amp; Yorumlar</button>
             <button type="button" class="pane-button" data-pane-target="gallery"><i class="bi bi-collection"></i>Galeri Başlıkları</button>
             <button type="button" class="pane-button" data-pane-target="lead"><i class="bi bi-ui-checks"></i>Sipariş Formu</button>
+            <button type="button" class="pane-button" data-pane-target="blog"><i class="bi bi-journal-text"></i>Blog Bölümü</button>
             <button type="button" class="pane-button" data-pane-target="media"><i class="bi bi-images"></i>Görsel İçerikler</button>
             <button type="button" class="pane-button" data-pane-target="cta"><i class="bi bi-bullseye"></i>Çağrı Alanı</button>
             <button type="button" class="pane-button" data-pane-target="sales"><i class="bi bi-shop"></i>Satış Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="payment"><i class="bi bi-credit-card-2-front"></i>Ödeme Ayarları</button>
             <button type="button" class="pane-button" data-pane-target="whatsapp"><i class="bi bi-whatsapp"></i>WhatsApp API</button>
             <button type="button" class="pane-button" data-pane-target="smtp"><i class="bi bi-envelope-paper"></i>SMTP Ayarları</button>
+            <button type="button" class="pane-button" data-pane-target="seo"><i class="bi bi-graph-up"></i>SEO &amp; Meta</button>
             <button type="button" class="pane-button" data-pane-target="faq"><i class="bi bi-chat-dots"></i>Sıkça Sorulanlar</button>
             <button type="button" class="pane-button" data-pane-target="footer"><i class="bi bi-columns-gap"></i>Footer İçeriği</button>
           </div>
@@ -869,15 +910,74 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
                   <label class="form-label">Buton Metni</label>
                   <input type="text" name="lead_form_submit_label" class="form-control" value="<?=h($content['lead_form_submit_label'] ?? '')?>" placeholder="Ödeme Adımına Geç">
                 </div>
-              </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-lite content-pane" data-pane="blog">
+        <div class="card-section border-bottom">
+          <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+              <h5 class="fw-bold mb-1">Blog Bölümü</h5>
+              <p class="text-muted mb-0">Anasayfadaki blog ve kaynaklar alanı için başlık, açıklama ve bağlantıları yönetin.</p>
+            </div>
+            <i class="bi bi-journal-text" style="font-size:1.6rem;color:var(--admin-brand);"></i>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Rozet</label>
+              <input type="text" name="blog_section_badge" class="form-control" value="<?=h($content['blog_section_badge'] ?? '')?>" placeholder="Örn. Blog">
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Başlık</label>
+              <input type="text" name="blog_section_title" class="form-control" value="<?=h($content['blog_section_title'] ?? '')?>" placeholder="Örn. BİKARE Blog &amp; Kaynaklar">
+            </div>
+            <div class="col-12">
+              <label class="form-label">Açıklama</label>
+              <textarea name="blog_section_text" class="form-control" rows="3" placeholder="Kısa açıklama metni"><?=h($content['blog_section_text'] ?? '')?></textarea>
             </div>
           </div>
+        </div>
+        <div class="card-section">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+              <h6 class="fw-semibold mb-1">Blog Yazıları</h6>
+              <p class="text-muted small mb-0">Her kart için başlık, açıklama ve yönlendirme bağlantısı ekleyin. Boş satırlar yayınlanmaz.</p>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary btn-add-row" data-target="blog">+ Blog Kartı Ekle</button>
+          </div>
+          <div data-repeater="blog">
+            <?php foreach ($blogPosts as $post):
+              $postTitle = trim((string)($post['title'] ?? ''));
+              $postDescription = trim((string)($post['description'] ?? ''));
+              $postUrl = trim((string)($post['url'] ?? ''));
+            ?>
+              <div class="repeater-item">
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Başlık</label>
+                    <input type="text" class="form-control" name="blog_title[]" value="<?=h($postTitle)?>" placeholder="Blog başlığı">
+                  </div>
+                  <div class="col-md-5">
+                    <label class="form-label">Kısa Açıklama</label>
+                    <textarea class="form-control" name="blog_description[]" rows="2" placeholder="Özet veya spot metni"><?=h($postDescription)?></textarea>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Bağlantı</label>
+                    <input type="text" class="form-control" name="blog_url[]" value="<?=h($postUrl)?>" placeholder="https://...">
+                  </div>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        </div>
+      </div>
 
-          <div class="card card-lite content-pane active" data-pane="contact">
-            <div class="card-section border-bottom">
-              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
-                <div>
-                  <h5 class="fw-bold mb-1">İletişim Bilgileri</h5>
+      <div class="card card-lite content-pane active" data-pane="contact">
+        <div class="card-section border-bottom">
+          <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+              <h5 class="fw-bold mb-1">İletişim Bilgileri</h5>
                   <p class="text-muted mb-0">Footer ve iletişim bloklarında yer alan temel bilgileri güncelleyin.</p>
                 </div>
                 <span class="badge rounded-pill text-bg-light text-uppercase" style="letter-spacing:.05em;color:var(--admin-brand);background:rgba(14,165,181,.15);">#0ea5b5</span>
@@ -1404,15 +1504,44 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
                 <div class="col-12">
                   <div class="alert alert-info small mb-0">SMTP alanlarını boş bırakırsanız sistem <code>config.php</code> veya ortam değişkenlerindeki değerleri kullanmaya devam eder.</div>
                 </div>
-              </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-lite content-pane" data-pane="seo">
+        <div class="card-section">
+          <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+              <h5 class="fw-bold mb-1">SEO &amp; Meta Bilgileri</h5>
+              <p class="text-muted mb-0">Anasayfa başlığı ve meta açıklamalarını arama motorları için optimize edin.</p>
+            </div>
+            <i class="bi bi-graph-up" style="font-size:1.6rem;color:var(--admin-brand);"></i>
+          </div>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Sayfa Başlığı (Title)</label>
+              <input type="text" name="seo_meta_title" class="form-control" value="<?=h($content['seo_meta_title'] ?? '')?>" placeholder="Örn. BİKARE — Dijital Etkinlik Platformu">
+              <div class="form-text">Tarayıcı sekmesinde ve arama sonuçlarında görünen başlık. 60 karakteri aşmaması önerilir.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Meta Açıklaması</label>
+              <textarea name="seo_meta_description" class="form-control" rows="3" placeholder="Kısa tanıtım metni"><?=h($content['seo_meta_description'] ?? '')?></textarea>
+              <div class="form-text">Arama sonuçlarında görünen açıklama metni. 120-160 karakter arası önerilir.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Anahtar Kelimeler</label>
+              <input type="text" name="seo_meta_keywords" class="form-control" value="<?=h($content['seo_meta_keywords'] ?? '')?>" placeholder="bikare, dijital etkinlik, qr kod">
+              <div class="form-text">Virgülle ayırarak anahtar kelimeler ekleyebilirsiniz.</div>
             </div>
           </div>
+        </div>
+      </div>
 
-          <div class="card card-lite content-pane" data-pane="faq">
-            <div class="card-section">
-              <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
-                <div>
-                  <h5 class="fw-bold mb-1">Sıkça Sorulan Sorular</h5>
+      <div class="card card-lite content-pane" data-pane="faq">
+        <div class="card-section">
+          <div class="d-flex align-items-start justify-content-between flex-wrap gap-3 mb-3">
+            <div>
+              <h5 class="fw-bold mb-1">Sıkça Sorulan Sorular</h5>
                   <p class="text-muted mb-0">Ziyaretçilerin en çok merak ettiği başlıkları hızlıca düzenleyin.</p>
                 </div>
                 <span class="badge text-bg-light" style="color:var(--admin-brand);background:rgba(14,165,181,.15);">En az 3 önerilir</span>
@@ -1552,6 +1681,27 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
     return wrapper;
   };
 
+  const templateBlog = () => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'repeater-item';
+    wrapper.innerHTML = `
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label">Başlık</label>
+          <input type="text" class="form-control" name="blog_title[]" placeholder="Blog başlığı">
+        </div>
+        <div class="col-md-5">
+          <label class="form-label">Kısa Açıklama</label>
+          <textarea class="form-control" name="blog_description[]" rows="2" placeholder="Özet veya spot metni"></textarea>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Bağlantı</label>
+          <input type="text" class="form-control" name="blog_url[]" placeholder="https://...">
+        </div>
+      </div>`;
+    return wrapper;
+  };
+
   document.querySelectorAll('.btn-add-row').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.target;
@@ -1560,6 +1710,9 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
       }
       if (target === 'nav') {
         document.querySelector('[data-repeater="nav"]').appendChild(templateNav());
+      }
+      if (target === 'blog') {
+        document.querySelector('[data-repeater="blog"]').appendChild(templateBlog());
       }
     });
   });

@@ -180,6 +180,29 @@ function site_content_defaults(): array {
     'footer_company' => 'Zerosoft Teknoloji',
     'footer_disclaimer_left' => '© '.$year.' Zerosoft Teknoloji',
     'footer_disclaimer_right' => 'Developed by Zerosoft — BİKARE Dijital Etkinlik Platformu',
+    'seo_meta_title' => 'BİKARE — Dijital Etkinlik Platformu ve QR Kod Çözümleri',
+    'seo_meta_description' => 'BİKARE; düğün, nişan, kurumsal etkinlik ve tüm özel davetlerinizde QR kodla fotoğraf ve videoları anında toplayan dijital etkinlik platformudur.',
+    'seo_meta_keywords' => 'bikare, qr kod, dijital etkinlik, fotoğraf toplama, düğün teknolojileri',
+    'blog_section_badge' => 'Blog',
+    'blog_section_title' => 'BİKARE Blog & Kaynaklar',
+    'blog_section_text' => 'Etkinliklerinizi daha verimli yönetmeniz için ipuçları, başarı hikayeleri ve dijital trendleri sizinle paylaşıyoruz.',
+    'blog_posts' => [
+      [
+        'title' => 'Etkinliklerde QR Kod Kullanmanın 5 Stratejisi',
+        'description' => 'Misafir deneyimini artırmak için QR kodları nasıl kurgulayabileceğinizi adım adım anlattık.',
+        'url' => 'https://bikare.com.tr/blog/etkinliklerde-qr-kod',
+      ],
+      [
+        'title' => 'Bayi Ağımızla Satışları Nasıl Artırıyoruz?',
+        'description' => 'Bayi paneli özelliklerimizi ve kazandıran satış otomasyonlarımızı keşfedin.',
+        'url' => 'https://bikare.com.tr/blog/bayi-agi',
+      ],
+      [
+        'title' => 'Dijital Misafir Deneyiminde 2024 Trendleri',
+        'description' => 'Yeni nesil davetlerde öne çıkan dijitalleşme başlıklarını derledik.',
+        'url' => 'https://bikare.com.tr/blog/dijital-deneyim-trendleri',
+      ],
+    ],
     'paytr_enabled' => (
       defined('PAYTR_MERCHANT_ID') && PAYTR_MERCHANT_ID !== '' &&
       defined('PAYTR_MERCHANT_KEY') && PAYTR_MERCHANT_KEY !== '' &&
@@ -393,6 +416,43 @@ function site_public_content(): array {
     $url = trim($item['url'] ?? '');
     return $label !== '' && $url !== '';
   }));
+
+  $content['seo_meta_title'] = trim((string)($content['seo_meta_title'] ?? '')) ?: $defaults['seo_meta_title'];
+  $content['seo_meta_description'] = trim((string)($content['seo_meta_description'] ?? '')) ?: $defaults['seo_meta_description'];
+  $content['seo_meta_keywords'] = trim((string)($content['seo_meta_keywords'] ?? '')) ?: $defaults['seo_meta_keywords'];
+
+  $content['blog_section_badge'] = trim((string)($content['blog_section_badge'] ?? '')) ?: $defaults['blog_section_badge'];
+  $content['blog_section_title'] = trim((string)($content['blog_section_title'] ?? '')) ?: $defaults['blog_section_title'];
+  $content['blog_section_text'] = trim((string)($content['blog_section_text'] ?? '')) ?: $defaults['blog_section_text'];
+
+  if (!isset($content['blog_posts']) || !is_array($content['blog_posts'])) {
+    $content['blog_posts'] = $defaults['blog_posts'];
+  }
+  $content['blog_posts'] = array_values(array_filter(array_map(function ($item) {
+    if (!is_array($item)) {
+      return null;
+    }
+    $title = trim((string)($item['title'] ?? ''));
+    $description = trim((string)($item['description'] ?? ''));
+    $url = trim((string)($item['url'] ?? ''));
+    if ($title === '' || $url === '') {
+      return null;
+    }
+    if (!preg_match('~^https?://|^/|^#|^mailto:|^tel:~i', $url)) {
+      $url = site_resolve_button_url($url) ?? '';
+    }
+    if ($url === '') {
+      return null;
+    }
+    return [
+      'title' => $title,
+      'description' => $description,
+      'url' => $url,
+    ];
+  }, $content['blog_posts'])));
+  if (!$content['blog_posts']) {
+    $content['blog_posts'] = $defaults['blog_posts'];
+  }
 
   return $content;
 }
