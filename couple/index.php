@@ -233,12 +233,12 @@ foreach ($stickersArr as $entry) {
   }
 }
 
-$TITLE_FONT_KEY = $ev['guest_title_font'] ?: 'inter';
-if (!isset($GUEST_FONTS[$TITLE_FONT_KEY])) { $TITLE_FONT_KEY = 'inter'; }
-$SUBTITLE_FONT_KEY = $ev['guest_subtitle_font'] ?: $TITLE_FONT_KEY;
-if (!isset($GUEST_FONTS[$SUBTITLE_FONT_KEY])) { $SUBTITLE_FONT_KEY = $TITLE_FONT_KEY; }
-$PROMPT_FONT_KEY = $ev['guest_prompt_font'] ?: $SUBTITLE_FONT_KEY;
-if (!isset($GUEST_FONTS[$PROMPT_FONT_KEY])) { $PROMPT_FONT_KEY = $SUBTITLE_FONT_KEY; }
+$TITLE_FONT_KEY = trim((string)($ev['guest_title_font'] ?? ''));
+if ($TITLE_FONT_KEY === '' || !isset($GUEST_FONTS[$TITLE_FONT_KEY])) { $TITLE_FONT_KEY = 'inter'; }
+$SUBTITLE_FONT_KEY = trim((string)($ev['guest_subtitle_font'] ?? ''));
+if ($SUBTITLE_FONT_KEY === '' || !isset($GUEST_FONTS[$SUBTITLE_FONT_KEY])) { $SUBTITLE_FONT_KEY = $TITLE_FONT_KEY; }
+$PROMPT_FONT_KEY = trim((string)($ev['guest_prompt_font'] ?? ''));
+if ($PROMPT_FONT_KEY === '' || !isset($GUEST_FONTS[$PROMPT_FONT_KEY])) { $PROMPT_FONT_KEY = $SUBTITLE_FONT_KEY; }
 $TITLE_FONT_STACK = guest_font_stack($TITLE_FONT_KEY);
 $SUBTITLE_FONT_STACK = guest_font_stack($SUBTITLE_FONT_KEY);
 $PROMPT_FONT_STACK = guest_font_stack($PROMPT_FONT_KEY);
@@ -450,14 +450,14 @@ a:hover{ text-decoration:none; }
 .preview-modal-title{ font-size:1.25rem; font-weight:700; color:var(--ink); }
 .preview-modal-sub{ margin:0; color:var(--muted); font-size:.92rem; max-width:560px; }
 .preview-modal-actions{ display:flex; gap:.75rem; align-items:center; }
-.preview-modal-body{ flex:1; display:flex; gap:1.5rem; padding:1.5rem 1.75rem 1.75rem; background:linear-gradient(140deg, rgba(239,246,255,.85), rgba(236,253,245,.82)); }
+.preview-modal-body{ flex:1; display:flex; gap:1.5rem; padding:1.5rem 1.75rem 1.75rem; background:linear-gradient(140deg, rgba(239,246,255,.85), rgba(236,253,245,.82)); overflow:auto; min-height:0; align-items:flex-start; }
 .preview-modal-sidebar{ flex:0 0 320px; display:flex; flex-direction:column; gap:1rem; overflow-y:auto; padding-right:.5rem; }
-.preview-modal-stage{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1.25rem; align-items:center; justify-content:center; position:relative; }
+.preview-modal-stage{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1.25rem; align-items:center; justify-content:flex-start; position:relative; }
 .preview-modal-hint{ display:flex; align-items:center; gap:.65rem; background:rgba(255,255,255,.85); border:1px solid rgba(148,163,184,.25); border-radius:999px; padding:.45rem 1rem; font-size:.85rem; font-weight:600; color:var(--ink); box-shadow:0 20px 40px -32px rgba(15,23,42,.35); }
 .preview-modal-footer{ padding:1rem 1.75rem 1.5rem; font-size:.85rem; color:var(--muted); background:rgba(255,255,255,.92); border-top:1px solid rgba(148,163,184,.2); }
-.preview-shell{ position:relative; width:min(100%,980px); margin:0 auto; padding:1.8rem; border-radius:28px; background:linear-gradient(135deg, rgba(14,165,181,.08), rgba(79,70,229,.06)); border:1px solid rgba(148,163,184,.2); box-shadow:0 42px 80px -60px rgba(14,165,181,.38); }
+.preview-shell{ position:relative; width:min(100%,980px); margin:0 auto; padding:1.8rem; border-radius:28px; background:linear-gradient(135deg, rgba(14,165,181,.08), rgba(79,70,229,.06)); border:1px solid rgba(148,163,184,.2); box-shadow:0 42px 80px -60px rgba(14,165,181,.38); display:flex; flex-direction:column; gap:1.25rem; max-height:100%; }
 .preview-shell::after{ content:''; position:absolute; inset:0; border-radius:inherit; background:linear-gradient(140deg, rgba(255,255,255,.65), rgba(255,255,255,.2)); pointer-events:none; mix-blend-mode:screen; }
-.preview-stage{ position:relative; width:100%; border-radius:26px; background:rgba(255,255,255,.95); overflow:hidden; border:1px solid rgba(148,163,184,.22); box-shadow:0 45px 90px -68px rgba(15,23,42,.42); }
+.preview-stage{ position:relative; width:100%; border-radius:26px; background:rgba(255,255,255,.95); overflow:hidden; border:1px solid rgba(148,163,184,.22); box-shadow:0 45px 90px -68px rgba(15,23,42,.42); flex:1; }
 .preview-card{ position:relative; overflow:hidden; }
 .preview-grid{ display:flex; flex-direction:column; gap:24px; }
 .preview-controls{ display:flex; flex-direction:column; gap:18px; }
