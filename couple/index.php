@@ -295,7 +295,9 @@ body{
              #f5f7fb;
   color:var(--ink);
   margin:0;
+  transition:overflow .2s ease;
 }
+body.preview-modal-open{ overflow:hidden; }
 a{ color:inherit; text-decoration:none; }
 a:hover{ text-decoration:none; }
 .portal-shell{
@@ -427,14 +429,38 @@ a:hover{ text-decoration:none; }
 .gallery-metrics .badge{ border-radius:999px; padding:.55rem 1.1rem; font-weight:600; font-size:.85rem; }
 .gallery-metrics .badge-count{ background:rgba(37,99,235,.12); color:#1d4ed8; }
 .gallery-metrics .badge-size{ background:rgba(79,70,229,.12); color:#4338ca; }
+.preview-launch{ display:flex; flex-direction:column; gap:1.5rem; }
+.preview-launch-grid{ display:flex; gap:2rem; align-items:stretch; flex-wrap:wrap; }
+.preview-launch-copy{ flex:1 1 320px; display:flex; flex-direction:column; gap:1rem; }
+.preview-launch-pill{ display:inline-flex; align-items:center; gap:.4rem; font-size:.8rem; font-weight:600; background:rgba(14,165,181,.16); color:var(--brand); padding:.45rem 1rem; border-radius:999px; }
+.preview-launch-meta{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.55rem; font-size:.9rem; color:var(--muted); }
+.preview-launch-meta li{ display:flex; align-items:center; gap:.6rem; }
+.preview-launch-meta i{ color:var(--brand); }
+.preview-launch-cta{ flex:0 1 260px; display:flex; flex-direction:column; gap:1rem; align-items:stretch; }
+.preview-launch-thumb{ width:100%; aspect-ratio:4/3; border-radius:20px; border:1px solid rgba(148,163,184,.24); background:linear-gradient(135deg, rgba(14,165,181,.18), rgba(148,163,184,.08)); display:flex; align-items:center; justify-content:center; color:var(--muted); font-weight:600; position:relative; overflow:hidden; box-shadow:0 26px 60px -48px rgba(15,23,42,.4); }
+.preview-launch-thumb.has-image{ background-size:cover; background-position:center; color:#fff; }
+.preview-launch-thumb::after{ content:''; position:absolute; inset:0; background:linear-gradient(140deg, rgba(15,23,42,.35), rgba(255,255,255,.15)); mix-blend-mode:soft-light; pointer-events:none; }
+.preview-launch-thumb.has-image::after{ background:linear-gradient(140deg, rgba(15,23,42,.55), rgba(255,255,255,.05)); }
+.preview-launch-thumb-label{ position:relative; z-index:1; }
+.preview-modal{ position:fixed; inset:0; z-index:1100; display:none; }
+.preview-modal.is-open{ display:block; }
+.preview-modal-backdrop{ position:absolute; inset:0; background:rgba(15,23,42,.72); backdrop-filter:blur(14px); }
+.preview-modal-dialog{ position:relative; z-index:1; margin:auto; width:min(1200px, 100%); height:min(92vh, 860px); background:rgba(15,23,42,.06); border-radius:34px; border:1px solid rgba(148,163,184,.25); box-shadow:0 60px 120px -48px rgba(15,23,42,.6); display:flex; flex-direction:column; overflow:hidden; }
+.preview-modal-header{ padding:1.5rem 1.75rem; display:flex; flex-wrap:wrap; gap:1rem; justify-content:space-between; align-items:center; background:rgba(255,255,255,.95); border-bottom:1px solid rgba(148,163,184,.2); }
+.preview-modal-title{ font-size:1.25rem; font-weight:700; color:var(--ink); }
+.preview-modal-sub{ margin:0; color:var(--muted); font-size:.92rem; max-width:560px; }
+.preview-modal-actions{ display:flex; gap:.75rem; align-items:center; }
+.preview-modal-body{ flex:1; display:flex; gap:1.5rem; padding:1.5rem 1.75rem 1.75rem; background:linear-gradient(140deg, rgba(239,246,255,.85), rgba(236,253,245,.82)); }
+.preview-modal-sidebar{ flex:0 0 320px; display:flex; flex-direction:column; gap:1rem; overflow-y:auto; padding-right:.5rem; }
+.preview-modal-stage{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1.25rem; align-items:center; justify-content:center; position:relative; }
+.preview-modal-hint{ display:flex; align-items:center; gap:.65rem; background:rgba(255,255,255,.85); border:1px solid rgba(148,163,184,.25); border-radius:999px; padding:.45rem 1rem; font-size:.85rem; font-weight:600; color:var(--ink); box-shadow:0 20px 40px -32px rgba(15,23,42,.35); }
+.preview-modal-footer{ padding:1rem 1.75rem 1.5rem; font-size:.85rem; color:var(--muted); background:rgba(255,255,255,.92); border-top:1px solid rgba(148,163,184,.2); }
 .preview-shell{ position:relative; width:min(100%,980px); margin:0 auto; padding:1.8rem; border-radius:28px; background:linear-gradient(135deg, rgba(14,165,181,.08), rgba(79,70,229,.06)); border:1px solid rgba(148,163,184,.2); box-shadow:0 42px 80px -60px rgba(14,165,181,.38); }
 .preview-shell::after{ content:''; position:absolute; inset:0; border-radius:inherit; background:linear-gradient(140deg, rgba(255,255,255,.65), rgba(255,255,255,.2)); pointer-events:none; mix-blend-mode:screen; }
 .preview-stage{ position:relative; width:100%; border-radius:26px; background:rgba(255,255,255,.95); overflow:hidden; border:1px solid rgba(148,163,184,.22); box-shadow:0 45px 90px -68px rgba(15,23,42,.42); }
 .preview-card{ position:relative; overflow:hidden; }
 .preview-grid{ display:flex; flex-direction:column; gap:24px; }
-@media(min-width:1200px){ .preview-grid{ flex-direction:row; align-items:stretch; } }
-.preview-controls{ flex:0 0 320px; display:flex; flex-direction:column; gap:18px; }
-@media(max-width:1199px){ .preview-controls{ width:100%; } }
+.preview-controls{ display:flex; flex-direction:column; gap:18px; }
 .preview-control{ border-radius:20px; padding:18px 20px; background:rgba(255,255,255,.9); border:1px solid rgba(148,163,184,.18); box-shadow:0 28px 60px -48px rgba(15,23,42,.35); display:flex; flex-direction:column; gap:14px; }
 .preview-control--accent{ background:linear-gradient(140deg, rgba(14,165,181,.12), rgba(79,70,229,.08)); border-color:rgba(14,165,181,.28); box-shadow:0 32px 68px -48px rgba(14,165,181,.45); }
 .preview-control-head{ display:flex; flex-direction:column; gap:4px; }
@@ -491,10 +517,16 @@ a:hover{ text-decoration:none; }
   .sidebar-nav{ flex-direction:row; flex-wrap:wrap; gap:18px 28px; flex:1; }
   .nav-group{ min-width:200px; }
   .sidebar-footer{ flex-direction:row; flex-wrap:wrap; }
+  .preview-modal-sidebar{ flex:0 0 280px; }
 }
 @media (max-width:991px){
   .portal-header-card{ padding:28px; }
   .portal-header-content{ gap:24px; }
+  .preview-launch-grid{ flex-direction:column; }
+  .preview-modal-dialog{ width:calc(100% - 3rem); height:min(95vh, 820px); }
+  .preview-modal-body{ flex-direction:column; padding:1.25rem 1.35rem 1.5rem; }
+  .preview-modal-sidebar{ flex:none; width:100%; max-height:260px; padding-right:0; }
+  .preview-modal-stage{ width:100%; }
 }
 @media (max-width:767px){
   .portal-shell{ padding:28px 1.25rem 40px; }
@@ -504,6 +536,9 @@ a:hover{ text-decoration:none; }
   .hero-title{ font-size:1.8rem; }
   .hero-license .form-select{ min-width:0; flex:1; }
   .portal-container{ gap:24px; }
+  .preview-modal-dialog{ width:calc(100% - 1.5rem); height:95vh; border-radius:22px; }
+  .preview-modal-header, .preview-modal-body, .preview-modal-footer{ padding:1.1rem 1.25rem; }
+  .preview-modal-footer{ padding-bottom:1.25rem; }
 }
 @media (max-width:575px){
   .nav-group{ min-width:0; width:100%; }
@@ -881,142 +916,27 @@ a:hover{ text-decoration:none; }
                 </div>
               </div>
 
-              <div class="card-lite filled p-4 preview-card">
-                <div class="d-flex flex-column flex-xl-row gap-3 align-items-xl-center justify-content-between mb-3">
-                  <div>
-                    <h2 class="card-title mb-1">Misafir Sayfası Önizleme</h2>
-                    <p class="card-subtitle mb-0">Metinleri doğrudan sahne üzerinde düzenleyin, yeni fontlar deneyin ve sticker/görsellerle kişiselleştirin.</p>
+              <div class="card-lite filled p-4 preview-launch">
+                <div class="preview-launch-grid">
+                  <div class="preview-launch-copy">
+                    <div class="preview-launch-pill"><i class="bi bi-stars me-1"></i>Misafir sayfası stüdyosu</div>
+                    <h2 class="card-title mb-1">Tasarımı aç ve canva hissiyle düzenle</h2>
+                    <p class="card-subtitle mb-3">Misafir sayfanızı tam ekran düzenleyicide açarak metinleri, fontları, arka planı ve sticker'ları hızlıca güncelleyebilirsiniz.</p>
+                    <ul class="preview-launch-meta">
+                      <li><i class="bi bi-type"></i><span><?=h($GUEST_FONTS[$TITLE_FONT_KEY]['label'] ?? 'Inter')?> başlık fontu</span></li>
+                      <li><i class="bi bi-palette"></i><span><?= $BACKGROUND_URL ? 'Özel arka plan aktif' : 'Varsayılan arka plan' ?></span></li>
+                      <li><i class="bi bi-magic"></i><span>Sahne üzerindeki metinleri sürükleyip bırakın</span></li>
+                    </ul>
                   </div>
-                  <div class="preview-hint">
-                    <span class="badge rounded-pill bg-light text-dark fw-semibold"><i class="bi bi-magic me-1"></i>İpucu</span>
-                    <span>Metinlerin üzerine çift tıklayarak içerik düzenleyebilirsiniz.</span>
+                  <div class="preview-launch-cta">
+                    <div class="preview-launch-thumb<?= $BACKGROUND_URL ? ' has-image' : ''?>"<?=$bgPreviewStyle ? ' style="'.$bgPreviewStyle.'"' : ''?>>
+                      <?php if(!$BACKGROUND_URL): ?>
+                        <span class="preview-launch-thumb-label">Canlı önizleme</span>
+                      <?php endif; ?>
+                    </div>
+                    <button type="button" class="btn btn-zs btn-lg w-100" id="openPreviewBtn"><i class="bi bi-easel me-1"></i>Önizlemeyi Aç</button>
+                    <p class="small text-muted mb-0">Tüm değişiklikler kaydet butonuna bastığınızda etkin olur.</p>
                   </div>
-                </div>
-                <div class="preview-grid">
-                  <div class="preview-shell">
-                    <div class="preview-stage" id="pvStage">
-                      <div class="stage-scale" id="scaleBox">
-                        <div class="preview-canvas" id="canvas" data-has-bg="<?=$canvasHasBg?>" data-initial-bg="<?= $BACKGROUND_URL ? h($BACKGROUND_URL) : '' ?>" style="<?=$canvasStyle?>">
-                          <div id="pv-title" class="pv-title pv-editable" contenteditable="true" data-field="guest_title" style="left:<?= (int)$tPos['x']?>px; top:<?= (int)$tPos['y']?>px;"><?=h($TITLE)?></div>
-                          <div id="pv-sub" class="pv-sub pv-editable" contenteditable="true" data-field="guest_subtitle" style="left:<?= (int)$sPos['x']?>px; top:<?= (int)$sPos['y']?>px;"><?=h($SUBTITLE)?></div>
-                          <div id="pv-prompt" class="pv-prompt pv-editable" contenteditable="true" data-field="guest_prompt" style="left:<?= (int)$pPos['x']?>px; top:<?= (int)$pPos['y']?>px;"><?=h($PROMPT)?></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  <div class="preview-controls">
-                    <div class="preview-control preview-control--accent">
-                      <div class="preview-control-head">
-                        <span class="preview-control-title">Hızlı düzenleme</span>
-                        <span class="preview-control-sub">Metinleri burada güncelleyin; değişiklikler anında önizlemeye yansır.</span>
-                      </div>
-                      <div class="preview-form">
-                        <label class="preview-form-label" for="quickTitle">Başlık</label>
-                        <input type="text" id="quickTitle" class="form-control preview-form-control" placeholder="Örn. Mutluluğumuza Ortak Olun" data-sync-field="guest_title" value="<?=h($TITLE)?>">
-                        <label class="preview-form-label" for="quickSubtitle">Alt Başlık</label>
-                        <textarea id="quickSubtitle" class="form-control preview-form-control" rows="2" data-sync-field="guest_subtitle" placeholder="Davet metninizi buraya yazın."><?=h($SUBTITLE)?></textarea>
-                        <label class="preview-form-label" for="quickPrompt">Yükleme Mesajı</label>
-                        <textarea id="quickPrompt" class="form-control preview-form-control" rows="3" data-sync-field="guest_prompt" placeholder="Misafirleriniz için açıklama ekleyin."><?=h($PROMPT)?></textarea>
-                      </div>
-                    </div>
-                    <div class="preview-control">
-                      <div class="preview-control-head">
-                        <span class="preview-control-title">Tipografi</span>
-                        <span class="preview-control-sub">Favori fontlarınızı seçin ve anında deneyin.</span>
-                      </div>
-                      <div class="preview-font-grid">
-                        <div class="preview-font-field">
-                          <label class="preview-form-label" for="quickFontTitle">Başlık fontu</label>
-                          <select id="quickFontTitle" class="form-select preview-form-control" data-sync-font="guest_title_font">
-                            <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
-                              <option value="<?=h($fontKey)?>" <?=$TITLE_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
-                            <?php endforeach; ?>
-                          </select>
-                        </div>
-                        <div class="preview-font-field">
-                          <label class="preview-form-label" for="quickFontSub">Alt başlık fontu</label>
-                          <select id="quickFontSub" class="form-select preview-form-control" data-sync-font="guest_subtitle_font">
-                            <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
-                              <option value="<?=h($fontKey)?>" <?=$SUBTITLE_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
-                            <?php endforeach; ?>
-                          </select>
-                        </div>
-                        <div class="preview-font-field">
-                          <label class="preview-form-label" for="quickFontPrompt">Mesaj fontu</label>
-                          <select id="quickFontPrompt" class="form-select preview-form-control" data-sync-font="guest_prompt_font">
-                            <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
-                              <option value="<?=h($fontKey)?>" <?=$PROMPT_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
-                            <?php endforeach; ?>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="preview-control">
-                      <div class="preview-control-head">
-                        <span class="preview-control-title">Arka plan ve vitrin</span>
-                        <span class="preview-control-sub">Etkinlik temanızla uyumlu görsel ve renkleri seçin.</span>
-                      </div>
-                      <div class="preview-bg-grid">
-                        <div class="bg-preview<?= $BACKGROUND_URL ? ' has-image' : ''?>" id="bgPreview"<?=$bgPreviewStyle ? ' style="'.$bgPreviewStyle.'"' : ''?>>
-                          <span id="bgPreviewLabel"><?= $BACKGROUND_URL ? 'Yüklenen görsel' : 'Varsayılan' ?></span>
-                        </div>
-                        <div class="preview-bg-actions">
-                          <input class="d-none" type="file" name="guest_background" id="guestBackground" accept="image/*" form="settingsForm">
-                          <div class="d-flex flex-wrap gap-2">
-                            <button class="btn btn-sm btn-zs" type="button" data-trigger-upload="guestBackground"><i class="bi bi-upload me-1"></i>Yeni görsel ekle</button>
-                            <button class="btn btn-sm btn-outline-danger" type="button" id="removeBgBtn" <?=$BACKGROUND_URL ? '' : 'disabled'?>>
-                              <i class="bi bi-trash me-1"></i>Varsayılanı kullan
-                            </button>
-                          </div>
-                          <p class="form-text mb-0">JPG, PNG veya WEBP görselleri yükleyebilirsiniz. Minimum 1920×1080 önerilir.</p>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="preview-control">
-                      <div class="preview-control-head">
-                        <span class="preview-control-title">Sahne kısayolları</span>
-                        <span class="preview-control-sub">Metinlerin üzerine çift tıklayın veya aşağıdaki butonlarla odaklanın.</span>
-                      </div>
-                      <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-title">Başlığı seç</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-sub">Alt başlığı seç</button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-prompt">Mesajı seç</button>
-                      </div>
-                    </div>
-                    <div class="preview-control">
-                      <div class="preview-control-head">
-                        <span class="preview-control-title">Sticker & görsel boyutu</span>
-                        <span class="preview-control-sub">Bir öğeye tıkladığınızda buradan boyutunu değiştirebilirsiniz.</span>
-                      </div>
-                      <div class="sticker-size-tool">
-                        <input type="range" class="form-range" id="stickerSizeRange" min="20" max="200" step="2" disabled>
-                        <div class="small text-muted" id="stickerSizeValue">Bir sticker seçin</div>
-                      </div>
-                      <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-danger" id="deleteStickerBtn" disabled><i class="bi bi-trash me-1"></i>Seçili öğeyi sil</button>
-                        <label class="btn btn-sm btn-zs-outline mb-0">
-                          <i class="bi bi-image me-1"></i>Özel görsel yükle
-                          <input type="file" name="sticker_image" accept="image/*" class="d-none" form="settingsForm">
-                        </label>
-                      </div>
-                      <p class="form-text mb-0">PNG, JPG, WEBP, GIF veya SVG yükleyebilirsiniz. Kaydettikten sonra misafir sayfasına yansır.</p>
-                    </div>
-                  </div>
-                </div>
-                <p class="small text-muted mt-3 mb-0">Not: Bu önizleme gerçek misafir sayfasının birebir yansımasıdır.</p>
-              </div>
-
-              <div class="card-lite filled p-4">
-                <h2 class="card-title mb-1">Sticker ve Simgeler</h2>
-                <p class="card-subtitle mb-3">Misafir sayfanızı renklendirmek için aşağıdan simge ekleyin; seçtiğiniz öğeleri sağdaki araçtan boyutlandırabilirsiniz.</p>
-                <div class="sticker-actions">
-                  <?php foreach(['💍','💐','🎉','🎶','📸','❤️','✨','🎈','🥂','👰','🤵','🍰','🌟','🎊','💞','🕊️'] as $em): ?>
-                    <button class="btn btn-sm btn-zs-outline add-sticker" data-emoji="<?=h($em)?>"><?=$em?></button>
-                  <?php endforeach; ?>
-                </div>
-                <div class="d-flex flex-wrap gap-2 mt-3">
-                  <button class="btn btn-sm btn-outline-danger" id="clearStickers"><i class="bi bi-trash me-1"></i>Tüm simgeleri kaldır</button>
-                  <button class="btn btn-sm btn-outline-secondary" id="resetLayout"><i class="bi bi-arrow-counterclockwise me-1"></i>Yerleşimi sıfırla</button>
                 </div>
               </div>
             </div>
@@ -1026,7 +946,156 @@ a:hover{ text-decoration:none; }
     </div>
   </main>
 </div>
-</body>
+<div class="preview-modal" id="previewModal" aria-hidden="true">
+  <div class="preview-modal-backdrop" data-close-preview></div>
+  <div class="preview-modal-dialog" role="dialog" aria-modal="true">
+    <div class="preview-modal-header">
+      <div>
+        <div class="preview-modal-title">Misafir Sayfası Tasarım Stüdyosu</div>
+        <p class="preview-modal-sub">Metinleri, fontları ve arka planı gerçek zamanlı düzenleyin; kaydettiğinizde misafir sayfasına yansır.</p>
+      </div>
+      <div class="preview-modal-actions">
+        <button type="button" class="btn btn-outline-secondary" data-close-preview><i class="bi bi-x-lg me-1"></i>Kapat</button>
+        <button type="submit" class="btn btn-zs" form="settingsForm"><i class="bi bi-save me-1"></i>Kaydet</button>
+      </div>
+    </div>
+    <div class="preview-modal-body">
+      <aside class="preview-modal-sidebar">
+        <div class="preview-control preview-control--accent">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Hızlı düzenleme</span>
+            <span class="preview-control-sub">Metinleri burada güncelleyin; değişiklikler anında sahneye yansır.</span>
+          </div>
+          <div class="preview-form">
+            <label class="preview-form-label" for="quickTitle">Başlık</label>
+            <input type="text" id="quickTitle" class="form-control preview-form-control" placeholder="Örn. Mutluluğumuza Ortak Olun" data-sync-field="guest_title" value="<?=h($TITLE)?>">
+            <label class="preview-form-label" for="quickSubtitle">Alt Başlık</label>
+            <textarea id="quickSubtitle" class="form-control preview-form-control" rows="2" data-sync-field="guest_subtitle" placeholder="Davet metninizi buraya yazın."><?=h($SUBTITLE)?></textarea>
+            <label class="preview-form-label" for="quickPrompt">Yükleme Mesajı</label>
+            <textarea id="quickPrompt" class="form-control preview-form-control" rows="3" data-sync-field="guest_prompt" placeholder="Misafirleriniz için açıklama ekleyin."><?=h($PROMPT)?></textarea>
+          </div>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Tipografi</span>
+            <span class="preview-control-sub">Favori fontlarınızı seçin ve anında deneyin.</span>
+          </div>
+          <div class="preview-font-grid">
+            <div class="preview-font-field">
+              <label class="preview-form-label" for="quickFontTitle">Başlık fontu</label>
+              <select id="quickFontTitle" class="form-select preview-form-control" data-sync-font="guest_title_font">
+                <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                  <option value="<?=h($fontKey)?>" <?=$TITLE_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="preview-font-field">
+              <label class="preview-form-label" for="quickFontSub">Alt başlık fontu</label>
+              <select id="quickFontSub" class="form-select preview-form-control" data-sync-font="guest_subtitle_font">
+                <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                  <option value="<?=h($fontKey)?>" <?=$SUBTITLE_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="preview-font-field">
+              <label class="preview-form-label" for="quickFontPrompt">Mesaj fontu</label>
+              <select id="quickFontPrompt" class="form-select preview-form-control" data-sync-font="guest_prompt_font">
+                <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                  <option value="<?=h($fontKey)?>" <?=$PROMPT_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Arka plan ve vitrin</span>
+            <span class="preview-control-sub">Etkinlik temanızla uyumlu görsel ve renkleri seçin.</span>
+          </div>
+          <div class="preview-bg-grid">
+            <div class="bg-preview<?= $BACKGROUND_URL ? ' has-image' : ''?>" id="bgPreview"<?=$bgPreviewStyle ? ' style="'.$bgPreviewStyle.'"' : ''?>>
+              <span id="bgPreviewLabel"><?= $BACKGROUND_URL ? 'Yüklenen görsel' : 'Varsayılan' ?></span>
+            </div>
+            <div class="preview-bg-actions">
+              <input class="d-none" type="file" name="guest_background" id="guestBackground" accept="image/*" form="settingsForm">
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-zs" type="button" data-trigger-upload="guestBackground"><i class="bi bi-upload me-1"></i>Yeni görsel ekle</button>
+                <button class="btn btn-sm btn-outline-danger" type="button" id="removeBgBtn" <?=$BACKGROUND_URL ? '' : 'disabled'?>>
+                  <i class="bi bi-trash me-1"></i>Varsayılanı kullan
+                </button>
+              </div>
+              <p class="form-text mb-0">JPG, PNG veya WEBP görselleri yükleyebilirsiniz. Minimum 1920×1080 önerilir.</p>
+            </div>
+          </div>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Sahne kısayolları</span>
+            <span class="preview-control-sub">Metinlerin üzerine çift tıklayın veya aşağıdaki butonlarla odaklanın.</span>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-title">Başlığı seç</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-sub">Alt başlığı seç</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-prompt">Mesajı seç</button>
+          </div>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Sticker & görsel boyutu</span>
+            <span class="preview-control-sub">Bir öğeye tıkladığınızda buradan boyutunu değiştirebilirsiniz.</span>
+          </div>
+          <div class="sticker-size-tool">
+            <input type="range" class="form-range" id="stickerSizeRange" min="20" max="200" step="2" disabled>
+            <div class="small text-muted" id="stickerSizeValue">Bir sticker seçin</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" id="deleteStickerBtn" disabled><i class="bi bi-trash me-1"></i>Seçili öğeyi sil</button>
+            <label class="btn btn-sm btn-zs-outline mb-0">
+              <i class="bi bi-image me-1"></i>Özel görsel yükle
+              <input type="file" name="sticker_image" accept="image/*" class="d-none" form="settingsForm">
+            </label>
+          </div>
+          <p class="form-text mb-0">PNG, JPG, WEBP, GIF veya SVG yükleyebilirsiniz. Kaydettikten sonra misafir sayfasına yansır.</p>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Sticker kitaplığı</span>
+            <span class="preview-control-sub">Bir tıklamayla sahneye ekleyin, sürükleyerek konumlandırın.</span>
+          </div>
+          <div class="sticker-actions">
+            <?php foreach(['💍','💐','🎉','🎶','📸','❤️','✨','🎈','🥂','👰','🤵','🍰','🌟','🎊','💞','🕊️'] as $em): ?>
+              <button class="btn btn-sm btn-zs-outline add-sticker" data-emoji="<?=h($em)?>"><?=$em?></button>
+            <?php endforeach; ?>
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            <button class="btn btn-sm btn-outline-danger" type="button" id="clearStickers"><i class="bi bi-trash me-1"></i>Tüm simgeleri kaldır</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" id="resetLayout"><i class="bi bi-arrow-counterclockwise me-1"></i>Yerleşimi sıfırla</button>
+          </div>
+        </div>
+      </aside>
+      <div class="preview-modal-stage">
+        <div class="preview-modal-hint">
+          <span class="badge rounded-pill bg-light text-dark fw-semibold"><i class="bi bi-magic me-1"></i>İpucu</span>
+          <span>Metinleri sürükleyip bırakabilir veya çift tıklayarak düzenleyebilirsiniz.</span>
+        </div>
+        <div class="preview-shell">
+          <div class="preview-stage" id="pvStage">
+            <div class="stage-scale" id="scaleBox">
+              <div class="preview-canvas" id="canvas" data-has-bg="<?=$canvasHasBg?>" data-initial-bg="<?= $BACKGROUND_URL ? h($BACKGROUND_URL) : '' ?>" style="<?=$canvasStyle?>">
+                <div id="pv-title" class="pv-title pv-editable" contenteditable="true" data-field="guest_title" style="left:<?= (int)$tPos['x']?>px; top:<?= (int)$tPos['y']?>px;"><?=h($TITLE)?></div>
+                <div id="pv-sub" class="pv-sub pv-editable" contenteditable="true" data-field="guest_subtitle" style="left:<?= (int)$sPos['x']?>px; top:<?= (int)$sPos['y']?>px;"><?=h($SUBTITLE)?></div>
+                <div id="pv-prompt" class="pv-prompt pv-editable" contenteditable="true" data-field="guest_prompt" style="left:<?= (int)$pPos['x']?>px; top:<?= (int)$pPos['y']?>px;"><?=h($PROMPT)?></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="preview-modal-footer">
+      Not: Misafir sayfası düzenleyicisi kaydettiğinizde etkin olur, kapattığınızda değişiklikler korunur.
+    </div>
+  </div>
+</div>
 <script>
 (function(){
   const stage=document.getElementById('pvStage'), box=document.getElementById('scaleBox');
@@ -1053,6 +1122,46 @@ let stickerState = <?=(string)$stickersJson?>;
 try { stickerState = Array.isArray(stickerState) ? stickerState : JSON.parse(stickerState || '[]'); }
 catch(e){ stickerState = []; }
 let activeStickerIndex = null;
+const previewModal = document.getElementById('previewModal');
+const openPreviewBtn = document.getElementById('openPreviewBtn');
+
+function openPreviewModal(){
+  if (!previewModal) return;
+  previewModal.classList.add('is-open');
+  document.body.classList.add('preview-modal-open');
+  previewModal.setAttribute('aria-hidden','false');
+  setTimeout(()=>{ window.dispatchEvent(new Event('resize')); }, 30);
+}
+
+function closePreviewModal(){
+  if (!previewModal) return;
+  previewModal.classList.remove('is-open');
+  document.body.classList.remove('preview-modal-open');
+  previewModal.setAttribute('aria-hidden','true');
+  if (openPreviewBtn) {
+    openPreviewBtn.focus({ preventScroll:true });
+  }
+}
+
+if (openPreviewBtn) {
+  openPreviewBtn.addEventListener('click',(e)=>{
+    e.preventDefault();
+    openPreviewModal();
+  });
+}
+
+document.querySelectorAll('[data-close-preview]').forEach((btn)=>{
+  btn.addEventListener('click',(e)=>{
+    e.preventDefault();
+    closePreviewModal();
+  });
+});
+
+document.addEventListener('keydown',(e)=>{
+  if (e.key === 'Escape' && previewModal && previewModal.classList.contains('is-open')) {
+    closePreviewModal();
+  }
+});
 
 function ensureFontLoaded(key){
   const cfg = fontMap[key];
