@@ -51,17 +51,37 @@ $ACCENT   = $ev['theme_accent']  ?: '#e0f7fb';
 $CAN_VIEW = (int)$ev['allow_guest_view']===1;
 $CAN_DOWN = (int)$ev['allow_guest_download']===1;
 
-$layout   = $ev['layout_json'] ?: '{"title":{"x":24,"y":24},"subtitle":{"x":24,"y":60},"prompt":{"x":24,"y":396}}';
-$stickers = $ev['stickers_json'] ?: '[]';
-$layoutArr   = json_decode($layout,true);
-$stickersArr = json_decode($stickers,true);
-if(!is_array($layoutArr)){
-  $layoutArr = array('title'=>array('x'=>24,'y'=>24),'subtitle'=>array('x'=>24,'y'=>60),'prompt'=>array('x'=>24,'y'=>396));
+$layoutRaw = $ev['layout_json'] ?: '{"title":{"x":24,"y":24},"subtitle":{"x":24,"y":60},"prompt":{"x":24,"y":396}}';
+$layoutArr = normalize_event_layout(json_decode($layoutRaw, true));
+$tPos = $layoutArr['title'];
+$sPos = $layoutArr['subtitle'];
+$pPos = $layoutArr['prompt'];
+$stickersRaw = $ev['stickers_json'] ?: '[]';
+$decodedStickers = json_decode($stickersRaw, true);
+$stickerAssetUrls = [];
+$stickersArr = normalize_event_stickers(is_array($decodedStickers) ? $decodedStickers : [], $event_id, $stickerAssetUrls);
+$GUEST_FONTS = guest_font_options();
+$TITLE_FONT_KEY = $ev['guest_title_font'] ?: 'inter';
+if (!isset($GUEST_FONTS[$TITLE_FONT_KEY])) { $TITLE_FONT_KEY = 'inter'; }
+$SUBTITLE_FONT_KEY = $ev['guest_subtitle_font'] ?: $TITLE_FONT_KEY;
+if (!isset($GUEST_FONTS[$SUBTITLE_FONT_KEY])) { $SUBTITLE_FONT_KEY = $TITLE_FONT_KEY; }
+$PROMPT_FONT_KEY = $ev['guest_prompt_font'] ?: $SUBTITLE_FONT_KEY;
+if (!isset($GUEST_FONTS[$PROMPT_FONT_KEY])) { $PROMPT_FONT_KEY = $SUBTITLE_FONT_KEY; }
+$TITLE_FONT_STACK = guest_font_stack($TITLE_FONT_KEY);
+$SUBTITLE_FONT_STACK = guest_font_stack($SUBTITLE_FONT_KEY);
+$PROMPT_FONT_STACK = guest_font_stack($PROMPT_FONT_KEY);
+$FONT_IMPORTS = guest_font_imports([$TITLE_FONT_KEY, $SUBTITLE_FONT_KEY, $PROMPT_FONT_KEY]);
+$TITLE_FONT_STACK_ESC = htmlspecialchars($TITLE_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$SUBTITLE_FONT_STACK_ESC = htmlspecialchars($SUBTITLE_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$PROMPT_FONT_STACK_ESC = htmlspecialchars($PROMPT_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$BACKGROUND_PATH = trim((string)($ev['guest_background_path'] ?? ''));
+if (!event_guest_background_exists($BACKGROUND_PATH)) { $BACKGROUND_PATH = ''; }
+$BACKGROUND_URL = $BACKGROUND_PATH !== '' ? event_guest_background_url($BACKGROUND_PATH) : null;
+$canvasStyle = '--zs:'.htmlspecialchars($PRIMARY, ENT_QUOTES, 'UTF-8').'; --zs-soft:'.htmlspecialchars($ACCENT, ENT_QUOTES, 'UTF-8').';';
+if ($BACKGROUND_URL) {
+  $canvasStyle .= ' background-image:url('.htmlspecialchars($BACKGROUND_URL, ENT_QUOTES, 'UTF-8').');';
 }
-if(!is_array($stickersArr)){ $stickersArr = array(); }
-$tPos = isset($layoutArr['title'])    ? $layoutArr['title']    : array('x'=>24,'y'=>24);
-$sPos = isset($layoutArr['subtitle']) ? $layoutArr['subtitle'] : array('x'=>24,'y'=>60);
-$pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'y'=>396);
+$canvasHasBg = $BACKGROUND_URL ? '1' : '0';
 
 $permaCode = trim($_GET['code'] ?? '');
 $permaCodeActive = dealer_qr_code_matches_event($permaCode, $event_id);
@@ -400,9 +420,12 @@ $directory = $profile ? guest_event_profile_directory($event_id, (int)$profile['
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <meta name="csrf" content="<?=h($pageCsrf)?>">
+<?php foreach ($FONT_IMPORTS as $import): ?>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=<?=h($import)?>&display=swap">
+<?php endforeach; ?>
 <style>
-:root{ --zs:<?=h($PRIMARY)?>; --zs-soft:<?=h($ACCENT)?>; --ink:#0f172a; --muted:#64748b; --card:#ffffff; --border:#e2e8f0; }
-body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif; color:var(--ink); }
+:root{ --zs:<?=h($PRIMARY)?>; --zs-soft:<?=h($ACCENT)?>; --ink:#0f172a; --muted:#64748b; --card:#ffffff; --border:#e2e8f0; --guest-title-font: <?=$TITLE_FONT_STACK_ESC?>; --guest-subtitle-font: <?=$SUBTITLE_FONT_STACK_ESC?>; --guest-prompt-font: <?=$PROMPT_FONT_STACK_ESC?>; }
+body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:var(--guest-subtitle-font, "Inter","Segoe UI",system-ui,-apple-system,sans-serif); color:var(--ink); }
 .page-shell{ max-width:1200px; margin:0 auto; }
 .card-lite{ border:1px solid rgba(148,163,184,.22); border-radius:24px; background:var(--card); box-shadow:0 25px 70px -45px rgba(15,23,42,.4); }
 .card-lite h5{ font-weight:700; }
@@ -430,14 +453,18 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
 .pill{ display:inline-flex; align-items:center; gap:.45rem; font-size:.82rem; font-weight:600; padding:.35rem .75rem; border-radius:999px; background:rgba(255,255,255,.16); backdrop-filter:blur(6px); }
 .muted-link{ color:var(--muted); text-decoration:none; }
 .muted-link:hover{ text-decoration:underline; }
-.preview-shell{ width:min(100%,960px); margin:0 auto; }
-.preview-stage{ position:relative; width:100%; border:1px dashed rgba(148,163,184,.45); border-radius:22px; background:#fff; overflow:hidden; }
+.preview-shell{ position:relative; width:min(100%,960px); margin:0 auto; padding:1.5rem; border-radius:26px; background:linear-gradient(135deg, rgba(14,165,181,.1), rgba(79,70,229,.06)); border:1px solid rgba(148,163,184,.2); box-shadow:0 34px 70px -58px rgba(14,165,181,.35); }
+.preview-shell::after{ content:''; position:absolute; inset:0; border-radius:inherit; background:linear-gradient(140deg, rgba(255,255,255,.65), rgba(255,255,255,.22)); pointer-events:none; mix-blend-mode:screen; }
+.preview-stage{ position:relative; width:100%; border-radius:24px; background:rgba(255,255,255,.96); overflow:hidden; border:1px solid rgba(148,163,184,.24); box-shadow:0 36px 72px -60px rgba(15,23,42,.4); }
 .stage-scale{ position:absolute; left:0; top:0; width:960px; height:540px; transform-origin:top left; transform:scale(var(--s,1)); }
-.preview-canvas{ position:absolute; inset:0; background:linear-gradient(180deg,var(--zs-soft),#fff); }
-.pv-title{ position:absolute; font-size:28px; font-weight:800; color:#111; }
-.pv-sub{ position:absolute; color:#334155; font-size:16px; }
-.pv-prompt{ position:absolute; color:#0f172a; font-size:16px; }
-.sticker{ position:absolute; user-select:none; pointer-events:none; }
+.preview-canvas{ position:absolute; inset:0; background:linear-gradient(180deg,var(--zs-soft),#fff); background-size:cover; background-position:center; transition:background-image .35s ease, background-color .35s ease; }
+.preview-canvas::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.6)); opacity:0; transition:opacity .3s ease; pointer-events:none; }
+.preview-canvas[data-has-bg="1"]::after{ opacity:1; }
+.pv-title{ position:absolute; font-size:30px; font-weight:800; color:#0f172a; letter-spacing:.015em; font-family:var(--guest-title-font); text-shadow:0 12px 30px rgba(15,23,42,.18); }
+.pv-sub{ position:absolute; color:#334155; font-size:18px; font-weight:600; max-width:520px; line-height:1.45; font-family:var(--guest-subtitle-font); }
+.pv-prompt{ position:absolute; color:#0f172a; font-size:16px; font-weight:500; letter-spacing:.01em; background:rgba(255,255,255,.85); padding:.75rem 1rem; border-radius:14px; box-shadow:0 14px 28px -20px rgba(15,23,42,.45); font-family:var(--guest-prompt-font); }
+.sticker{ position:absolute; user-select:none; pointer-events:none; filter:drop-shadow(0 8px 18px rgba(15,23,42,.25)); }
+.sticker-img img{ display:block; pointer-events:none; user-select:none; border-radius:18px; box-shadow:0 24px 50px -36px rgba(15,23,42,.4); }
 .note-card{ border-radius:20px; border:1px solid rgba(148,163,184,.28); padding:1.8rem; background:#f8fafc; }
 .note-card textarea{ border-radius:16px; border:1px solid rgba(148,163,184,.32); padding:1rem; font-size:.98rem; }
 .note-card textarea:focus{ border-color:var(--zs); box-shadow:0 0 0 .25rem rgba(14,165,181,.2); }
@@ -507,17 +534,29 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
     <div class="preview-shell">
       <div class="preview-stage" id="pvStage">
         <div class="stage-scale" id="scaleBox">
-          <div class="preview-canvas">
+          <div class="preview-canvas" data-has-bg="<?=$canvasHasBg?>" style="<?=$canvasStyle?>">
             <div class="pv-title"  style="left:<?= (int)$tPos['x']?>px; top:<?= (int)$tPos['y']?>px;"><?=h($TITLE)?></div>
             <div class="pv-sub"    style="left:<?= (int)$sPos['x']?>px; top:<?= (int)$sPos['y']?>px;"><?=h($SUBTITLE)?></div>
             <div class="pv-prompt" style="left:<?= (int)$pPos['x']?>px; top:<?= (int)$pPos['y']?>px;"><?=h($PROMPT)?></div>
-            <?php foreach($stickersArr as $st){
-              $txt = isset($st['txt'])?$st['txt']:'💍';
-              $x   = isset($st['x'])?(int)$st['x']:20;
-              $y   = isset($st['y'])?(int)$st['y']:90;
-              $sz  = isset($st['size'])?(int)$st['size']:32; ?>
-              <div class="sticker" style="left:<?=$x?>px; top:<?=$y?>px; font-size:<?=$sz?>px"><?=$txt?></div>
-            <?php } ?>
+            <?php foreach($stickersArr as $st):
+              $type = $st['type'] ?? 'emoji';
+              $x    = isset($st['x']) ? (int)$st['x'] : 20;
+              $y    = isset($st['y']) ? (int)$st['y'] : 90;
+              if ($type === 'image') {
+                $path = $st['path'] ?? '';
+                $width = isset($st['width']) ? (int)$st['width'] : 220;
+                $url = ($path !== '' && isset($stickerAssetUrls[$path])) ? $stickerAssetUrls[$path] : null;
+                if ($url): ?>
+                  <div class="sticker sticker-img" style="left:<?=$x?>px; top:<?=$y?>px;">
+                    <img src="<?=h($url)?>" alt="" style="width:<?=$width?>px;">
+                  </div>
+                <?php endif;
+              } else {
+                $txt = $st['txt'] ?? '💍';
+                $size = isset($st['size']) ? (int)$st['size'] : 32; ?>
+                <div class="sticker" style="left:<?=$x?>px; top:<?=$y?>px; font-size:<?=$size?>px"><?=$txt?></div>
+              <?php }
+            endforeach; ?>
           </div>
         </div>
       </div>

@@ -1538,10 +1538,16 @@ function install_schema(){
   }
   if (!column_exists('events','guest_title'))         pdo()->exec("ALTER TABLE events ADD guest_title VARCHAR(190) NULL");
   if (!column_exists('events','guest_subtitle'))      pdo()->exec("ALTER TABLE events ADD guest_subtitle VARCHAR(255) NULL");
+  if (!column_exists('events','guest_title_font'))    pdo()->exec("ALTER TABLE events ADD guest_title_font VARCHAR(60) NULL AFTER guest_prompt");
+  if (!column_exists('events','guest_subtitle_font')) pdo()->exec("ALTER TABLE events ADD guest_subtitle_font VARCHAR(60) NULL AFTER guest_title_font");
+  if (!column_exists('events','guest_prompt_font'))   pdo()->exec("ALTER TABLE events ADD guest_prompt_font VARCHAR(60) NULL AFTER guest_subtitle_font");
   if (!column_exists('events','allow_guest_view'))    pdo()->exec("ALTER TABLE events ADD allow_guest_view TINYINT(1) NOT NULL DEFAULT 1");
   if (!column_exists('events','allow_guest_download'))pdo()->exec("ALTER TABLE events ADD allow_guest_download TINYINT(1) NOT NULL DEFAULT 1");
   if (!column_exists('events','allow_guest_delete'))  pdo()->exec("ALTER TABLE events ADD allow_guest_delete TINYINT(1) NOT NULL DEFAULT 0");
   if (!column_exists('events','layout_json'))         pdo()->exec("ALTER TABLE events ADD layout_json ".($json==='JSON'?'JSON':'LONGTEXT')." NULL");
+  if (!column_exists('events','guest_background_path')){
+    pdo()->exec("ALTER TABLE events ADD guest_background_path VARCHAR(255) NULL AFTER layout_json");
+  }
   if (!column_exists('events','stickers_json'))       pdo()->exec("ALTER TABLE events ADD stickers_json ".($json==='JSON'?'JSON':'LONGTEXT')." NULL");
   if (!column_exists('events','updated_at'))          pdo()->exec("ALTER TABLE events ADD updated_at DATETIME NULL");
   if (!column_exists('events','contact_email'))       pdo()->exec("ALTER TABLE events ADD contact_email VARCHAR(190) NULL");
