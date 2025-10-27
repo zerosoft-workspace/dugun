@@ -16,6 +16,16 @@ $content = site_settings_all();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   csrf_or_die();
 
+  if (isset($_POST['generate_sitemap'])) {
+    [$ok, $message] = site_generate_sitemap();
+    if ($ok) {
+      flash('ok', $message);
+    } else {
+      flash('err', $message);
+    }
+    redirect(BASE_URL.'/admin/site_content.php#seo');
+  }
+
   $payload = [
     'hero_badge' => trim($_POST['hero_badge'] ?? ''),
     'hero_title' => trim($_POST['hero_title'] ?? ''),
@@ -1533,6 +1543,14 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
               <input type="text" name="seo_meta_keywords" class="form-control" value="<?=h($content['seo_meta_keywords'] ?? '')?>" placeholder="bikare, dijital etkinlik, qr kod">
               <div class="form-text">Virgülle ayırarak anahtar kelimeler ekleyebilirsiniz.</div>
             </div>
+          </div>
+          <hr class="my-4">
+          <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div>
+              <h6 class="fw-semibold mb-1">Sitemap.xml Oluştur</h6>
+              <p class="text-muted small mb-0">Blog bağlantıları ve anlaşmalı şirket sayfaları dahil tüm önemli adresleri kapsayan sitemap dosyasını tek tıkla yenileyin.</p>
+            </div>
+            <button type="submit" name="generate_sitemap" value="1" class="btn btn-outline-primary px-4" formnovalidate>Site Haritasını Güncelle</button>
           </div>
         </div>
       </div>

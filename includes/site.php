@@ -457,6 +457,166 @@ function site_public_content(): array {
   return $content;
 }
 
+function site_generate_sitemap(): array {
+  $baseUrl = defined('BASE_URL') ? rtrim((string)BASE_URL, '/') : '';
+  if ($baseUrl === '') {
+    return [false, 'Sistem ana URL bilgisine erişilemediği için sitemap oluşturulamadı.'];
+  }
+
+  $entries = [];
+  $addEntry = function (string $loc, ?string $changefreq = null, ?string $priority = null, ?string $lastmod = null) use (&$entries): void {
+    $loc = trim($loc);
+    if ($loc === '') {
+      return;
+    }
+    if (!isset($entries[$loc])) {
+      $entries[$loc] = [
+        'loc' => $loc,
+        'changefreq' => $changefreq,
+        'priority' => $priority,
+        'lastmod' => $lastmod,
+      ];
+      return;
+    }
+
+    if ($lastmod) {
+      $current = $entries[$loc]['lastmod'] ?? null;
+      if (!$current || strtotime($lastmod) > strtotime((string)$current)) {
+        $entries[$loc]['lastmod'] = $lastmod;
+      }
+    }
+  };
+
+  $baseHost = parse_url($baseUrl, PHP_URL_HOST) ?: '';
+  $ensureLocal = function (?string $url) use ($baseHost) {
+    if ($url === null) {
+      return null;
+    }
+    $trimmed = trim($url);
+    if ($trimmed === '') {
+      return null;
+    }
+    if (preg_match('~^(?:mailto:|tel:|#)~i', $trimmed)) {
+      return null;
+    }
+    $resolved = site_resolve_button_url($trimmed);
+    if (!$resolved) {
+      return null;
+    }
+    $host = parse_url($resolved, PHP_URL_HOST);
+    if ($host && $baseHost && strcasecmp($host, $baseHost) !== 0) {
+      return null;
+    }
+    return $resolved;
+  };
+
+  $nowIso = date('c');
+  $addEntry($baseUrl.'/', 'daily', '1.0', $nowIso);
+  $addEntry($baseUrl.'/public/partners.php', 'weekly', '0.8');
+
+  $content = site_public_content();
+  $contentUrls = [];
+  $simpleFields = [
+    'hero_primary_url',
+    'hero_secondary_url',
+    'dealer_button_url',
+    'cta_banner_button_url',
+    'contact_primary_url',
+    'contact_secondary_url',
+    'contact_website',
+  ];
+  foreach ($simpleFields as $field) {
+    if (!empty($content[$field])) {
+      $contentUrls[] = $content[$field];
+    }
+  }
+
+  if (!empty($content['footer_nav_links']) && is_array($content['footer_nav_links'])) {
+    foreach ($content['footer_nav_links'] as $navItem) {
+      if (is_array($navItem) && !empty($navItem['url'])) {
+        $contentUrls[] = $navItem['url'];
+      }
+    }
+  }
+
+  if (!empty($content['blog_posts']) && is_array($content['blog_posts'])) {
+    foreach ($content['blog_posts'] as $post) {
+      if (is_array($post) && !empty($post['url'])) {
+        $resolved = $ensureLocal($post['url']);
+        if ($resolved) {
+          $addEntry($resolved, 'weekly', '0.6');
+        }
+      }
+    }
+  }
+
+  foreach ($contentUrls as $url) {
+    $resolved = $ensureLocal($url);
+    if ($resolved) {
+      $addEntry($resolved, 'monthly', '0.5');
+    }
+  }
+
+  if (table_exists('dealer_listings')) {
+    try {
+      $sql = "SELECT slug, updated_at, published_at, created_at FROM dealer_listings WHERE status='approved' AND slug<>''";
+      $st = pdo()->query($sql);
+      while ($row = $st->fetch()) {
+        $slug = trim((string)($row['slug'] ?? ''));
+        if ($slug === '') {
+          continue;
+        }
+        $loc = $baseUrl.'/public/partner.php?listing='.rawurlencode($slug);
+        $timestamps = [];
+        foreach (['updated_at', 'published_at', 'created_at'] as $col) {
+          if (!empty($row[$col])) {
+            $ts = strtotime((string)$row[$col]);
+            if ($ts) {
+              $timestamps[] = $ts;
+            }
+          }
+        }
+        $lastmod = $timestamps ? date('c', max($timestamps)) : null;
+        $addEntry($loc, 'weekly', '0.7', $lastmod);
+      }
+    } catch (Throwable $e) {
+      // yok say: bayi listeleri olmadan sitemap yine de oluşturulsun
+    }
+  }
+
+  if (!$entries) {
+    return [false, 'Sitemap için adres listesi oluşturulamadı.'];
+  }
+
+  ksort($entries);
+
+  $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+  $xml .= "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
+  foreach ($entries as $entry) {
+    $xml .= "  <url>\n";
+    $xml .= '    <loc>'.htmlspecialchars($entry['loc'], ENT_XML1)."</loc>\n";
+    if (!empty($entry['lastmod'])) {
+      $xml .= '    <lastmod>'.htmlspecialchars($entry['lastmod'], ENT_XML1)."</lastmod>\n";
+    }
+    if (!empty($entry['changefreq'])) {
+      $xml .= '    <changefreq>'.htmlspecialchars($entry['changefreq'], ENT_XML1)."</changefreq>\n";
+    }
+    if (!empty($entry['priority'])) {
+      $xml .= '    <priority>'.htmlspecialchars($entry['priority'], ENT_XML1)."</priority>\n";
+    }
+    $xml .= "  </url>\n";
+  }
+  $xml .= "</urlset>\n";
+
+  $target = __DIR__.'/../sitemap.xml';
+  $result = @file_put_contents($target, $xml, LOCK_EX);
+  if ($result === false) {
+    return [false, 'sitemap.xml dosyası yazılamadı. Lütfen dosya izinlerini kontrol edin.'];
+  }
+
+  return [true, 'Sitemap başarıyla oluşturuldu.'];
+}
+
 function site_content_upload_dir(): string {
   $dir = __DIR__.'/../uploads/site';
   if (!is_dir($dir)) {
