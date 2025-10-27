@@ -189,10 +189,19 @@ unset($_SESSION['lead_success']);
   [data-theme="dark"] .testimonial::before{color:rgba(56,189,248,0.24);}
   .blog-section{border-radius:32px;background:rgba(255,255,255,0.92);padding:48px;box-shadow:0 32px 90px -60px rgba(15,118,110,0.22);}
   [data-theme="dark"] .blog-section{background:rgba(15,23,42,0.86);border:1px solid rgba(148,163,184,0.24);box-shadow:0 40px 120px -64px rgba(8,47,73,0.9);}
-  .blog-card{border-radius:24px;background:#fff;padding:32px;height:100%;display:flex;flex-direction:column;gap:1.25rem;box-shadow:0 24px 70px -55px rgba(15,118,110,0.18);}
+  .blog-card{border-radius:26px;background:#fff;box-shadow:0 24px 70px -55px rgba(15,118,110,0.18);overflow:hidden;display:flex;flex-direction:column;height:100%;transition:transform .2s ease,box-shadow .2s ease;}
+  .blog-card:hover{transform:translateY(-6px);box-shadow:0 34px 100px -60px rgba(15,118,110,0.28);}
   [data-theme="dark"] .blog-card{background:var(--card);border:1px solid var(--border);box-shadow:0 30px 90px -60px rgba(8,47,73,0.88);}
-  .blog-card .badge{align-self:flex-start;}
-  .blog-card__link{color:var(--brand);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:.35rem;}
+  [data-theme="dark"] .blog-card:hover{box-shadow:0 40px 120px -70px rgba(8,47,73,0.9);}
+  .blog-card__media{position:relative;min-height:220px;background-size:cover;background-position:center;border-radius:0;overflow:hidden;}
+  .blog-card__media::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.55));opacity:.65;transition:opacity .2s ease;}
+  .blog-card:hover .blog-card__media::after{opacity:.8;}
+  .blog-card__media--empty{background:linear-gradient(135deg,rgba(14,165,181,0.22),rgba(15,23,42,0.12));}
+  [data-theme="dark"] .blog-card__media--empty{background:linear-gradient(135deg,rgba(56,189,248,0.28),rgba(8,47,73,0.5));}
+  .blog-card__date{position:absolute;left:18px;bottom:18px;border-radius:999px;background:rgba(255,255,255,0.85);backdrop-filter:blur(8px);}
+  [data-theme="dark"] .blog-card__date{background:rgba(15,23,42,0.78);color:#38bdf8!important;border:1px solid rgba(56,189,248,0.24);}
+  .blog-card__body{padding:28px;display:flex;flex-direction:column;gap:1rem;height:100%;}
+  .blog-card__link{color:var(--brand);font-weight:600;text-decoration:none;display:inline-flex;align-items-center;gap:.45rem;}
   .blog-card__link:hover{color:var(--brand-dark);text-decoration:underline;}
   .cta-section{border-radius:32px;background:linear-gradient(135deg,#0ea5b5,#6366f1);color:#fff;padding:48px;}
   [data-theme="dark"] .cta-section{background:linear-gradient(135deg,rgba(56,189,248,0.18),rgba(14,116,198,0.42));backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,0.2);}
@@ -536,17 +545,30 @@ unset($_SESSION['lead_success']);
           if ($postTitle === '' || $postUrl === '') {
             continue;
           }
+          $postImage = trim((string)($post['image'] ?? ''));
+          $mediaClasses = 'blog-card__media'.($postImage === '' ? ' blog-card__media--empty' : '');
+          $mediaStyle = $postImage !== '' ? " style=\"background-image:url('".h($postImage)."');\"" : '';
+          $postDate = '';
+          if (!empty($post['published_at'])) {
+            try {
+              $dt = new DateTime($post['published_at']);
+              $postDate = $dt->format('d.m.Y');
+            } catch (Throwable $e) {
+              $postDate = '';
+            }
+          }
         ?>
           <div class="col-md-4">
             <div class="blog-card h-100">
-              <div>
-                <h5 class="fw-bold mb-2"><?=h($postTitle)?></h5>
-                <?php if ($postDescription !== ''): ?><p class="muted mb-0"><?=nl2br(h($postDescription))?></p><?php endif; ?>
+              <div class="<?=$mediaClasses?>"<?=$mediaStyle?>>
+                <?php if ($postDate !== ''): ?><span class="blog-card__date badge text-bg-light text-dark px-3 py-2 fw-semibold"><?=$postDate?></span><?php endif; ?>
               </div>
-              <div class="mt-auto">
-                <a class="blog-card__link" href="<?=h($postUrl)?>" target="_blank" rel="noopener">
+              <div class="blog-card__body">
+                <h5 class="fw-bold mb-2"><?=h($postTitle)?></h5>
+                <?php if ($postDescription !== ''): ?><p class="muted mb-3"><?=nl2br(h($postDescription))?></p><?php endif; ?>
+                <a class="blog-card__link" href="<?=h($postUrl)?>">
                   Devamını oku
-                  <i class="bi bi-arrow-up-right"></i>
+                  <i class="bi bi-arrow-right"></i>
                 </a>
               </div>
             </div>

@@ -19,7 +19,7 @@ function site_public_header(string $active = 'home', ?array $content = null): vo
       'home' => $links['home'],
       'features' => $links['features'],
       'packages' => $links['packages'],
-      'blog' => ['label' => 'Blog', 'url' => BASE_URL.'/index.php#blog'],
+      'blog' => ['label' => 'Blog', 'url' => site_blog_url('')],
       'partners' => $links['partners'],
       'contact' => $links['contact'],
     ];

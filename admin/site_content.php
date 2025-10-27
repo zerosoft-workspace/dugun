@@ -179,21 +179,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $blogPosts = [];
   $blogTitles = $_POST['blog_title'] ?? [];
   $blogDescriptions = $_POST['blog_description'] ?? [];
-  $blogUrls = $_POST['blog_url'] ?? [];
+  $blogSlugs = $_POST['blog_slug'] ?? [];
+  $blogImages = $_POST['blog_image'] ?? [];
+  $blogBodies = $_POST['blog_content'] ?? [];
+  $blogPublishedAt = $_POST['blog_published_at'] ?? [];
+  $blogGalleryRaw = $_POST['blog_gallery'] ?? [];
   foreach ($blogTitles as $idx => $title) {
     $title = trim((string)$title);
     $description = trim((string)($blogDescriptions[$idx] ?? ''));
-    $url = trim((string)($blogUrls[$idx] ?? ''));
-    if ($title === '' && $description === '' && $url === '') {
-      continue;
+    $slug = trim((string)($blogSlugs[$idx] ?? ''));
+    $image = trim((string)($blogImages[$idx] ?? ''));
+    $body = trim((string)($blogBodies[$idx] ?? ''));
+    $published = trim((string)($blogPublishedAt[$idx] ?? ''));
+    $galleryField = $blogGalleryRaw[$idx] ?? '';
+    if (is_array($galleryField)) {
+      $galleryField = implode("\n", array_filter(array_map('trim', $galleryField)));
     }
-    if ($title === '' || $url === '') {
+    $galleryLines = preg_split('~[\r\n]+~', (string)$galleryField) ?: [];
+    $gallery = [];
+    foreach ($galleryLines as $line) {
+      $line = trim((string)$line);
+      if ($line !== '') {
+        $gallery[] = $line;
+      }
+    }
+    if ($title === '' && $description === '' && $slug === '' && $image === '' && $body === '' && $published === '' && !$gallery) {
       continue;
     }
     $blogPosts[] = [
       'title' => $title,
       'description' => $description,
-      'url' => $url,
+      'slug' => $slug,
+      'image' => $image,
+      'content' => $body,
+      'published_at' => site_normalize_blog_date($published) ?? '',
+      'gallery' => $gallery,
     ];
   }
   if (!$blogPosts) {
@@ -482,6 +502,39 @@ if (!is_array($blogPosts)) {
   $blogPosts = $defaults['blog_posts'];
 }
 $blogPosts = array_values($blogPosts);
+$blogPosts = array_map(function ($post) {
+  if (!is_array($post)) {
+    $post = [];
+  }
+  $gallery = [];
+  if (!empty($post['gallery']) && is_array($post['gallery'])) {
+    foreach ($post['gallery'] as $item) {
+      $item = trim((string)$item);
+      if ($item !== '') {
+        $gallery[] = $item;
+      }
+    }
+  } elseif (!empty($post['gallery']) && is_string($post['gallery'])) {
+    $lines = preg_split('~[\r\n]+~', $post['gallery']) ?: [];
+    foreach ($lines as $line) {
+      $line = trim((string)$line);
+      if ($line !== '') {
+        $gallery[] = $line;
+      }
+    }
+  }
+  $published = $post['published_at'] ?? '';
+  $published = site_normalize_blog_date($published) ?? trim((string)$published);
+  return [
+    'title' => trim((string)($post['title'] ?? '')),
+    'description' => trim((string)($post['description'] ?? '')),
+    'slug' => trim((string)($post['slug'] ?? '')),
+    'image' => trim((string)($post['image'] ?? ($post['hero_image'] ?? ''))),
+    'content' => trim((string)($post['content'] ?? ($post['body'] ?? ''))),
+    'published_at' => $published,
+    'gallery' => $gallery,
+  ];
+}, $blogPosts);
 
 while (count($faqItems) < 4) {
   $faqItems[] = ['question' => '', 'answer' => ''];
@@ -514,7 +567,15 @@ while (count($leadFormBullets) < 3) {
   $leadFormBullets[] = '';
 }
 while (count($blogPosts) < 3) {
-  $blogPosts[] = ['title' => '', 'description' => '', 'url' => ''];
+  $blogPosts[] = [
+    'title' => '',
+    'description' => '',
+    'slug' => '',
+    'image' => '',
+    'content' => '',
+    'published_at' => '',
+    'gallery' => [],
+  ];
 }
 
 $paytrEnabledSetting = (int)($content['paytr_enabled'] ?? '0') === 1;
@@ -952,7 +1013,7 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
             <div>
               <h6 class="fw-semibold mb-1">Blog Yazıları</h6>
-              <p class="text-muted small mb-0">Her kart için başlık, açıklama ve yönlendirme bağlantısı ekleyin. Boş satırlar yayınlanmaz.</p>
+              <p class="text-muted small mb-0">Başlık, kısa açıklama, slug, görsel ve içerik girerek blog detay sayfasını oluşturun. Boş bırakılan satırlar yayınlanmaz.</p>
             </div>
             <button type="button" class="btn btn-sm btn-outline-secondary btn-add-row" data-target="blog">+ Blog Kartı Ekle</button>
           </div>
@@ -960,21 +1021,47 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
             <?php foreach ($blogPosts as $post):
               $postTitle = trim((string)($post['title'] ?? ''));
               $postDescription = trim((string)($post['description'] ?? ''));
-              $postUrl = trim((string)($post['url'] ?? ''));
+              $postSlug = trim((string)($post['slug'] ?? ''));
+              $postImage = trim((string)($post['image'] ?? ''));
+              $postPublished = trim((string)($post['published_at'] ?? ''));
+              $postContent = trim((string)($post['content'] ?? ''));
+              $postGallery = '';
+              if (!empty($post['gallery']) && is_array($post['gallery'])) {
+                $postGallery = implode("\n", array_map('trim', $post['gallery']));
+              }
             ?>
               <div class="repeater-item">
                 <div class="row g-3">
-                  <div class="col-md-4">
+                  <div class="col-md-6">
                     <label class="form-label">Başlık</label>
                     <input type="text" class="form-control" name="blog_title[]" value="<?=h($postTitle)?>" placeholder="Blog başlığı">
                   </div>
-                  <div class="col-md-5">
-                    <label class="form-label">Kısa Açıklama</label>
-                    <textarea class="form-control" name="blog_description[]" rows="2" placeholder="Özet veya spot metni"><?=h($postDescription)?></textarea>
+                  <div class="col-md-3">
+                    <label class="form-label">Slug</label>
+                    <input type="text" class="form-control" name="blog_slug[]" value="<?=h($postSlug)?>" placeholder="ornek-yazi">
+                    <div class="form-text">Boş bırakılırsa başlıktan otomatik oluşturulur.</div>
                   </div>
                   <div class="col-md-3">
-                    <label class="form-label">Bağlantı</label>
-                    <input type="text" class="form-control" name="blog_url[]" value="<?=h($postUrl)?>" placeholder="https://...">
+                    <label class="form-label">Yayın Tarihi</label>
+                    <input type="date" class="form-control" name="blog_published_at[]" value="<?=h($postPublished)?>">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Kısa Açıklama</label>
+                    <textarea class="form-control" name="blog_description[]" rows="3" placeholder="Özet veya spot metni"><?=h($postDescription)?></textarea>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Kapak Görseli</label>
+                    <input type="text" class="form-control" name="blog_image[]" value="<?=h($postImage)?>" placeholder="https://...">
+                    <div class="form-text">Görsel URL'si. Yüklemek için medya yönetimi veya harici bağlantı kullanın.</div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">İçerik</label>
+                    <textarea class="form-control" name="blog_content[]" rows="5" placeholder="Makale metni"><?=h($postContent)?></textarea>
+                    <div class="form-text">Paragraflar arasında boş satır bırakarak yeni paragraf oluşturabilirsiniz.</div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Galeri Görselleri</label>
+                    <textarea class="form-control" name="blog_gallery[]" rows="3" placeholder="Her satıra bir görsel URL'si yazın."><?=h($postGallery)?></textarea>
                   </div>
                 </div>
               </div>
@@ -1704,17 +1791,36 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
     wrapper.className = 'repeater-item';
     wrapper.innerHTML = `
       <div class="row g-3">
-        <div class="col-md-4">
+        <div class="col-md-6">
           <label class="form-label">Başlık</label>
           <input type="text" class="form-control" name="blog_title[]" placeholder="Blog başlığı">
         </div>
-        <div class="col-md-5">
-          <label class="form-label">Kısa Açıklama</label>
-          <textarea class="form-control" name="blog_description[]" rows="2" placeholder="Özet veya spot metni"></textarea>
+        <div class="col-md-3">
+          <label class="form-label">Slug</label>
+          <input type="text" class="form-control" name="blog_slug[]" placeholder="ornek-yazi">
+          <div class="form-text">Boş bırakılırsa başlıktan otomatik oluşturulur.</div>
         </div>
         <div class="col-md-3">
-          <label class="form-label">Bağlantı</label>
-          <input type="text" class="form-control" name="blog_url[]" placeholder="https://...">
+          <label class="form-label">Yayın Tarihi</label>
+          <input type="date" class="form-control" name="blog_published_at[]">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Kısa Açıklama</label>
+          <textarea class="form-control" name="blog_description[]" rows="3" placeholder="Özet veya spot metni"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Kapak Görseli</label>
+          <input type="text" class="form-control" name="blog_image[]" placeholder="https://...">
+          <div class="form-text">Görsel URL'si. Yüklemek için medya yönetimi veya harici bağlantı kullanın.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">İçerik</label>
+          <textarea class="form-control" name="blog_content[]" rows="5" placeholder="Makale metni"></textarea>
+          <div class="form-text">Paragraflar arasında boş satır bırakarak yeni paragraf oluşturabilirsiniz.</div>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Galeri Görselleri</label>
+          <textarea class="form-control" name="blog_gallery[]" rows="3" placeholder="Her satıra bir görsel URL'si yazın."></textarea>
         </div>
       </div>`;
     return wrapper;

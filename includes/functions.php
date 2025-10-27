@@ -258,6 +258,19 @@ function slugify($s){
   $s = trim($s,'-');
   return $s !== '' ? $s : bin2hex(random_bytes(4));
 }
+
+function slugify_allow_empty($s){
+  $s = (string)$s;
+  $s = trim($s);
+  if ($s === '') {
+    return '';
+  }
+  $s = mb_strtolower($s, 'UTF-8');
+  $s = strtr($s, ['ş'=>'s','ı'=>'i','ç'=>'c','ö'=>'o','ü'=>'u','ğ'=>'g']);
+  $s = preg_replace('~[^a-z0-9]+~u', '-', $s);
+  $s = trim($s, '-');
+  return $s;
+}
 /* -------------------- Flash mesajları -------------------- */
 function flash($key, $msg=null){
   if ($msg===null){

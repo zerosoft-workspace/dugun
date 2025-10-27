@@ -188,19 +188,36 @@ function site_content_defaults(): array {
     'blog_section_text' => 'Etkinliklerinizi daha verimli yönetmeniz için ipuçları, başarı hikayeleri ve dijital trendleri sizinle paylaşıyoruz.',
     'blog_posts' => [
       [
+        'slug' => 'etkinliklerde-qr-kod',
         'title' => 'Etkinliklerde QR Kod Kullanmanın 5 Stratejisi',
-        'description' => 'Misafir deneyimini artırmak için QR kodları nasıl kurgulayabileceğinizi adım adım anlattık.',
-        'url' => 'https://bikare.com.tr/blog/etkinliklerde-qr-kod',
+        'description' => 'Misafir deneyimini artırmak için QR kodlarını nasıl kurgulayabileceğinizi adım adım anlattık.',
+        'image' => 'https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=compress&cs=tinysrgb&fit=crop&w=1200&q=80',
+        'content' => "BİKARE ile QR kodları etkinlik deneyiminin merkezine taşıyabilirsiniz. Misafirlerinizi saniyeler içinde dijital alanlara yönlendirerek kayıt, yükleme ve etkileşim süreçlerini kolaylaştırın.\n\nQR kod senaryolarını planlarken yerleşim, içerik ve yönlendirme mesajlarını stratejik şekilde kurgulamak kritik öneme sahiptir. Bu rehberde etkinlik girişlerinden canlı anketlere kadar her adımı adım adım paylaşıyoruz.",
+        'published_at' => date('Y-m-d', strtotime('-21 days')),
+        'gallery' => [
+          'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=compress&cs=tinysrgb&fit=crop&w=1000&q=80',
+          'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=1000&q=80',
+        ],
       ],
       [
+        'slug' => 'bayi-aginda-basari-formulleri',
         'title' => 'Bayi Ağımızla Satışları Nasıl Artırıyoruz?',
         'description' => 'Bayi paneli özelliklerimizi ve kazandıran satış otomasyonlarımızı keşfedin.',
-        'url' => 'https://bikare.com.tr/blog/bayi-agi',
+        'image' => 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=1200&q=80',
+        'content' => "Bayi paneli ile stok, bakiye ve kampanya yönetimini tek bir yerden takip edebilirsiniz. Otomatik bildirimler ve PayTR entegrasyonu sayesinde satış süreçleri hızlanır, müşteri memnuniyeti artar.\n\nMakalenin devamında temsilci görev atamalarından hızlı teklif oluşturma akışlarına kadar farklı başarı hikayelerini paylaşıyoruz.",
+        'published_at' => date('Y-m-d', strtotime('-14 days')),
+        'gallery' => [
+          'https://images.unsplash.com/photo-1483478550801-ceba5fe50e8e?auto=compress&cs=tinysrgb&fit=crop&w=1000&q=80',
+        ],
       ],
       [
+        'slug' => 'dijital-deneyim-trendleri',
         'title' => 'Dijital Misafir Deneyiminde 2024 Trendleri',
         'description' => 'Yeni nesil davetlerde öne çıkan dijitalleşme başlıklarını derledik.',
-        'url' => 'https://bikare.com.tr/blog/dijital-deneyim-trendleri',
+        'image' => 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=1200&q=80',
+        'content' => "Etkileşimli oyunlar, canlı yayın stüdyoları ve gerçek zamanlı fotoğraf galerileri 2024 etkinliklerinin vazgeçilmezleri arasında. Bu trendlerin her biri için BİKARE altyapısının sunduğu araçları anlatıyoruz.\n\nMisafirleriniz için unutulmaz deneyimler tasarlarken hangi analitik verileri takip etmeniz gerektiğini ve sürdürülebilir içerik akışlarını nasıl kuracağınızı öğrenin.",
+        'published_at' => date('Y-m-d', strtotime('-7 days')),
+        'gallery' => [],
       ],
     ],
     'paytr_enabled' => (
@@ -428,26 +445,88 @@ function site_public_content(): array {
   if (!isset($content['blog_posts']) || !is_array($content['blog_posts'])) {
     $content['blog_posts'] = $defaults['blog_posts'];
   }
-  $content['blog_posts'] = array_values(array_filter(array_map(function ($item) {
+  $seenSlugs = [];
+  $content['blog_posts'] = array_values(array_filter(array_map(function ($item) use (&$seenSlugs, $defaults) {
     if (!is_array($item)) {
       return null;
     }
     $title = trim((string)($item['title'] ?? ''));
+    if ($title === '') {
+      return null;
+    }
     $description = trim((string)($item['description'] ?? ''));
-    $url = trim((string)($item['url'] ?? ''));
-    if ($title === '' || $url === '') {
+    $slug = slugify_allow_empty($item['slug'] ?? '');
+    if ($slug === '') {
+      $legacyUrl = trim((string)($item['url'] ?? ''));
+      if ($legacyUrl !== '') {
+        $path = parse_url($legacyUrl, PHP_URL_PATH) ?: '';
+        if ($path !== '') {
+          $slug = slugify_allow_empty(basename($path));
+        }
+      }
+    }
+    if ($slug === '') {
+      $slug = slugify_allow_empty($title);
+    }
+    if ($slug === '') {
       return null;
     }
-    if (!preg_match('~^https?://|^/|^#|^mailto:|^tel:~i', $url)) {
-      $url = site_resolve_button_url($url) ?? '';
+    $baseSlug = $slug;
+    $i = 2;
+    while (in_array($slug, $seenSlugs, true)) {
+      $slug = $baseSlug.'-'.$i++;
     }
-    if ($url === '') {
-      return null;
+    $seenSlugs[] = $slug;
+
+    $image = trim((string)($item['image'] ?? $item['hero_image'] ?? ''));
+    if ($image !== '' && !site_content_asset_exists($image)) {
+      $image = '';
     }
+    if ($image === '') {
+      foreach ($defaults['blog_posts'] as $defaultPost) {
+        if (!empty($defaultPost['image']) && site_content_asset_exists($defaultPost['image'])) {
+          $image = $defaultPost['image'];
+          break;
+        }
+      }
+    }
+
+    $body = trim((string)($item['content'] ?? $item['body'] ?? ''));
+    $body = site_normalize_blog_content($body);
+
+    $publishedAt = site_normalize_blog_date($item['published_at'] ?? null);
+
+    $gallery = [];
+    $rawGallery = $item['gallery'] ?? [];
+    if (is_string($rawGallery)) {
+      $rawGallery = preg_split('~[\r\n]+~', $rawGallery) ?: [];
+    }
+    if (!is_array($rawGallery)) {
+      $rawGallery = [];
+    }
+    foreach ($rawGallery as $src) {
+      $src = trim((string)$src);
+      if ($src === '') {
+        continue;
+      }
+      if (!site_content_asset_exists($src)) {
+        continue;
+      }
+      if (!in_array($src, $gallery, true)) {
+        $gallery[] = $src;
+      }
+    }
+
     return [
+      'slug' => $slug,
       'title' => $title,
       'description' => $description,
-      'url' => $url,
+      'image' => $image,
+      'content' => $body,
+      'published_at' => $publishedAt,
+      'url' => site_blog_url($slug),
+      'pretty_url' => site_blog_pretty_url($slug),
+      'gallery' => $gallery,
     ];
   }, $content['blog_posts'])));
   if (!$content['blog_posts']) {
@@ -455,6 +534,86 @@ function site_public_content(): array {
   }
 
   return $content;
+}
+
+function site_normalize_blog_content(string $content): string {
+  if ($content === '') {
+    return '';
+  }
+  $content = preg_replace("~\r\n?~", "\n", $content);
+  $content = preg_replace("~\n{3,}~", "\n\n", $content);
+  return trim($content);
+}
+
+function site_normalize_blog_date($date): ?string {
+  if ($date instanceof DateTimeInterface) {
+    return $date->format('Y-m-d');
+  }
+  if (is_int($date)) {
+    return date('Y-m-d', $date);
+  }
+  if (is_numeric($date) && $date !== '') {
+    return date('Y-m-d', (int)$date);
+  }
+  if (is_string($date)) {
+    $date = trim($date);
+    if ($date === '') {
+      return null;
+    }
+    $normalized = site_normalize_event_date($date);
+    if ($normalized) {
+      return $normalized;
+    }
+    $ts = strtotime($date);
+    if ($ts !== false) {
+      return date('Y-m-d', $ts);
+    }
+  }
+  return null;
+}
+
+function site_blog_url(string $slug): string {
+  $slug = slugify_allow_empty($slug);
+  $base = defined('BASE_URL') ? rtrim((string)BASE_URL, '/') : '';
+  $prefix = ($base !== '' ? $base : '').'/blog/';
+  if ($slug === '') {
+    return $prefix;
+  }
+  return $prefix.'?slug='.rawurlencode($slug);
+}
+
+function site_blog_pretty_url(string $slug): string {
+  $slug = slugify_allow_empty($slug);
+  if ($slug === '') {
+    return site_blog_url($slug);
+  }
+  $base = defined('BASE_URL') ? rtrim((string)BASE_URL, '/') : '';
+  if ($base === '') {
+    return '/blog/'.$slug;
+  }
+  return $base.'/blog/'.$slug;
+}
+
+function site_blog_posts_all(?array $content = null): array {
+  if ($content === null) {
+    $content = site_public_content();
+  }
+  $posts = $content['blog_posts'] ?? [];
+  return is_array($posts) ? $posts : [];
+}
+
+function site_blog_post_by_slug(string $slug, ?array $content = null): ?array {
+  $slug = slugify_allow_empty($slug);
+  if ($slug === '') {
+    return null;
+  }
+  $posts = site_blog_posts_all($content);
+  foreach ($posts as $post) {
+    if (($post['slug'] ?? '') === $slug) {
+      return $post;
+    }
+  }
+  return null;
 }
 
 function site_generate_sitemap(): array {
@@ -515,6 +674,10 @@ function site_generate_sitemap(): array {
   $addEntry($baseUrl.'/public/partners.php', 'weekly', '0.8');
 
   $content = site_public_content();
+  $blogIndexUrl = $ensureLocal(site_blog_url(''));
+  if ($blogIndexUrl) {
+    $addEntry($blogIndexUrl, 'weekly', '0.6');
+  }
   $contentUrls = [];
   $simpleFields = [
     'hero_primary_url',
@@ -541,12 +704,21 @@ function site_generate_sitemap(): array {
 
   if (!empty($content['blog_posts']) && is_array($content['blog_posts'])) {
     foreach ($content['blog_posts'] as $post) {
-      if (is_array($post) && !empty($post['url'])) {
-        $resolved = $ensureLocal($post['url']);
-        if ($resolved) {
-          $addEntry($resolved, 'weekly', '0.6');
+      if (!is_array($post) || empty($post['url'])) {
+        continue;
+      }
+      $resolved = $ensureLocal($post['url']);
+      if (!$resolved) {
+        continue;
+      }
+      $lastmod = null;
+      if (!empty($post['published_at'])) {
+        $ts = strtotime((string)$post['published_at']);
+        if ($ts) {
+          $lastmod = date('c', $ts);
         }
       }
+      $addEntry($resolved, 'monthly', '0.65', $lastmod);
     }
   }
 
