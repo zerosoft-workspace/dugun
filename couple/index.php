@@ -15,6 +15,24 @@ if (!$ev) {
 $GUEST_FONTS = guest_font_options();
 $currentBackgroundPath = trim((string)($ev['guest_background_path'] ?? ''));
 
+$layoutDecoded = json_decode($ev['layout_json'] ?? '', true);
+$layoutArr = normalize_event_layout($layoutDecoded);
+$layoutJson = json_encode($layoutArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$tPos = $layoutArr['title'];
+$sPos = $layoutArr['subtitle'];
+$pPos = $layoutArr['prompt'];
+
+$existingStickerMap = [];
+$stickersDecoded = json_decode($ev['stickers_json'] ?? '[]', true);
+$stickersArr = normalize_event_stickers($stickersDecoded, $EVENT_ID, $existingStickerMap);
+$stickersJson = json_encode($stickersArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$existingImagePaths = [];
+foreach ($stickersArr as $entry) {
+  if (($entry['type'] ?? '') === 'image' && !empty($entry['path'])) {
+    $existingImagePaths[] = $entry['path'];
+  }
+}
+
 // Lisans kur / kontrol et
 license_ensure_active($EVENT_ID);
 $license_active = license_is_active($EVENT_ID);
@@ -65,19 +83,46 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='save_settings')
 
   $stickersPayload = json_decode((string)$stickers, true);
   $stickerAssetUrls = [];
+  $pendingStickerPlacement = null;
+  if (is_array($stickersPayload)) {
+    foreach ($stickersPayload as $payloadEntry) {
+      if (!is_array($payloadEntry)) {
+        continue;
+      }
+      $isPending = !empty($payloadEntry['pending']) || ($payloadEntry['path'] ?? '') === '__pending__';
+      if ($isPending && strtolower((string)($payloadEntry['type'] ?? '')) === 'image') {
+        $px = isset($payloadEntry['x']) ? (int)$payloadEntry['x'] : 40;
+        $py = isset($payloadEntry['y']) ? (int)$payloadEntry['y'] : 300;
+        $pw = isset($payloadEntry['width']) ? (int)$payloadEntry['width'] : (isset($payloadEntry['size']) ? (int)$payloadEntry['size'] : 260);
+        $pendingStickerPlacement = [
+          'x' => max(0, min(940, $px)),
+          'y' => max(0, min(520, $py)),
+          'width' => max(80, min(560, $pw)),
+        ];
+        break;
+      }
+    }
+  }
   $stickersNormalized = normalize_event_stickers($stickersPayload ?: [], $EVENT_ID, $stickerAssetUrls);
 
   $newOverlayPath = null;
   if (!empty($_FILES['sticker_image']) && is_array($_FILES['sticker_image'])) {
     $newOverlayPath = event_guest_overlay_store($EVENT_ID, $_FILES['sticker_image']);
     if ($newOverlayPath) {
+      $newStickerX = $pendingStickerPlacement['x'] ?? 40;
+      $newStickerY = $pendingStickerPlacement['y'] ?? 300;
+      $newStickerW = $pendingStickerPlacement['width'] ?? 260;
       $stickersNormalized[] = [
         'type'  => 'image',
         'path'  => $newOverlayPath,
-        'x'     => 40,
-        'y'     => 300,
-        'width' => 260,
+        'x'     => $newStickerX,
+        'y'     => $newStickerY,
+        'width' => $newStickerW,
       ];
+      $newOverlayUrl = event_guest_overlay_url($newOverlayPath);
+      if ($newOverlayUrl) {
+        $stickerAssetUrls[$newOverlayPath] = $newOverlayUrl;
+      }
     }
   }
   $stickersNormalized = array_values($stickersNormalized);
@@ -213,25 +258,6 @@ $SUBTITLE = $ev['guest_subtitle'] ?: 'En güzel anlarınızı bizimle paylaşın
 $PROMPT   = $ev['guest_prompt'] ?: 'Adınızı yazıp anınızı yükleyin.';
 $PRIMARY  = $ev['theme_primary'] ?: '#0ea5b5';
 $ACCENT   = $ev['theme_accent']  ?: '#e0f7fb';
-
-// Layout & stickers (normalize with helpers)
-$layoutDecoded = json_decode($ev['layout_json'] ?? '', true);
-$layoutArr = normalize_event_layout($layoutDecoded);
-$layoutJson = json_encode($layoutArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-$tPos = $layoutArr['title'];
-$sPos = $layoutArr['subtitle'];
-$pPos = $layoutArr['prompt'];
-
-$existingStickerMap = [];
-$stickersDecoded = json_decode($ev['stickers_json'] ?? '[]', true);
-$stickersArr = normalize_event_stickers($stickersDecoded, $EVENT_ID, $existingStickerMap);
-$stickersJson = json_encode($stickersArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-$existingImagePaths = [];
-foreach ($stickersArr as $entry) {
-  if (($entry['type'] ?? '') === 'image' && !empty($entry['path'])) {
-    $existingImagePaths[] = $entry['path'];
-  }
-}
 
 $TITLE_FONT_KEY = trim((string)($ev['guest_title_font'] ?? ''));
 if ($TITLE_FONT_KEY === '' || !isset($GUEST_FONTS[$TITLE_FONT_KEY])) { $TITLE_FONT_KEY = 'inter'; }
@@ -489,6 +515,9 @@ a:hover{ text-decoration:none; }
 #pv-prompt{ position:absolute; color:#0f172a; font-size:16px; font-weight:500; letter-spacing:.01em; background:rgba(255,255,255,.85); padding:.75rem 1rem; border-radius:14px; box-shadow:0 14px 28px -20px rgba(15,23,42,.45); font-family:var(--guest-prompt-font); }
 .sticker{ position:absolute; user-select:none; cursor:move; filter:drop-shadow(0 8px 18px rgba(15,23,42,.25)); transition:transform .18s ease; touch-action:none; }
 .sticker.is-active{ outline:2px dashed var(--brand); outline-offset:6px; }
+.sticker-pending{ outline:2px dashed var(--brand); outline-offset:8px; background:rgba(14,165,181,.1); border-radius:18px; }
+.sticker-pending img{ box-shadow:0 28px 60px -42px rgba(15,23,42,.35); }
+.sticker-placeholder{ display:grid; place-items:center; font-weight:600; font-size:.8rem; color:rgba(15,23,42,.65); min-width:140px; min-height:120px; border-radius:18px; background:rgba(255,255,255,.82); border:1px dashed rgba(148,163,184,.55); }
 .sticker-img img{ display:block; max-width:520px; border-radius:18px; pointer-events:none; user-select:none; box-shadow:0 24px 50px -36px rgba(15,23,42,.4); }
 .sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
 .sticker-actions .btn{ border-radius:12px; padding:.45rem .85rem; font-weight:600; }
@@ -1055,7 +1084,7 @@ a:hover{ text-decoration:none; }
               <input type="file" name="sticker_image" accept="image/*" class="d-none" form="settingsForm">
             </label>
           </div>
-          <p class="form-text mb-0">PNG, JPG, WEBP, GIF veya SVG yükleyebilirsiniz. Kaydettikten sonra misafir sayfasına yansır.</p>
+          <p class="form-text mb-0">PNG, JPG, WEBP, GIF veya SVG yükleyebilirsiniz. Dosyayı seçtiğinizde sahneye eklenir; konumunu ayarlayıp kaydetmeyi unutmayın.</p>
         </div>
         <div class="preview-control">
           <div class="preview-control-head">
@@ -1126,12 +1155,14 @@ const stickerSizeRange = document.getElementById('stickerSizeRange');
 const stickerSizeValue = document.getElementById('stickerSizeValue');
 const deleteStickerBtn = document.getElementById('deleteStickerBtn');
 const stickerAssetMap = <?=safe_json_encode($existingStickerMap)?>;
+const stickerUploadInput = document.querySelector('input[name="sticker_image"]');
 let stickerState = <?=(string)$stickersJson?>;
 try { stickerState = Array.isArray(stickerState) ? stickerState : JSON.parse(stickerState || '[]'); }
 catch(e){ stickerState = []; }
 let activeStickerIndex = null;
 const previewModal = document.getElementById('previewModal');
 const openPreviewBtn = document.getElementById('openPreviewBtn');
+let pendingStickerUrl = null;
 
 function openPreviewModal(){
   if (!previewModal) return;
@@ -1440,7 +1471,23 @@ function saveHidden(){
     layoutField.value = JSON.stringify(layout);
   }
   if (stickersField) {
-    stickersField.value = JSON.stringify(stickerState);
+    const serialized = stickerState.map((st)=>{
+      if (!st || typeof st !== 'object') return st;
+      const clone = Object.assign({}, st);
+      if (clone.previewUrl) delete clone.previewUrl;
+      return clone;
+    });
+    stickersField.value = JSON.stringify(serialized);
+  }
+}
+
+function clearPendingUpload(){
+  if (stickerUploadInput) {
+    stickerUploadInput.value = '';
+  }
+  if (pendingStickerUrl) {
+    URL.revokeObjectURL(pendingStickerUrl);
+    pendingStickerUrl = null;
   }
 }
 
@@ -1483,7 +1530,21 @@ function createStickerNode(st, idx){
     const width = st && st.width ? st.width : 220;
     node.dataset.path = path;
     node.dataset.width = width;
-    const src = stickerAssetMap && path ? (stickerAssetMap[path] || '') : '';
+    const isPending = !!(st && (st.pending || path === '__pending__'));
+    node.dataset.pending = isPending ? '1' : '0';
+    if (isPending) {
+      node.classList.add('sticker-pending');
+    }
+    let src = '';
+    if (isPending && st && st.previewUrl) {
+      src = st.previewUrl;
+    } else if (stickerAssetMap && path) {
+      src = stickerAssetMap[path] || '';
+    }
+    if (!src && st && st.previewDataUrl) {
+      src = st.previewDataUrl;
+    }
+    node.style.width = width + 'px';
     if (src) {
       const img = document.createElement('img');
       img.src = src;
@@ -1491,6 +1552,9 @@ function createStickerNode(st, idx){
       img.draggable = false;
       img.style.width = width + 'px';
       node.appendChild(img);
+    } else {
+      node.classList.add('sticker-placeholder');
+      node.textContent = 'Görsel yükleniyor';
     }
   } else {
     const txt = st && st.txt ? st.txt : '💍';
@@ -1608,8 +1672,13 @@ if (stickerSizeRange) {
     const value = parseInt(stickerSizeRange.value, 10) || 0;
     if (st.type === 'image') {
       st.width = value;
-      const node = canvas && canvas.querySelector(`.sticker[data-index="${activeStickerIndex}"] img`);
-      if (node) node.style.width = value + 'px';
+      const wrapper = canvas && canvas.querySelector(`.sticker[data-index="${activeStickerIndex}"]`);
+      if (wrapper) {
+        wrapper.dataset.width = value;
+        wrapper.style.width = value + 'px';
+        const img = wrapper.querySelector('img');
+        if (img) img.style.width = value + 'px';
+      }
       stickerSizeValue.textContent = `Genişlik: ${value}px`;
     } else {
       st.size = value;
@@ -1624,10 +1693,14 @@ if (stickerSizeRange) {
 if (deleteStickerBtn) {
   deleteStickerBtn.addEventListener('click', ()=>{
     if (activeStickerIndex === null) return;
-    stickerState.splice(activeStickerIndex, 1);
+    const removed = stickerState.splice(activeStickerIndex, 1);
     activeStickerIndex = null;
     renderStickers();
     saveHidden();
+    const removedEntry = removed && removed[0];
+    if (removedEntry && removedEntry.pending) {
+      clearPendingUpload();
+    }
   });
 }
 
@@ -1646,8 +1719,48 @@ const clearBtn = document.getElementById('clearStickers');
 if (clearBtn) {
   clearBtn.addEventListener('click',(e)=>{
     e.preventDefault();
+    const hadPending = stickerState.some((st)=>st && st.pending);
     stickerState = [];
     activeStickerIndex = null;
+    renderStickers();
+    saveHidden();
+    if (hadPending) {
+      clearPendingUpload();
+    }
+  });
+}
+
+if (stickerUploadInput) {
+  stickerUploadInput.addEventListener('change', ()=>{
+    const file = stickerUploadInput.files && stickerUploadInput.files[0];
+    if (!file) {
+      return;
+    }
+    let previousPending = null;
+    stickerState = stickerState.filter((st)=>{
+      if (st && st.pending) {
+        previousPending = st;
+        return false;
+      }
+      return true;
+    });
+    if (pendingStickerUrl) {
+      URL.revokeObjectURL(pendingStickerUrl);
+      pendingStickerUrl = null;
+    }
+    const blobUrl = URL.createObjectURL(file);
+    pendingStickerUrl = blobUrl;
+    const pendingSticker = {
+      type: 'image',
+      path: '__pending__',
+      pending: true,
+      previewUrl: blobUrl,
+      width: previousPending && typeof previousPending.width === 'number' ? previousPending.width : 260,
+      x: previousPending && typeof previousPending.x === 'number' ? previousPending.x : 40,
+      y: previousPending && typeof previousPending.y === 'number' ? previousPending.y : 300,
+    };
+    stickerState.push(pendingSticker);
+    activeStickerIndex = stickerState.length - 1;
     renderStickers();
     saveHidden();
   });
