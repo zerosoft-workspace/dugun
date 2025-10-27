@@ -23,6 +23,29 @@ function table_supports_force_password_reset(string $table): bool {
     return $cache[$table] = false;
   }
 }
+function events_support_guest_fonts(): bool {
+  static $cache = null;
+  if ($cache !== null) {
+    return $cache;
+  }
+  if (!function_exists('column_exists')) {
+    return $cache = false;
+  }
+  try {
+    if (!column_exists('events', 'guest_title_font')) {
+      return $cache = false;
+    }
+    if (!column_exists('events', 'guest_subtitle_font')) {
+      return $cache = false;
+    }
+    if (!column_exists('events', 'guest_prompt_font')) {
+      return $cache = false;
+    }
+    return $cache = true;
+  } catch (Throwable $e) {
+    return $cache = false;
+  }
+}
 function format_currency(int $cents, string $suffix = ' TL'): string {
   $value = $cents / 100;
   return number_format($value, 2, ',', '.').$suffix;

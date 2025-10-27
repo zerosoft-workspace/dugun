@@ -13,6 +13,7 @@ if (!$ev) {
 }
 
 $GUEST_FONTS = guest_font_options();
+$supportsGuestFonts = events_support_guest_fonts();
 $currentBackgroundPath = trim((string)($ev['guest_background_path'] ?? ''));
 
 $layoutDecoded = json_decode($ev['layout_json'] ?? '', true);
@@ -25,9 +26,15 @@ $pPos = $layoutArr['prompt'];
 $existingStickerMap = [];
 $stickersDecoded = json_decode($ev['stickers_json'] ?? '[]', true);
 $stickersArr = normalize_event_stickers($stickersDecoded, $EVENT_ID, $existingStickerMap);
+if (!is_array($stickersArr)) {
+  $stickersArr = [];
+}
 $stickersJson = json_encode($stickersArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 $existingImagePaths = [];
 foreach ($stickersArr as $entry) {
+  if (!is_array($entry)) {
+    continue;
+  }
   if (($entry['type'] ?? '') === 'image' && !empty($entry['path'])) {
     $existingImagePaths[] = $entry['path'];
   }
@@ -71,6 +78,11 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='save_settings')
   $titleFont = isset($GUEST_FONTS[$titleFont]) ? $titleFont : 'inter';
   $subFont   = isset($GUEST_FONTS[$subFont])   ? $subFont   : $titleFont;
   $promptFont= isset($GUEST_FONTS[$promptFont])? $promptFont: $subFont;
+  if (!$supportsGuestFonts) {
+    $titleFont = 'inter';
+    $subFont   = $titleFont;
+    $promptFont= $subFont;
+  }
   $view      = isset($_POST['allow_guest_view']) ? 1 : 0;
   $download  = isset($_POST['allow_guest_download']) ? 1 : 0;
   $delete    = isset($_POST['allow_guest_delete']) ? 1 : 0;
@@ -158,22 +170,61 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='save_settings')
   $inv_vkn   = trim($_POST['invoice_vkn'] ?? '');
   $inv_addr  = trim($_POST['invoice_address'] ?? '');
 
-  pdo()->prepare("UPDATE events SET
-    guest_title=?, guest_subtitle=?, guest_prompt=?,
-    guest_title_font=?, guest_subtitle_font=?, guest_prompt_font=?,
-    theme_primary=?, theme_accent=?,
-    allow_guest_view=?, allow_guest_download=?, allow_guest_delete=?,
-    layout_json=?, guest_background_path=?, stickers_json=?,
-    contact_email=?, couple_phone=?, couple_tckn=?, invoice_title=?, invoice_vkn=?, invoice_address=?,
-    updated_at=?
-  WHERE id=?")->execute([
-    $title?:null,$subtitle?:null,$prompt?:null,
-    $titleFont?:null,$subFont?:null,$promptFont?:null,
-    $primary,$accent,$view,$download,$delete,
-    $layout?:null,$backgroundPath?:null,$stickers?:null,
-    $contact?:null,$phone?:null,$tckn?:null,$inv_title?:null,$inv_vkn?:null,$inv_addr?:null,
-    now(), $EVENT_ID
+  $updateParts = [
+    'guest_title=?',
+    'guest_subtitle=?',
+    'guest_prompt=?',
+  ];
+  $updateValues = [
+    $title ?: null,
+    $subtitle ?: null,
+    $prompt ?: null,
+  ];
+  if ($supportsGuestFonts) {
+    $updateParts[] = 'guest_title_font=?';
+    $updateParts[] = 'guest_subtitle_font=?';
+    $updateParts[] = 'guest_prompt_font=?';
+    $updateValues[] = $titleFont ?: null;
+    $updateValues[] = $subFont ?: null;
+    $updateValues[] = $promptFont ?: null;
+  }
+  $updateParts = array_merge($updateParts, [
+    'theme_primary=?',
+    'theme_accent=?',
+    'allow_guest_view=?',
+    'allow_guest_download=?',
+    'allow_guest_delete=?',
+    'layout_json=?',
+    'guest_background_path=?',
+    'stickers_json=?',
+    'contact_email=?',
+    'couple_phone=?',
+    'couple_tckn=?',
+    'invoice_title=?',
+    'invoice_vkn=?',
+    'invoice_address=?',
+    'updated_at=?',
   ]);
+  $updateValues = array_merge($updateValues, [
+    $primary,
+    $accent,
+    $view,
+    $download,
+    $delete,
+    $layout ?: null,
+    $backgroundPath ?: null,
+    $stickers ?: null,
+    $contact ?: null,
+    $phone ?: null,
+    $tckn ?: null,
+    $inv_title ?: null,
+    $inv_vkn ?: null,
+    $inv_addr ?: null,
+    now(),
+    $EVENT_ID,
+  ]);
+  $sql = 'UPDATE events SET '.implode(', ', $updateParts).' WHERE id=?';
+  pdo()->prepare($sql)->execute($updateValues);
   flash('ok','Ayarlar kaydedildi.');
   redirect($_SERVER['REQUEST_URI']);
 }
