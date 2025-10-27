@@ -46,6 +46,20 @@ function events_support_guest_fonts(): bool {
     return $cache = false;
   }
 }
+function events_support_guest_backgrounds(): bool {
+  static $cache = null;
+  if ($cache !== null) {
+    return $cache;
+  }
+  if (!function_exists('column_exists')) {
+    return $cache = false;
+  }
+  try {
+    return $cache = column_exists('events', 'guest_background_path');
+  } catch (Throwable $e) {
+    return $cache = false;
+  }
+}
 function format_currency(int $cents, string $suffix = ' TL'): string {
   $value = $cents / 100;
   return number_format($value, 2, ',', '.').$suffix;

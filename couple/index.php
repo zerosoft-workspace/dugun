@@ -14,7 +14,8 @@ if (!$ev) {
 
 $GUEST_FONTS = guest_font_options();
 $supportsGuestFonts = events_support_guest_fonts();
-$currentBackgroundPath = trim((string)($ev['guest_background_path'] ?? ''));
+$supportsGuestBackground = events_support_guest_backgrounds();
+$currentBackgroundPath = $supportsGuestBackground ? trim((string)($ev['guest_background_path'] ?? '')) : '';
 
 $layoutDecoded = json_decode($ev['layout_json'] ?? '', true);
 $layoutArr = normalize_event_layout($layoutDecoded);
@@ -152,14 +153,16 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='save_settings')
     }
   }
 
-  $removeBg  = ($_POST['remove_guest_background'] ?? '') === '1';
-  $backgroundPath = $currentBackgroundPath;
-  if ($removeBg && $backgroundPath !== '') {
-    event_guest_background_delete($backgroundPath);
-    $backgroundPath = '';
-  }
-  if (!empty($_FILES['guest_background']) && is_array($_FILES['guest_background'])) {
-    $backgroundPath = event_guest_background_store($EVENT_ID, $_FILES['guest_background'], $backgroundPath ?: null) ?: $backgroundPath;
+  $backgroundPath = $supportsGuestBackground ? $currentBackgroundPath : '';
+  if ($supportsGuestBackground) {
+    $removeBg  = ($_POST['remove_guest_background'] ?? '') === '1';
+    if ($removeBg && $backgroundPath !== '') {
+      event_guest_background_delete($backgroundPath);
+      $backgroundPath = '';
+    }
+    if (!empty($_FILES['guest_background']) && is_array($_FILES['guest_background'])) {
+      $backgroundPath = event_guest_background_store($EVENT_ID, $_FILES['guest_background'], $backgroundPath ?: null) ?: $backgroundPath;
+    }
   }
 
 
@@ -170,59 +173,61 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='save_settings')
   $inv_vkn   = trim($_POST['invoice_vkn'] ?? '');
   $inv_addr  = trim($_POST['invoice_address'] ?? '');
 
-  $updateParts = [
-    'guest_title=?',
-    'guest_subtitle=?',
-    'guest_prompt=?',
-  ];
-  $updateValues = [
-    $title ?: null,
-    $subtitle ?: null,
-    $prompt ?: null,
-  ];
+  $updateParts = [];
+  $updateValues = [];
+
+  $updateParts[] = 'guest_title=?';
+  $updateValues[] = $title ?: null;
+  $updateParts[] = 'guest_subtitle=?';
+  $updateValues[] = $subtitle ?: null;
+  $updateParts[] = 'guest_prompt=?';
+  $updateValues[] = $prompt ?: null;
+
   if ($supportsGuestFonts) {
     $updateParts[] = 'guest_title_font=?';
-    $updateParts[] = 'guest_subtitle_font=?';
-    $updateParts[] = 'guest_prompt_font=?';
     $updateValues[] = $titleFont ?: null;
+    $updateParts[] = 'guest_subtitle_font=?';
     $updateValues[] = $subFont ?: null;
+    $updateParts[] = 'guest_prompt_font=?';
     $updateValues[] = $promptFont ?: null;
   }
-  $updateParts = array_merge($updateParts, [
-    'theme_primary=?',
-    'theme_accent=?',
-    'allow_guest_view=?',
-    'allow_guest_download=?',
-    'allow_guest_delete=?',
-    'layout_json=?',
-    'guest_background_path=?',
-    'stickers_json=?',
-    'contact_email=?',
-    'couple_phone=?',
-    'couple_tckn=?',
-    'invoice_title=?',
-    'invoice_vkn=?',
-    'invoice_address=?',
-    'updated_at=?',
-  ]);
-  $updateValues = array_merge($updateValues, [
-    $primary,
-    $accent,
-    $view,
-    $download,
-    $delete,
-    $layout ?: null,
-    $backgroundPath ?: null,
-    $stickers ?: null,
-    $contact ?: null,
-    $phone ?: null,
-    $tckn ?: null,
-    $inv_title ?: null,
-    $inv_vkn ?: null,
-    $inv_addr ?: null,
-    now(),
-    $EVENT_ID,
-  ]);
+
+  $updateParts[] = 'theme_primary=?';
+  $updateValues[] = $primary;
+  $updateParts[] = 'theme_accent=?';
+  $updateValues[] = $accent;
+  $updateParts[] = 'allow_guest_view=?';
+  $updateValues[] = $view;
+  $updateParts[] = 'allow_guest_download=?';
+  $updateValues[] = $download;
+  $updateParts[] = 'allow_guest_delete=?';
+  $updateValues[] = $delete;
+  $updateParts[] = 'layout_json=?';
+  $updateValues[] = $layout ?: null;
+
+  if ($supportsGuestBackground) {
+    $updateParts[] = 'guest_background_path=?';
+    $updateValues[] = $backgroundPath ?: null;
+  }
+
+  $updateParts[] = 'stickers_json=?';
+  $updateValues[] = $stickers ?: null;
+  $updateParts[] = 'contact_email=?';
+  $updateValues[] = $contact ?: null;
+  $updateParts[] = 'couple_phone=?';
+  $updateValues[] = $phone ?: null;
+  $updateParts[] = 'couple_tckn=?';
+  $updateValues[] = $tckn ?: null;
+  $updateParts[] = 'invoice_title=?';
+  $updateValues[] = $inv_title ?: null;
+  $updateParts[] = 'invoice_vkn=?';
+  $updateValues[] = $inv_vkn ?: null;
+  $updateParts[] = 'invoice_address=?';
+  $updateValues[] = $inv_addr ?: null;
+  $updateParts[] = 'updated_at=?';
+  $updateValues[] = now();
+
+  $updateValues[] = $EVENT_ID;
   $sql = 'UPDATE events SET '.implode(', ', $updateParts).' WHERE id=?';
   pdo()->prepare($sql)->execute($updateValues);
   flash('ok','Ayarlar kaydedildi.');
@@ -323,8 +328,8 @@ $FONT_IMPORTS = guest_font_imports([$TITLE_FONT_KEY, $SUBTITLE_FONT_KEY, $PROMPT
 $TITLE_FONT_STACK_ESC = htmlspecialchars($TITLE_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
 $SUBTITLE_FONT_STACK_ESC = htmlspecialchars($SUBTITLE_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
 $PROMPT_FONT_STACK_ESC = htmlspecialchars($PROMPT_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
-$BACKGROUND_PATH = trim((string)($ev['guest_background_path'] ?? ''));
-if (!event_guest_background_exists($BACKGROUND_PATH)) { $BACKGROUND_PATH = ''; }
+$BACKGROUND_PATH = $supportsGuestBackground ? trim((string)($ev['guest_background_path'] ?? '')) : '';
+if ($BACKGROUND_PATH !== '' && !event_guest_background_exists($BACKGROUND_PATH)) { $BACKGROUND_PATH = ''; }
 $BACKGROUND_URL = $BACKGROUND_PATH !== '' ? event_guest_background_url($BACKGROUND_PATH) : null;
 $canvasStyle = '--zs:'.htmlspecialchars($PRIMARY, ENT_QUOTES, 'UTF-8').'; --zs-soft:'.htmlspecialchars($ACCENT, ENT_QUOTES, 'UTF-8').';';
 if ($BACKGROUND_URL) {
