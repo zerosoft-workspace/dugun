@@ -183,6 +183,7 @@ function site_content_defaults(): array {
     'seo_meta_title' => 'BİKARE — Dijital Etkinlik Platformu ve QR Kod Çözümleri',
     'seo_meta_description' => 'BİKARE; düğün, nişan, kurumsal etkinlik ve tüm özel davetlerinizde QR kodla fotoğraf ve videoları anında toplayan dijital etkinlik platformudur.',
     'seo_meta_keywords' => 'bikare, qr kod, dijital etkinlik, fotoğraf toplama, düğün teknolojileri',
+    'seo_favicon' => '',
     'blog_section_badge' => 'Blog',
     'blog_section_title' => 'BİKARE Blog & Kaynaklar',
     'blog_section_text' => 'Etkinliklerinizi daha verimli yönetmeniz için ipuçları, başarı hikayeleri ve dijital trendleri sizinle paylaşıyoruz.',
@@ -364,6 +365,15 @@ function site_public_content(): array {
     $logo = $defaults['site_logo'];
   }
   $content['site_logo'] = $logo;
+
+  $favicon = trim((string)($content['seo_favicon'] ?? ''));
+  if ($favicon !== '' && !site_content_asset_exists($favicon)) {
+    $favicon = '';
+  }
+  if ($favicon === '' && !empty($defaults['seo_favicon'])) {
+    $favicon = $defaults['seo_favicon'];
+  }
+  $content['seo_favicon'] = $favicon;
 
   $heroMain = trim((string)($content['hero_image_main'] ?? ''));
   if ($heroMain === '' || !site_content_asset_exists($heroMain)) {
@@ -616,6 +626,48 @@ function site_blog_post_by_slug(string $slug, ?array $content = null): ?array {
   return null;
 }
 
+function site_favicon_url(?array $content = null): string {
+  if ($content === null) {
+    $content = site_public_content();
+  }
+
+  $favicon = trim((string)($content['seo_favicon'] ?? ''));
+  return $favicon;
+}
+
+function site_guess_favicon_mime(string $path): ?string {
+  $urlPath = parse_url($path, PHP_URL_PATH);
+  if (!is_string($urlPath)) {
+    $urlPath = $path;
+  }
+  $ext = strtolower(pathinfo($urlPath, PATHINFO_EXTENSION));
+  return match ($ext) {
+    'png' => 'image/png',
+    'svg' => 'image/svg+xml',
+    'ico' => 'image/x-icon',
+    'gif' => 'image/gif',
+    'jpg', 'jpeg' => 'image/jpeg',
+    'webp' => 'image/webp',
+    default => null,
+  };
+}
+
+function site_head_favicon(?array $content = null): string {
+  $favicon = site_favicon_url($content);
+  if ($favicon === '') {
+    return '';
+  }
+
+  $mime = site_guess_favicon_mime($favicon);
+  $tag = '<link rel="icon"';
+  if ($mime) {
+    $tag .= ' type="'.h($mime).'"';
+  }
+  $tag .= ' href="'.h($favicon).'">';
+
+  return $tag;
+}
+
 function site_generate_sitemap(): array {
   $baseUrl = defined('BASE_URL') ? rtrim((string)BASE_URL, '/') : '';
   if ($baseUrl === '') {
@@ -823,7 +875,7 @@ function site_content_store_upload(array $file, ?string $previous = null): ?stri
   }
   $name = $file['name'] ?? 'upload';
   $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-  $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+  $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico'];
   if (!in_array($ext, $allowed, true)) {
     return null;
   }

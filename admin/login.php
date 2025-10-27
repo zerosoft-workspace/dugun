@@ -80,6 +80,7 @@ $next = $_GET['next'] ?? ($_POST['next'] ?? 'dashboard.php');
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title><?= $mode === 'setup' ? 'İlk Yönetici Kurulumu' : 'Yönetici Girişi' ?> — <?=h(APP_NAME)?></title>
+  <?=site_head_favicon()?>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <?=theme_head_assets()?>
   <style>

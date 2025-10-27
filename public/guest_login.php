@@ -190,6 +190,7 @@ function portal_tab_link(string $tab, array $params = []): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Misafir &amp; Etkinlik Girişi — <?=h(APP_NAME)?></title>
+  <?=site_head_favicon()?>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <?=theme_head_assets()?>
   <style>

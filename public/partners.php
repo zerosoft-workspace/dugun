@@ -10,6 +10,8 @@ require_once __DIR__.'/../includes/public_header.php';
 
 install_schema();
 
+$siteContent = site_public_content();
+
 $categoryFilter = isset($_GET['category']) ? (int)$_GET['category'] : 0;
 $cityFilter = trim($_GET['city'] ?? '');
 $districtFilter = trim($_GET['district'] ?? '');
@@ -160,6 +162,7 @@ CSS;
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><?=h(APP_NAME)?> — Anlaşmalı Şirketler</title>
+  <?=site_head_favicon($siteContent)?>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <?=theme_head_assets()?>
@@ -168,7 +171,7 @@ CSS;
   </style>
 </head>
 <body>
-<?php site_public_header('partners'); ?>
+<?php site_public_header('partners', $siteContent); ?>
   <div class="container py-5 page-shell">
     <header class="hero mb-5">
       <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 position-relative" style="z-index:2;">

@@ -130,6 +130,7 @@ unset($_SESSION['lead_success']);
 <meta property="og:title" content="<?=h($documentTitle)?>">
 <meta property="og:type" content="website">
 <meta property="og:url" content="<?=h(BASE_URL.'/index.php')?>">
+<?=site_head_favicon($content)?>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <?=theme_head_assets()?>
 <style>

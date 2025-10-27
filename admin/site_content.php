@@ -344,6 +344,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   }
   $payload['site_logo'] = $siteLogo;
 
+  $seoFavicon = $content['seo_favicon'] ?? $defaults['seo_favicon'];
+  if (!empty($_POST['seo_favicon_remove'])) {
+    site_content_delete_asset($seoFavicon);
+    $seoFavicon = '';
+  }
+  if (!empty($_FILES['seo_favicon']) && (int)($_FILES['seo_favicon']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+    $uploaded = site_content_store_upload($_FILES['seo_favicon'], $seoFavicon ?: null);
+    if ($uploaded) {
+      $seoFavicon = $uploaded;
+    }
+  }
+  $payload['seo_favicon'] = $seoFavicon;
+
   $heroMain = $content['hero_image_main'] ?? $defaults['hero_image_main'];
   if (!empty($_POST['hero_image_main_remove'])) {
     site_content_delete_asset($heroMain);
@@ -1615,6 +1628,33 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
             <i class="bi bi-graph-up" style="font-size:1.6rem;color:var(--admin-brand);"></i>
           </div>
           <div class="row g-3">
+            <div class="col-md-6 col-lg-4">
+              <label class="form-label">Favicon</label>
+              <input type="hidden" name="seo_favicon_remove" value="0">
+              <input type="file" name="seo_favicon" class="form-control" accept="image/png,image/svg+xml,image/x-icon,image/webp,image/jpeg">
+              <?php
+                $currentFavicon = $content['seo_favicon'] ?? '';
+                if ($currentFavicon !== '' && !site_content_asset_exists($currentFavicon)) {
+                  $currentFavicon = '';
+                }
+                if ($currentFavicon === '' && !empty($defaults['seo_favicon']) && site_content_asset_exists($defaults['seo_favicon'])) {
+                  $currentFavicon = $defaults['seo_favicon'];
+                }
+              ?>
+              <?php if ($currentFavicon !== ''): ?>
+                <div class="d-flex align-items-center gap-3 mt-3 p-3 border rounded bg-light-subtle">
+                  <img src="<?=h($currentFavicon)?>" alt="Favicon" style="width:48px;height:48px;object-fit:contain;border-radius:12px;background:#fff;">
+                  <div class="flex-grow-1">
+                    <div class="small text-muted mb-1">Mevcut favicon</div>
+                    <div class="text-break"><a href="<?=h($currentFavicon)?>" target="_blank" rel="noopener"><?=h($currentFavicon)?></a></div>
+                  </div>
+                  <button type="button" class="btn btn-outline-danger btn-sm js-remove-asset" data-remove-field="seo_favicon_remove" data-confirm="Favicon görselini silmek istediğinize emin misiniz?">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </div>
+              <?php endif; ?>
+              <div class="form-text">.ico, .png veya .svg formatında en az 32x32 piksel bir simge yükleyin.</div>
+            </div>
             <div class="col-12">
               <label class="form-label">Sayfa Başlığı (Title)</label>
               <input type="text" name="seo_meta_title" class="form-control" value="<?=h($content['seo_meta_title'] ?? '')?>" placeholder="Örn. BİKARE — Dijital Etkinlik Platformu">
