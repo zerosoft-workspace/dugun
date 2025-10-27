@@ -184,6 +184,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $blogBodies = $_POST['blog_content'] ?? [];
   $blogPublishedAt = $_POST['blog_published_at'] ?? [];
   $blogGalleryRaw = $_POST['blog_gallery'] ?? [];
+  $blogImageUploads = $_FILES['blog_image_upload'] ?? null;
+  $blogGalleryUploads = $_FILES['blog_gallery_upload'] ?? null;
+  $blogImageDeleteExisting = $_POST['blog_image_delete_existing'] ?? [];
+  if (!is_array($blogImageDeleteExisting)) {
+    $blogImageDeleteExisting = [];
+  }
+  $blogImageDeleteExisting = array_filter(array_map('strval', $blogImageDeleteExisting));
+  if ($blogImageDeleteExisting) {
+    foreach ($blogImageDeleteExisting as $deletedPath) {
+      site_content_delete_asset($deletedPath);
+    }
+  }
+
+  $extractUpload = static function ($files, $index) {
+    if (!is_array($files) || !isset($files['name'][$index])) {
+      return null;
+    }
+    $keys = ['name', 'type', 'tmp_name', 'error', 'size'];
+    $upload = [];
+    foreach ($keys as $key) {
+      $value = $files[$key][$index] ?? null;
+      if (is_array($value)) {
+        return null;
+      }
+      $upload[$key] = $value;
+    }
+    return $upload;
+  };
+
+  $collectGalleryUploads = static function ($files, $index): array {
+    $uploads = [];
+    if (!is_array($files) || !isset($files['name'][$index]) || !is_array($files['name'][$index])) {
+      return $uploads;
+    }
+    $names = $files['name'][$index];
+    $types = $files['type'][$index] ?? [];
+    $tmpNames = $files['tmp_name'][$index] ?? [];
+    $errors = $files['error'][$index] ?? [];
+    $sizes = $files['size'][$index] ?? [];
+    foreach ($names as $idx => $name) {
+      $uploads[] = [
+        'name' => $name,
+        'type' => $types[$idx] ?? '',
+        'tmp_name' => $tmpNames[$idx] ?? '',
+        'error' => $errors[$idx] ?? UPLOAD_ERR_NO_FILE,
+        'size' => $sizes[$idx] ?? 0,
+      ];
+    }
+    return $uploads;
+  };
+
   foreach ($blogTitles as $idx => $title) {
     $title = trim((string)$title);
     $description = trim((string)($blogDescriptions[$idx] ?? ''));
@@ -203,16 +254,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $gallery[] = $line;
       }
     }
-    if ($title === '' && $description === '' && $slug === '' && $image === '' && $body === '' && $published === '' && !$gallery) {
+
+    $imageUpload = $extractUpload($blogImageUploads, $idx);
+    if ($imageUpload && (int)($imageUpload['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+      $uploaded = site_content_store_upload($imageUpload, $image ?: null);
+      if ($uploaded) {
+        $image = $uploaded;
+      }
+    }
+
+    $galleryUploadFiles = $collectGalleryUploads($blogGalleryUploads, $idx);
+    if ($galleryUploadFiles) {
+      foreach ($galleryUploadFiles as $uploadFile) {
+        if ((int)($uploadFile['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+          continue;
+        }
+        $uploaded = site_content_store_upload($uploadFile);
+        if ($uploaded) {
+          $gallery[] = $uploaded;
+        }
+      }
+    }
+
+    $gallery = array_values(array_unique(array_filter($gallery, static function ($item) {
+      return trim((string)$item) !== '';
+    })));
+
+    if ($slug === '') {
+      $slug = slugify_allow_empty($title);
+    } else {
+      $slug = slugify_allow_empty($slug);
+    }
+
+    $normalizedDate = site_normalize_blog_date($published);
+
+    if ($title === '' && $description === '' && $slug === '' && $image === '' && $body === '' && $normalizedDate === null && !$gallery) {
       continue;
     }
+
     $blogPosts[] = [
       'title' => $title,
       'description' => $description,
       'slug' => $slug,
       'image' => $image,
       'content' => $body,
-      'published_at' => site_normalize_blog_date($published) ?? '',
+      'published_at' => $normalizedDate ?? '',
       'gallery' => $gallery,
     ];
   }
@@ -640,6 +726,37 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
     .media-gallery-item{background:#f8fafc;border-radius:16px;padding:.75rem;border:1px solid rgba(148,163,184,.25);display:flex;flex-direction:column;gap:.5rem;}
     .media-gallery-item img{border-radius:12px;width:100%;height:120px;object-fit:cover;box-shadow:0 12px 28px rgba(15,118,110,.15);}
     .media-gallery-item .btn{border-radius:12px;}
+    .blog-grid{display:flex;flex-direction:column;gap:1.25rem;}
+    .blog-empty-state{display:flex;gap:1rem;align-items:center;padding:1.5rem;border:1.5px dashed rgba(14,165,181,.35);border-radius:18px;background:rgba(14,165,181,.05);}
+    .blog-empty-illustration{width:60px;height:60px;border-radius:16px;background:rgba(14,165,181,.12);display:flex;align-items:center;justify-content:center;color:var(--admin-brand);font-size:1.6rem;}
+    .blog-entry{border-radius:20px;border:1px solid rgba(148,163,184,.28);background:#fff;box-shadow:0 35px 80px -60px rgba(15,23,42,.45);overflow:hidden;transition:box-shadow .2s ease,transform .2s ease;}
+    .blog-entry:hover{box-shadow:0 35px 90px -55px rgba(15,23,42,.55);transform:translateY(-2px);}
+    .blog-entry-header{display:flex;align-items:center;gap:1.25rem;padding:1.25rem 1.5rem;background:linear-gradient(135deg,rgba(14,165,181,.08),rgba(14,165,181,.02));}
+    .blog-entry.is-open .blog-entry-header{border-bottom:1px solid rgba(148,163,184,.25);}
+    .blog-entry-thumb{width:82px;height:82px;border-radius:18px;background:rgba(148,163,184,.18);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;position:relative;}
+    .blog-entry-thumb img{width:100%;height:100%;object-fit:cover;}
+    .blog-entry-thumb-empty{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:rgba(71,85,105,.65);font-size:1.75rem;}
+    .blog-entry-summary{flex:1;min-width:0;}
+    .blog-entry-summary .blog-entry-title{font-weight:700;color:var(--admin-ink);}
+    .blog-entry-summary p{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .blog-entry-actions{display:flex;flex-direction:column;gap:.5rem;}
+    .blog-entry-body{display:none;padding:1.6rem 1.6rem 1.8rem;background:#fff;}
+    .blog-entry.is-open .blog-entry-body{display:block;}
+    .blog-cover-preview{border:1px dashed rgba(148,163,184,.45);border-radius:18px;height:160px;background:rgba(241,245,249,.7);display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
+    .blog-cover-preview img{width:100%;height:100%;object-fit:cover;}
+    .blog-cover-placeholder{display:flex;align-items:center;justify-content:center;width:100%;height:100%;color:rgba(100,116,139,.65);font-size:2rem;}
+    .blog-gallery-list{display:flex;flex-wrap:wrap;gap:.5rem;}
+    .blog-gallery-chip{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem .7rem;border-radius:999px;background:rgba(14,165,181,.15);border:1px solid rgba(14,165,181,.25);color:var(--admin-ink);}
+    .blog-gallery-chip .btn-close{width:.8rem;height:.8rem;font-size:.6rem;opacity:.6;}
+    .blog-gallery-chip .btn-close:hover{opacity:1;}
+    .blog-gallery-adder .form-control{border-radius:10px 0 0 10px;}
+    .blog-gallery-adder .btn{border-radius:0 10px 10px 0;}
+    .blog-gallery-note{margin-top:.4rem;}
+    @media (max-width: 991px){
+      .blog-entry-header{flex-direction:column;align-items:flex-start;gap:1rem;}
+      .blog-entry-actions{flex-direction:row;width:100%;}
+      .blog-entry-actions .btn{flex:1;}
+    }
     @media (max-width: 991px){
       .settings-shell{gap:1rem;}
     }
@@ -1026,11 +1143,23 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
             <div>
               <h6 class="fw-semibold mb-1">Blog Yazıları</h6>
-              <p class="text-muted small mb-0">Başlık, kısa açıklama, slug, görsel ve içerik girerek blog detay sayfasını oluşturun. Boş bırakılan satırlar yayınlanmaz.</p>
+              <p class="text-muted small mb-0">Görselleri yükleyip meta alanlarını doldurarak yeni yazıları kolayca düzenleyin. Modal pencereden yeni yazı oluşturabilirsiniz.</p>
             </div>
-            <button type="button" class="btn btn-sm btn-outline-secondary btn-add-row" data-target="blog">+ Blog Kartı Ekle</button>
+            <button type="button" class="btn btn-sm btn-brand" data-blog-open-modal><i class="bi bi-plus-lg me-1"></i>Yeni Blog Yazısı</button>
           </div>
-          <div data-repeater="blog">
+          <?php
+            $blogLoopIndex = 0;
+          ?>
+          <div class="blog-empty-state<?=empty($blogPosts) ? '' : ' d-none'?>" data-blog-empty>
+            <div class="blog-empty-illustration">
+              <i class="bi bi-journal-richtext"></i>
+            </div>
+            <div>
+              <h6 class="fw-semibold mb-1">Henüz blog yazısı eklenmedi</h6>
+              <p class="text-muted mb-0">Yeni bir içerik oluşturmak için yukarıdaki &ldquo;Yeni Blog Yazısı&rdquo; butonunu kullanın.</p>
+            </div>
+          </div>
+          <div data-repeater="blog" class="blog-grid" data-blog-next-index="<?=count($blogPosts)?>">
             <?php foreach ($blogPosts as $post):
               $postTitle = trim((string)($post['title'] ?? ''));
               $postDescription = trim((string)($post['description'] ?? ''));
@@ -1038,47 +1167,117 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
               $postImage = trim((string)($post['image'] ?? ''));
               $postPublished = trim((string)($post['published_at'] ?? ''));
               $postContent = trim((string)($post['content'] ?? ''));
-              $postGallery = '';
+              $postGalleryItems = [];
               if (!empty($post['gallery']) && is_array($post['gallery'])) {
-                $postGallery = implode("\n", array_map('trim', $post['gallery']));
+                foreach ($post['gallery'] as $galleryItem) {
+                  $galleryItem = trim((string)$galleryItem);
+                  if ($galleryItem !== '') {
+                    $postGalleryItems[] = $galleryItem;
+                  }
+                }
               }
+              $postGalleryValue = implode("\n", $postGalleryItems);
+              $publishedDisplay = 'Taslak';
+              if ($postPublished !== '') {
+                $ts = strtotime($postPublished);
+                $publishedDisplay = $ts ? date('d.m.Y', $ts) : $postPublished;
+              }
+              $postSummaryTitle = $postTitle !== '' ? $postTitle : 'Yeni blog yazısı';
+              $postSummarySlug = $postSlug !== '' ? $postSlug : 'Slug henüz oluşturulmadı';
+              $isOpen = $blogLoopIndex === 0 ? ' is-open' : '';
             ?>
-              <div class="repeater-item">
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <label class="form-label">Başlık</label>
-                    <input type="text" class="form-control" name="blog_title[]" value="<?=h($postTitle)?>" placeholder="Blog başlığı">
+              <div class="blog-entry<?=$isOpen?>" data-blog-entry data-blog-index="<?=$blogLoopIndex?>">
+                <div class="blog-entry-header">
+                  <div class="blog-entry-thumb" data-blog-cover>
+                    <img src="<?=h($postImage)?>" alt="Blog kapak görseli" class="<?=$postImage !== '' ? '' : 'd-none'?>" loading="lazy">
+                    <div class="blog-entry-thumb-empty<?=$postImage !== '' ? ' d-none' : ''?>"><i class="bi bi-image"></i></div>
                   </div>
-                  <div class="col-md-3">
-                    <label class="form-label">Slug</label>
-                    <input type="text" class="form-control" name="blog_slug[]" value="<?=h($postSlug)?>" placeholder="ornek-yazi">
-                    <div class="form-text">Boş bırakılırsa başlıktan otomatik oluşturulur.</div>
+                  <div class="blog-entry-summary">
+                    <span class="badge rounded-pill text-bg-light blog-entry-status" data-blog-summary-status><?=h($postPublished !== '' ? 'Yayın Tarihi: '.$publishedDisplay : 'Taslak')?></span>
+                    <h6 class="mb-1 blog-entry-title" data-blog-summary-title><?=h($postSummaryTitle)?></h6>
+                    <p class="text-muted small mb-0" data-blog-summary-slug><?=h($postSummarySlug)?></p>
                   </div>
-                  <div class="col-md-3">
-                    <label class="form-label">Yayın Tarihi</label>
-                    <input type="date" class="form-control" name="blog_published_at[]" value="<?=h($postPublished)?>">
+                  <div class="blog-entry-actions">
+                    <button type="button" class="btn btn-sm btn-outline-primary" data-blog-toggle>Detayları <?= $isOpen ? 'Gizle' : 'Göster' ?></button>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-blog-remove><i class="bi bi-trash"></i></button>
                   </div>
-                  <div class="col-md-6">
-                    <label class="form-label">Kısa Açıklama</label>
-                    <textarea class="form-control" name="blog_description[]" rows="3" placeholder="Özet veya spot metni"><?=h($postDescription)?></textarea>
+                </div>
+                <div class="blog-entry-body">
+                  <div class="row g-3">
+                    <div class="col-lg-8">
+                      <label class="form-label">Başlık</label>
+                      <input type="text" class="form-control" name="blog_title[<?=$blogLoopIndex?>]" value="<?=h($postTitle)?>" placeholder="Blog başlığı" data-blog-title>
+                    </div>
+                    <div class="col-lg-4">
+                      <label class="form-label">Slug</label>
+                      <input type="text" class="form-control" name="blog_slug[<?=$blogLoopIndex?>]" value="<?=h($postSlug)?>" placeholder="ornek-yazi" data-blog-slug data-slug-auto="<?=$postSlug === '' ? '1' : '0'?>">
+                      <div class="form-text">Boş bırakılırsa başlıktan otomatik oluşturulur.</div>
+                    </div>
+                    <div class="col-lg-4">
+                      <label class="form-label">Yayın Tarihi</label>
+                      <input type="date" class="form-control" name="blog_published_at[<?=$blogLoopIndex?>]" value="<?=h($postPublished)?>" data-blog-date>
+                    </div>
+                    <div class="col-lg-8">
+                      <label class="form-label">Kısa Açıklama</label>
+                      <textarea class="form-control" name="blog_description[<?=$blogLoopIndex?>]" rows="2" placeholder="Özet veya spot metni" data-blog-description><?=h($postDescription)?></textarea>
+                    </div>
                   </div>
-                  <div class="col-md-6">
-                    <label class="form-label">Kapak Görseli</label>
-                    <input type="text" class="form-control" name="blog_image[]" value="<?=h($postImage)?>" placeholder="https://...">
-                    <div class="form-text">Görsel URL'si. Yüklemek için medya yönetimi veya harici bağlantı kullanın.</div>
+                  <hr class="my-4">
+                  <div class="row g-3 align-items-start">
+                    <div class="col-md-4">
+                      <div class="blog-cover-preview" data-blog-cover-preview>
+                        <img src="<?=h($postImage)?>" alt="Blog kapak görseli" class="<?=$postImage !== '' ? '' : 'd-none'?>">
+                        <div class="blog-cover-placeholder<?=$postImage !== '' ? ' d-none' : ''?>"><i class="bi bi-image"></i></div>
+                      </div>
+                    </div>
+                    <div class="col-md-8">
+                      <label class="form-label">Kapak Görseli</label>
+                      <input type="hidden" name="blog_image[<?=$blogLoopIndex?>]" value="<?=h($postImage)?>" data-blog-image>
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text">URL</span>
+                        <input type="text" class="form-control" placeholder="https://..." value="<?=h($postImage)?>" data-blog-image-url>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2 mt-3">
+                        <input type="file" class="d-none" name="blog_image_upload[<?=$blogLoopIndex?>]" accept="image/*" data-blog-image-file>
+                        <button type="button" class="btn btn-sm btn-outline-primary" data-blog-image-browse><i class="bi bi-upload"></i> Görsel Yükle</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-blog-image-remove><i class="bi bi-x"></i> Görseli Kaldır</button>
+                      </div>
+                      <div class="form-text mt-2">Harici bağlantı girebilir veya yeni görsel yükleyebilirsiniz. Yüklediğiniz görsel kaydedildiğinde önizleme güncellenir.</div>
+                    </div>
                   </div>
-                  <div class="col-12">
+                  <div class="mt-4">
                     <label class="form-label">İçerik</label>
-                    <textarea class="form-control" name="blog_content[]" rows="5" placeholder="Makale metni"><?=h($postContent)?></textarea>
+                    <textarea class="form-control" name="blog_content[<?=$blogLoopIndex?>]" rows="6" placeholder="Makale metni" data-blog-content><?=h($postContent)?></textarea>
                     <div class="form-text">Paragraflar arasında boş satır bırakarak yeni paragraf oluşturabilirsiniz.</div>
                   </div>
-                  <div class="col-12">
-                    <label class="form-label">Galeri Görselleri</label>
-                    <textarea class="form-control" name="blog_gallery[]" rows="3" placeholder="Her satıra bir görsel URL'si yazın."><?=h($postGallery)?></textarea>
+                  <div class="mt-4 blog-gallery" data-blog-gallery>
+                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+                      <div>
+                        <label class="form-label mb-1">Galeri Görselleri</label>
+                        <p class="text-muted small mb-0">URL ekleyin veya görsel yükleyin. Kaydettiğinizde galeri güncellenir.</p>
+                      </div>
+                      <button type="button" class="btn btn-sm btn-outline-secondary" data-blog-gallery-browse><i class="bi bi-images"></i> Görsel Yükle</button>
+                    </div>
+                    <input type="file" class="d-none" name="blog_gallery_upload[<?=$blogLoopIndex?>][]" accept="image/*" multiple data-blog-gallery-file>
+                    <div class="blog-gallery-list" data-blog-gallery-list>
+                      <?php foreach ($postGalleryItems as $galleryItem): ?>
+                        <span class="blog-gallery-chip" data-gallery-item>
+                          <span class="blog-gallery-chip-label"><?=h($galleryItem)?></span>
+                          <button type="button" class="btn-close" aria-label="Sil" data-gallery-remove></button>
+                        </span>
+                      <?php endforeach; ?>
+                    </div>
+                    <div class="input-group input-group-sm blog-gallery-adder mt-3">
+                      <input type="text" class="form-control" placeholder="https://..." data-blog-gallery-input>
+                      <button type="button" class="btn btn-outline-primary" data-blog-gallery-add>Ekle</button>
+                    </div>
+                    <div class="blog-gallery-note text-muted small d-none" data-gallery-upload-note></div>
+                    <div class="form-text mt-2">Yüklenen dosyalar kaydettikten sonra galeri listesine eklenir.</div>
+                    <textarea class="d-none" name="blog_gallery[<?=$blogLoopIndex?>]" data-blog-gallery-storage><?=h($postGalleryValue)?></textarea>
                   </div>
                 </div>
               </div>
-            <?php endforeach; ?>
+            <?php $blogLoopIndex++; endforeach; ?>
           </div>
         </div>
       </div>
@@ -1773,6 +1972,48 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
         </div>
       </div>
     </form>
+
+    <div class="modal fade" id="blogEntryModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Yeni Blog Yazısı</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+          </div>
+          <div class="modal-body">
+            <p class="text-muted small mb-3">Başlık ve kısa açıklamayı girip, gerekirse slug bilgisini düzenleyin. Kaydettiğinizde detayları panelde düzenlemeye devam edebilirsiniz.</p>
+            <div class="row g-3">
+              <div class="col-md-8">
+                <label class="form-label">Başlık</label>
+                <input type="text" class="form-control" placeholder="Örn. BİKARE ile düğün planlama" data-modal-blog-title>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Slug</label>
+                <input type="text" class="form-control" placeholder="ornek-yazi" data-modal-blog-slug>
+                <div class="form-text">Boş bırakılırsa başlıktan otomatik alınır.</div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label">Yayın Tarihi</label>
+                <input type="date" class="form-control" data-modal-blog-date>
+              </div>
+              <div class="col-md-8">
+                <label class="form-label">Kısa Açıklama</label>
+                <textarea class="form-control" rows="2" placeholder="Özet veya spot metin" data-modal-blog-description></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label">İçerik (isteğe bağlı)</label>
+                <textarea class="form-control" rows="4" placeholder="Blog yazınızın kısa içeriğini buraya yazabilirsiniz." data-modal-blog-content></textarea>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Vazgeç</button>
+            <button type="button" class="btn btn-brand" data-modal-blog-save>Blog Yazısı Oluştur</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
 <?php admin_layout_end(); ?>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
@@ -1826,46 +2067,6 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
     return wrapper;
   };
 
-  const templateBlog = () => {
-    const wrapper = document.createElement('div');
-    wrapper.className = 'repeater-item';
-    wrapper.innerHTML = `
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Başlık</label>
-          <input type="text" class="form-control" name="blog_title[]" placeholder="Blog başlığı">
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Slug</label>
-          <input type="text" class="form-control" name="blog_slug[]" placeholder="ornek-yazi">
-          <div class="form-text">Boş bırakılırsa başlıktan otomatik oluşturulur.</div>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Yayın Tarihi</label>
-          <input type="date" class="form-control" name="blog_published_at[]">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Kısa Açıklama</label>
-          <textarea class="form-control" name="blog_description[]" rows="3" placeholder="Özet veya spot metni"></textarea>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Kapak Görseli</label>
-          <input type="text" class="form-control" name="blog_image[]" placeholder="https://...">
-          <div class="form-text">Görsel URL'si. Yüklemek için medya yönetimi veya harici bağlantı kullanın.</div>
-        </div>
-        <div class="col-12">
-          <label class="form-label">İçerik</label>
-          <textarea class="form-control" name="blog_content[]" rows="5" placeholder="Makale metni"></textarea>
-          <div class="form-text">Paragraflar arasında boş satır bırakarak yeni paragraf oluşturabilirsiniz.</div>
-        </div>
-        <div class="col-12">
-          <label class="form-label">Galeri Görselleri</label>
-          <textarea class="form-control" name="blog_gallery[]" rows="3" placeholder="Her satıra bir görsel URL'si yazın."></textarea>
-        </div>
-      </div>`;
-    return wrapper;
-  };
-
   document.querySelectorAll('.btn-add-row').forEach(btn => {
     btn.addEventListener('click', () => {
       const target = btn.dataset.target;
@@ -1874,9 +2075,6 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
       }
       if (target === 'nav') {
         document.querySelector('[data-repeater="nav"]').appendChild(templateNav());
-      }
-      if (target === 'blog') {
-        document.querySelector('[data-repeater="blog"]').appendChild(templateBlog());
       }
     });
   });
@@ -1904,11 +2102,11 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
       });
     });
 
-    form.querySelectorAll('.js-remove-gallery').forEach(button => {
-      button.addEventListener('click', () => {
-        const value = button.dataset.removeValue || '';
-        if (value === '') {
-          return;
+      form.querySelectorAll('.js-remove-gallery').forEach(button => {
+        button.addEventListener('click', () => {
+          const value = button.dataset.removeValue || '';
+          if (value === '') {
+            return;
         }
         const message = button.dataset.confirm || 'Bu görseli silmek istediğinize emin misiniz?';
         if (!window.confirm(message)) {
@@ -1922,6 +2120,557 @@ $whatsappCurrentSender = trim((string)($whatsappConfigLive['sender'] ?? ''));
         button.disabled = true;
         form.submit();
       });
+    });
+  }
+
+  const blogList = document.querySelector('[data-repeater="blog"]');
+  const blogEmpty = document.querySelector('[data-blog-empty]');
+  let blogIndexCounter = blogList ? parseInt(blogList.dataset.blogNextIndex || '0', 10) : 0;
+  if (!Number.isFinite(blogIndexCounter)) {
+    blogIndexCounter = 0;
+  }
+
+  const escapeHtml = (value) => String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+
+  const slugifyTr = (value) => {
+    return String(value ?? '')
+      .toLocaleLowerCase('tr-TR')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-+/g, '-');
+  };
+
+  const formatDisplayDate = (value) => {
+    if (!value) {
+      return '';
+    }
+    const date = new Date(value);
+    if (!Number.isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = date.getFullYear();
+      return `${day}.${month}.${year}`;
+    }
+    return value;
+  };
+
+  const updateToggleLabel = (entry) => {
+    const toggleBtn = entry.querySelector('[data-blog-toggle]');
+    if (!toggleBtn) {
+      return;
+    }
+    toggleBtn.textContent = entry.classList.contains('is-open') ? 'Detayları Gizle' : 'Detayları Göster';
+  };
+
+  const refreshBlogEmptyState = () => {
+    if (!blogEmpty) {
+      return;
+    }
+    const hasEntries = blogList && blogList.querySelector('[data-blog-entry]');
+    blogEmpty.classList.toggle('d-none', !!hasEntries);
+  };
+
+  const appendDeletionInput = (path) => {
+    if (!form || !path) {
+      return;
+    }
+    const already = Array.from(form.querySelectorAll('input[name="blog_image_delete_existing[]"]'))
+      .some(input => input.value === path);
+    if (already) {
+      return;
+    }
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'blog_image_delete_existing[]';
+    hidden.value = path;
+    form.appendChild(hidden);
+  };
+
+  const updateBlogSummary = (entry) => {
+    const titleInput = entry.querySelector('[data-blog-title]');
+    const slugInput = entry.querySelector('[data-blog-slug]');
+    const dateInput = entry.querySelector('[data-blog-date]');
+    const summaryTitle = entry.querySelector('[data-blog-summary-title]');
+    const summarySlug = entry.querySelector('[data-blog-summary-slug]');
+    const status = entry.querySelector('[data-blog-summary-status]');
+    const title = titleInput ? titleInput.value.trim() : '';
+    const slug = slugInput ? slugInput.value.trim() : '';
+    const date = dateInput ? dateInput.value.trim() : '';
+    if (summaryTitle) {
+      summaryTitle.textContent = title !== '' ? title : 'Yeni blog yazısı';
+    }
+    if (summarySlug) {
+      summarySlug.textContent = slug !== '' ? slug : 'Slug henüz oluşturulmadı';
+    }
+    if (status) {
+      status.textContent = date !== '' ? `Yayın Tarihi: ${formatDisplayDate(date)}` : 'Taslak';
+    }
+  };
+
+  const updateCoverPreview = (entry, src) => {
+    const preview = entry.querySelector('[data-blog-cover-preview]');
+    if (preview) {
+      const img = preview.querySelector('img');
+      const placeholder = preview.querySelector('.blog-cover-placeholder');
+      const hasImage = src && src.trim() !== '';
+      if (img) {
+        if (hasImage) {
+          img.src = src;
+          img.classList.remove('d-none');
+        } else {
+          img.src = '';
+          img.classList.add('d-none');
+        }
+      }
+      if (placeholder) {
+        placeholder.classList.toggle('d-none', !!hasImage);
+      }
+    }
+    const thumbImg = entry.querySelector('[data-blog-cover] img');
+    const thumbPlaceholder = entry.querySelector('[data-blog-cover] .blog-entry-thumb-empty');
+    const hasThumbImage = src && src.trim() !== '';
+    if (thumbImg) {
+      if (hasThumbImage) {
+        thumbImg.src = src;
+        thumbImg.classList.remove('d-none');
+      } else {
+        thumbImg.src = '';
+        thumbImg.classList.add('d-none');
+      }
+    }
+    if (thumbPlaceholder) {
+      thumbPlaceholder.classList.toggle('d-none', !!hasThumbImage);
+    }
+  };
+
+  const initGallery = (wrapper) => {
+    if (!wrapper) {
+      return;
+    }
+    const list = wrapper.querySelector('[data-blog-gallery-list]');
+    const storage = wrapper.querySelector('[data-blog-gallery-storage]');
+    const input = wrapper.querySelector('[data-blog-gallery-input]');
+    const addBtn = wrapper.querySelector('[data-blog-gallery-add]');
+    const browseBtn = wrapper.querySelector('[data-blog-gallery-browse]');
+    const fileInput = wrapper.querySelector('[data-blog-gallery-file]');
+    const note = wrapper.querySelector('[data-gallery-upload-note]');
+    if (!list || !storage) {
+      return;
+    }
+
+    const syncStorage = () => {
+      const values = Array.from(list.querySelectorAll('[data-gallery-item] .blog-gallery-chip-label'))
+        .map(el => el.textContent.trim())
+        .filter(Boolean);
+      storage.value = values.join('\n');
+    };
+
+    list.querySelectorAll('[data-gallery-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chip = btn.closest('[data-gallery-item]');
+        if (chip) {
+          chip.remove();
+          syncStorage();
+        }
+      });
+    });
+
+    const addChip = (value) => {
+      const trimmed = (value || '').trim();
+      if (trimmed === '') {
+        return;
+      }
+      const chip = document.createElement('span');
+      chip.className = 'blog-gallery-chip';
+      chip.dataset.galleryItem = '1';
+      const label = document.createElement('span');
+      label.className = 'blog-gallery-chip-label';
+      label.textContent = trimmed;
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn-close';
+      removeBtn.setAttribute('aria-label', 'Sil');
+      removeBtn.dataset.galleryRemove = '1';
+      removeBtn.addEventListener('click', () => {
+        chip.remove();
+        syncStorage();
+      });
+      chip.append(label, removeBtn);
+      list.appendChild(chip);
+      syncStorage();
+    };
+
+    if (addBtn && input) {
+      const addFromInput = () => {
+        addChip(input.value);
+        input.value = '';
+        input.focus();
+      };
+      addBtn.addEventListener('click', addFromInput);
+      input.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+          event.preventDefault();
+          addFromInput();
+        }
+      });
+    }
+
+    if (browseBtn && fileInput) {
+      browseBtn.addEventListener('click', () => fileInput.click());
+    }
+
+    if (fileInput && note) {
+      fileInput.addEventListener('change', () => {
+        const count = fileInput.files ? fileInput.files.length : 0;
+        if (count > 0) {
+          note.textContent = `${count} yeni görsel seçildi. Kaydettiğinizde listeye eklenecek.`;
+          note.classList.remove('d-none');
+        } else {
+          note.textContent = '';
+          note.classList.add('d-none');
+        }
+      });
+    }
+
+    syncStorage();
+  };
+
+  const initBlogEntry = (entry) => {
+    if (!entry) {
+      return;
+    }
+    const toggleBtn = entry.querySelector('[data-blog-toggle]');
+    const removeBtn = entry.querySelector('[data-blog-remove]');
+    const titleInput = entry.querySelector('[data-blog-title]');
+    const slugInput = entry.querySelector('[data-blog-slug]');
+    const dateInput = entry.querySelector('[data-blog-date]');
+    const imageHidden = entry.querySelector('[data-blog-image]');
+    const imageUrlInput = entry.querySelector('[data-blog-image-url]');
+    const imageFileInput = entry.querySelector('[data-blog-image-file]');
+    const imageBrowseBtn = entry.querySelector('[data-blog-image-browse]');
+    const imageRemoveBtn = entry.querySelector('[data-blog-image-remove]');
+    const galleryWrapper = entry.querySelector('[data-blog-gallery]');
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        entry.classList.toggle('is-open');
+        updateToggleLabel(entry);
+      });
+      updateToggleLabel(entry);
+    }
+
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        if (!window.confirm('Bu blog yazısını kaldırmak istediğinize emin misiniz?')) {
+          return;
+        }
+        entry.remove();
+        refreshBlogEmptyState();
+      });
+    }
+
+    if (slugInput) {
+      const autoAttr = slugInput.dataset.slugAuto === '1';
+      if (!autoAttr && slugInput.value.trim() !== '') {
+        slugInput.dataset.slugDirty = '1';
+      }
+      slugInput.addEventListener('input', () => {
+        slugInput.dataset.slugDirty = '1';
+        slugInput.dataset.slugAuto = '0';
+        updateBlogSummary(entry);
+      });
+      slugInput.addEventListener('blur', () => {
+        if (slugInput.value.trim() === '' && titleInput) {
+          const generated = slugifyTr(titleInput.value);
+          slugInput.value = generated;
+          slugInput.dataset.slugDirty = generated !== '' ? '' : '';
+          slugInput.dataset.slugAuto = '1';
+          updateBlogSummary(entry);
+        }
+      });
+    }
+
+    if (titleInput && slugInput) {
+      titleInput.addEventListener('input', () => {
+        if (slugInput.dataset.slugDirty !== '1') {
+          const generated = slugifyTr(titleInput.value);
+          slugInput.value = generated;
+          slugInput.dataset.slugAuto = '1';
+        }
+        updateBlogSummary(entry);
+      });
+      titleInput.addEventListener('blur', () => updateBlogSummary(entry));
+    }
+
+    if (dateInput) {
+      dateInput.addEventListener('change', () => updateBlogSummary(entry));
+      dateInput.addEventListener('blur', () => updateBlogSummary(entry));
+    }
+
+    if (imageUrlInput && imageHidden) {
+      imageUrlInput.addEventListener('input', () => {
+        const value = imageUrlInput.value.trim();
+        imageHidden.value = value;
+        updateCoverPreview(entry, value);
+      });
+    }
+
+    if (imageBrowseBtn && imageFileInput) {
+      imageBrowseBtn.addEventListener('click', () => imageFileInput.click());
+    }
+
+    if (imageFileInput) {
+      imageFileInput.addEventListener('change', () => {
+        if (imageFileInput.files && imageFileInput.files[0]) {
+          const reader = new FileReader();
+          reader.addEventListener('load', () => {
+            updateCoverPreview(entry, reader.result || '');
+          });
+          reader.readAsDataURL(imageFileInput.files[0]);
+        }
+      });
+    }
+
+    if (imageRemoveBtn) {
+      imageRemoveBtn.addEventListener('click', () => {
+        if (!window.confirm('Kapak görselini kaldırmak istediğinize emin misiniz?')) {
+          return;
+        }
+        const current = imageHidden ? imageHidden.value.trim() : '';
+        if (current !== '') {
+          appendDeletionInput(current);
+        }
+        if (imageHidden) {
+          imageHidden.value = '';
+        }
+        if (imageUrlInput) {
+          imageUrlInput.value = '';
+        }
+        if (imageFileInput) {
+          imageFileInput.value = '';
+        }
+        updateCoverPreview(entry, '');
+      });
+    }
+
+    if (galleryWrapper) {
+      initGallery(galleryWrapper);
+    }
+
+    updateBlogSummary(entry);
+    const initialCover = (imageHidden && imageHidden.value.trim()) || (imageUrlInput && imageUrlInput.value.trim()) || '';
+    updateCoverPreview(entry, initialCover);
+  };
+
+  const createBlogEntry = (index, defaults = {}) => {
+    const title = (defaults.title || '').trim();
+    let slugValue = (defaults.slug || '').trim();
+    let slugAuto = '0';
+    if (slugValue === '') {
+      slugValue = slugifyTr(title);
+      slugAuto = '1';
+    }
+    const dateValue = (defaults.date || '').trim();
+    const description = (defaults.description || '').trim();
+    const content = (defaults.content || '').trim();
+    const image = (defaults.image || '').trim();
+    const galleryItems = Array.isArray(defaults.gallery) ? defaults.gallery.filter(Boolean) : [];
+    const galleryValue = galleryItems.join('\n');
+    const summaryTitle = title !== '' ? title : 'Yeni blog yazısı';
+    const summarySlug = slugValue !== '' ? slugValue : 'Slug henüz oluşturulmadı';
+    const summaryStatus = dateValue !== '' ? `Yayın Tarihi: ${formatDisplayDate(dateValue)}` : 'Taslak';
+    const galleryChipsHtml = galleryItems.map(item => `
+      <span class="blog-gallery-chip" data-gallery-item>
+        <span class="blog-gallery-chip-label">${escapeHtml(item)}</span>
+        <button type="button" class="btn-close" aria-label="Sil" data-gallery-remove></button>
+      </span>
+    `).join('');
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = `
+      <div class="blog-entry is-open" data-blog-entry data-blog-index="${index}">
+        <div class="blog-entry-header">
+          <div class="blog-entry-thumb" data-blog-cover>
+            <img src="${escapeHtml(image)}" alt="Blog kapak görseli" class="${image ? '' : 'd-none'}" loading="lazy">
+            <div class="blog-entry-thumb-empty${image ? ' d-none' : ''}"><i class="bi bi-image"></i></div>
+          </div>
+          <div class="blog-entry-summary">
+            <span class="badge rounded-pill text-bg-light blog-entry-status" data-blog-summary-status>${escapeHtml(summaryStatus)}</span>
+            <h6 class="mb-1 blog-entry-title" data-blog-summary-title>${escapeHtml(summaryTitle)}</h6>
+            <p class="text-muted small mb-0" data-blog-summary-slug>${escapeHtml(summarySlug)}</p>
+          </div>
+          <div class="blog-entry-actions">
+            <button type="button" class="btn btn-sm btn-outline-primary" data-blog-toggle>Detayları Gizle</button>
+            <button type="button" class="btn btn-sm btn-outline-danger" data-blog-remove><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+        <div class="blog-entry-body">
+          <div class="row g-3">
+            <div class="col-lg-8">
+              <label class="form-label">Başlık</label>
+              <input type="text" class="form-control" name="blog_title[${index}]" value="${escapeHtml(title)}" placeholder="Blog başlığı" data-blog-title>
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label">Slug</label>
+              <input type="text" class="form-control" name="blog_slug[${index}]" value="${escapeHtml(slugValue)}" placeholder="ornek-yazi" data-blog-slug data-slug-auto="${slugAuto}">
+              <div class="form-text">Boş bırakılırsa başlıktan otomatik oluşturulur.</div>
+            </div>
+            <div class="col-lg-4">
+              <label class="form-label">Yayın Tarihi</label>
+              <input type="date" class="form-control" name="blog_published_at[${index}]" value="${escapeHtml(dateValue)}" data-blog-date>
+            </div>
+            <div class="col-lg-8">
+              <label class="form-label">Kısa Açıklama</label>
+              <textarea class="form-control" name="blog_description[${index}]" rows="2" placeholder="Özet veya spot metni" data-blog-description>${escapeHtml(description)}</textarea>
+            </div>
+          </div>
+          <hr class="my-4">
+          <div class="row g-3 align-items-start">
+            <div class="col-md-4">
+              <div class="blog-cover-preview" data-blog-cover-preview>
+                <img src="${escapeHtml(image)}" alt="Blog kapak görseli" class="${image ? '' : 'd-none'}">
+                <div class="blog-cover-placeholder${image ? ' d-none' : ''}"><i class="bi bi-image"></i></div>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <label class="form-label">Kapak Görseli</label>
+              <input type="hidden" name="blog_image[${index}]" value="${escapeHtml(image)}" data-blog-image>
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">URL</span>
+                <input type="text" class="form-control" placeholder="https://..." value="${escapeHtml(image)}" data-blog-image-url>
+              </div>
+              <div class="d-flex flex-wrap gap-2 mt-3">
+                <input type="file" class="d-none" name="blog_image_upload[${index}]" accept="image/*" data-blog-image-file>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-blog-image-browse><i class="bi bi-upload"></i> Görsel Yükle</button>
+                <button type="button" class="btn btn-sm btn-outline-danger" data-blog-image-remove><i class="bi bi-x"></i> Görseli Kaldır</button>
+              </div>
+              <div class="form-text mt-2">Harici bağlantı girebilir veya yeni görsel yükleyebilirsiniz. Yüklediğiniz görsel kaydedildiğinde önizleme güncellenir.</div>
+            </div>
+          </div>
+          <div class="mt-4">
+            <label class="form-label">İçerik</label>
+            <textarea class="form-control" name="blog_content[${index}]" rows="6" placeholder="Makale metni" data-blog-content>${escapeHtml(content)}</textarea>
+            <div class="form-text">Paragraflar arasında boş satır bırakarak yeni paragraf oluşturabilirsiniz.</div>
+          </div>
+          <div class="mt-4 blog-gallery" data-blog-gallery>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+              <div>
+                <label class="form-label mb-1">Galeri Görselleri</label>
+                <p class="text-muted small mb-0">URL ekleyin veya görsel yükleyin. Kaydettiğinizde galeri güncellenir.</p>
+              </div>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-blog-gallery-browse><i class="bi bi-images"></i> Görsel Yükle</button>
+            </div>
+            <input type="file" class="d-none" name="blog_gallery_upload[${index}][]" accept="image/*" multiple data-blog-gallery-file>
+            <div class="blog-gallery-list" data-blog-gallery-list>${galleryChipsHtml}</div>
+            <div class="input-group input-group-sm blog-gallery-adder mt-3">
+              <input type="text" class="form-control" placeholder="https://..." data-blog-gallery-input>
+              <button type="button" class="btn btn-outline-primary" data-blog-gallery-add>Ekle</button>
+            </div>
+            <div class="blog-gallery-note text-muted small d-none" data-gallery-upload-note></div>
+            <div class="form-text mt-2">Yüklenen dosyalar kaydettikten sonra galeri listesine eklenir.</div>
+            <textarea class="d-none" name="blog_gallery[${index}]" data-blog-gallery-storage>${escapeHtml(galleryValue)}</textarea>
+          </div>
+        </div>
+      </div>
+    `;
+    return wrapper.firstElementChild;
+  };
+
+  if (blogList) {
+    blogList.querySelectorAll('[data-blog-entry]').forEach(initBlogEntry);
+  }
+  refreshBlogEmptyState();
+
+  const blogOpenBtn = document.querySelector('[data-blog-open-modal]');
+  const blogModalEl = document.getElementById('blogEntryModal');
+  if (blogModalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+    const blogModal = new bootstrap.Modal(blogModalEl);
+    const modalTitleInput = blogModalEl.querySelector('[data-modal-blog-title]');
+    const modalSlugInput = blogModalEl.querySelector('[data-modal-blog-slug]');
+    const modalDateInput = blogModalEl.querySelector('[data-modal-blog-date]');
+    const modalDescriptionInput = blogModalEl.querySelector('[data-modal-blog-description]');
+    const modalContentInput = blogModalEl.querySelector('[data-modal-blog-content]');
+    const modalSaveBtn = blogModalEl.querySelector('[data-modal-blog-save]');
+    let modalSlugDirty = false;
+
+    const resetModal = () => {
+      if (modalTitleInput) modalTitleInput.value = '';
+      if (modalSlugInput) modalSlugInput.value = '';
+      if (modalDateInput) modalDateInput.value = '';
+      if (modalDescriptionInput) modalDescriptionInput.value = '';
+      if (modalContentInput) modalContentInput.value = '';
+      modalSlugDirty = false;
+    };
+
+    if (modalTitleInput && modalSlugInput) {
+      modalTitleInput.addEventListener('input', () => {
+        if (!modalSlugDirty) {
+          modalSlugInput.value = slugifyTr(modalTitleInput.value);
+        }
+      });
+      modalSlugInput.addEventListener('input', () => {
+        modalSlugDirty = modalSlugInput.value.trim() !== '';
+      });
+      modalSlugInput.addEventListener('blur', () => {
+        if (modalSlugInput.value.trim() === '') {
+          modalSlugInput.value = slugifyTr(modalTitleInput.value);
+          modalSlugDirty = false;
+        }
+      });
+    }
+
+    blogModalEl.addEventListener('hidden.bs.modal', resetModal);
+    blogModalEl.addEventListener('shown.bs.modal', () => {
+      if (modalTitleInput) {
+        modalTitleInput.focus();
+      }
+    });
+
+    if (blogOpenBtn) {
+      blogOpenBtn.addEventListener('click', () => {
+        resetModal();
+        blogModal.show();
+      });
+    }
+
+    if (modalSaveBtn) {
+      modalSaveBtn.addEventListener('click', () => {
+        const title = modalTitleInput ? modalTitleInput.value.trim() : '';
+        const slug = modalSlugInput ? modalSlugInput.value.trim() : '';
+        const date = modalDateInput ? modalDateInput.value.trim() : '';
+        const description = modalDescriptionInput ? modalDescriptionInput.value.trim() : '';
+        const content = modalContentInput ? modalContentInput.value.trim() : '';
+        const entry = createBlogEntry(blogIndexCounter, {
+          title,
+          slug,
+          date,
+          description,
+          content,
+        });
+        blogIndexCounter += 1;
+        if (blogList) {
+          blogList.dataset.blogNextIndex = String(blogIndexCounter);
+          blogList.appendChild(entry);
+          initBlogEntry(entry);
+          refreshBlogEmptyState();
+          updateBlogSummary(entry);
+          setTimeout(() => {
+            entry.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 150);
+        }
+        blogModal.hide();
+      });
+    }
+  } else if (blogOpenBtn) {
+    blogOpenBtn.addEventListener('click', () => {
+      window.alert('Blog oluşturma modali şu anda yüklenemedi.');
     });
   }
 })();
