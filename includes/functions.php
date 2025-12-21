@@ -472,14 +472,7 @@ function event_guest_background_exists(?string $path): bool {
   if (strpos($normalized, '..') !== false) {
     return false;
   }
-  $root = realpath(__DIR__.'/..');
-  if ($root === false) {
-    return false;
-  }
-  $full = realpath($root.'/'.$normalized);
-  if ($full !== false && strpos($full, $root) === 0 && is_file($full)) {
-    return true;
-  }
+  $root = __DIR__.'/..';
   $candidate = $root.'/'.$normalized;
   return is_file($candidate);
 }
@@ -617,22 +610,23 @@ function event_guest_overlay_store(int $eventId, array $file): ?string {
     return null;
   }
   $ext = $allowed[$mime];
-  $dir = event_guest_asset_dir($eventId);
+  
+  // Use explicit path construction
+  $dir = __DIR__.'/../storage/events/'.(int)$eventId;
+  if (!is_dir($dir)) {
+    @mkdir($dir, 0775, true);
+  }
+
   $filename = 'guest-overlay-'.date('Ymd-His').'-'.bin2hex(random_bytes(4)).$ext;
-  $target = rtrim($dir, '/').'/'.$filename;
+  $target = $dir.'/'.$filename;
+  
   if (!move_uploaded_file($tmp, $target)) {
     return null;
   }
   @chmod($target, 0664);
-  $relative = '';
-  $root = realpath(__DIR__.'/..');
-  if ($root && strpos($target, $root) === 0) {
-    $relative = ltrim(str_replace('\\', '/', substr($target, strlen($root))), '/');
-  }
-  if ($relative === '') {
-    $relative = 'storage/events/'.(int)$eventId.'/'.$filename;
-  }
-  return $relative;
+
+  // Return clean relative path from project root
+  return 'storage/events/'.(int)$eventId.'/'.$filename;
 }
 
 function normalize_event_layout($layout): array {

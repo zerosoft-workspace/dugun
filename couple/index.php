@@ -538,7 +538,7 @@ a:hover{ text-decoration:none; }
 .preview-modal-hint{ display:flex; align-items:center; gap:.65rem; background:rgba(255,255,255,.85); border:1px solid rgba(148,163,184,.25); border-radius:999px; padding:.45rem 1rem; font-size:.85rem; font-weight:600; color:var(--ink); box-shadow:0 20px 40px -32px rgba(15,23,42,.35); }
 .preview-modal-footer{ padding:1rem 1.75rem 1.5rem; font-size:.85rem; color:var(--muted); background:rgba(255,255,255,.92); border-top:1px solid rgba(148,163,184,.2); }
 .preview-shell{ position:relative; width:min(100%,980px); margin:0 auto; padding:1.8rem; border-radius:28px; background:linear-gradient(135deg, rgba(14,165,181,.08), rgba(79,70,229,.06)); border:1px solid rgba(148,163,184,.2); box-shadow:0 42px 80px -60px rgba(14,165,181,.38); display:flex; flex-direction:column; gap:1.25rem; max-height:100%; }
-.preview-shell::after{ content:''; position:absolute; inset:0; border-radius:inherit; background:linear-gradient(140deg, rgba(255,255,255,.65), rgba(255,255,255,.2)); pointer-events:none; mix-blend-mode:screen; }
+.preview-shell::after{ content:''; position:absolute; inset:0; border-radius:inherit; background:transparent; pointer-events:none; }
 .preview-stage{ position:relative; width:100%; border-radius:26px; background:rgba(255,255,255,.95); overflow:hidden; border:1px solid rgba(148,163,184,.22); box-shadow:0 45px 90px -68px rgba(15,23,42,.42); flex:1; }
 .preview-card{ position:relative; overflow:hidden; }
 .preview-grid{ display:flex; flex-direction:column; gap:24px; }
@@ -564,17 +564,17 @@ a:hover{ text-decoration:none; }
 .pv-editable:focus{ box-shadow:0 0 0 4px rgba(14,165,181,.25); border-radius:12px; padding:.2rem .4rem; margin:-.2rem -.4rem; background:rgba(255,255,255,.8); }
 .stage-scale{ position:absolute; left:0; top:0; width:960px; height:540px; transform-origin:top left; transform:scale(var(--s,1)); }
 .preview-canvas{ position:absolute; inset:0; background:linear-gradient(180deg,var(--zs-soft),#fff); background-size:cover; background-position:center; transition:background-image .35s ease, background-color .35s ease; }
-.preview-canvas::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.88),rgba(255,255,255,.6)); opacity:0; transition:opacity .3s ease; pointer-events:none; }
+.preview-canvas::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.1)); opacity:0; transition:opacity .3s ease; pointer-events:none; }
 .preview-canvas[data-has-bg="1"]::after{ opacity:1; }
 #pv-title{ position:absolute; font-size:30px; font-weight:800; color:#0f172a; letter-spacing:.015em; font-family:var(--guest-title-font); text-shadow:0 12px 30px rgba(15,23,42,.18); }
 #pv-sub{ position:absolute; color:#334155; font-size:18px; font-weight:600; max-width:520px; line-height:1.45; font-family:var(--guest-subtitle-font); }
-#pv-prompt{ position:absolute; color:#0f172a; font-size:16px; font-weight:500; letter-spacing:.01em; background:rgba(255,255,255,.85); padding:.75rem 1rem; border-radius:14px; box-shadow:0 14px 28px -20px rgba(15,23,42,.45); font-family:var(--guest-prompt-font); }
+#pv-prompt{ position:absolute; color:#0f172a; font-size:16px; font-weight:500; letter-spacing:.01em; background:transparent; padding:0; font-family:var(--guest-prompt-font); }
 .sticker{ position:absolute; user-select:none; cursor:move; filter:drop-shadow(0 8px 18px rgba(15,23,42,.25)); transition:transform .18s ease; touch-action:none; }
 .sticker.is-active{ outline:2px dashed var(--brand); outline-offset:6px; }
 .sticker-pending{ outline:2px dashed var(--brand); outline-offset:8px; background:rgba(14,165,181,.1); border-radius:18px; }
 .sticker-pending img{ box-shadow:0 28px 60px -42px rgba(15,23,42,.35); }
 .sticker-placeholder{ display:grid; place-items:center; font-weight:600; font-size:.8rem; color:rgba(15,23,42,.65); min-width:140px; min-height:120px; border-radius:18px; background:rgba(255,255,255,.82); border:1px dashed rgba(148,163,184,.55); }
-.sticker-img img{ display:block; max-width:520px; border-radius:18px; pointer-events:none; user-select:none; box-shadow:0 24px 50px -36px rgba(15,23,42,.4); }
+.sticker-img img{ display:block; max-width:520px; pointer-events:none; user-select:none; }
 .sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
 .sticker-actions .btn{ border-radius:12px; padding:.45rem .85rem; font-weight:600; }
 .sticker-size-tool .form-range{ --bs-form-range-thumb-bg: var(--brand); }
@@ -1158,21 +1158,111 @@ a:hover{ text-decoration:none; }
           </div>
         </div>
       </aside>
+<style>
+  .preview-modal-stage {
+    background: radial-gradient(circle at center, #f1f5f9 0%, #e2e8f0 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; overflow: hidden; padding: 2rem;
+    flex: 1; /* Fill parent */
+    width: 100%; 
+  }
+  .preview-device-frame {
+    background: #2d3436;
+    padding: 12px 14px;
+    border-radius: 32px;
+    box-shadow: 
+      0 50px 100px -20px rgba(50,50,93,0.25), 
+      0 30px 60px -30px rgba(0,0,0,0.3), 
+      inset 0 0 0 2px rgba(255,255,255,0.1);
+    position: relative; 
+    transition: transform 0.3s ease;
+    
+    /* Critical Fixes for Layout Collapse */
+    width: 90%; 
+    max-width: 1000px; /* Max logical width */
+    aspect-ratio: 16/9; /* Force aspect ratio to match canvas */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  /* Decorative camera/sensor */
+  .preview-device-frame::after {
+    content:''; position: absolute; top: 50%; left: 6px; transform: translateY(-50%);
+    width: 4px; height: 30px; background: rgba(255,255,255,0.1); border-radius: 4px;
+  }
+
+  .preview-shell {
+    border-radius: 20px; overflow: hidden; background: #fff;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+  
+  /* Editables Styling */
+  .pv-editable {
+    background-color: transparent !important;
+    border: 1px dashed rgba(0,0,0,0.15); 
+    border-radius: 8px;
+    padding: 6px 10px; 
+    transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1); 
+    cursor: grab;
+    min-width: 50px; min-height: 24px; 
+  }
+  .pv-editable:hover { 
+    background-color: rgba(255,255,255,0.5) !important; 
+    border-color: var(--brand, #0ea5b5); 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  .pv-editable:focus {
+    background-color: #fff !important; 
+    border-color: var(--brand, #0ea5b5); 
+    color:#2d3436 !important;
+    box-shadow: 0 8px 24px rgba(14, 165, 181, 0.15); 
+    outline: none; cursor: text;
+    z-index: 10;
+  }
+  
+  /* Modern Hint Badge */
+  .preview-modal-hint {
+    background: #fff; padding: 8px 16px; border-radius: 100px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 24px;
+    font-size: 0.9rem; color: #64748b; font-weight: 500;
+    display: flex; align-items: center; gap: 10px; border: 1px solid rgba(0,0,0,0.04);
+  }
+  
+  /* Canvas fixes */
+  .preview-canvas { 
+    overflow: hidden; 
+    -webkit-font-smoothing: antialiased;
+  }
+  .sticker.is-active { 
+    outline: 2px solid var(--brand, #0ea5b5); 
+    box-shadow: 0 0 0 4px rgba(14, 165, 181, 0.15);
+  }
+</style>
       <div class="preview-modal-stage">
         <div class="preview-modal-hint">
-          <span class="badge rounded-pill bg-light text-dark fw-semibold"><i class="bi bi-magic me-1"></i>İpucu</span>
-          <span>Metinleri sürükleyip bırakabilir veya çift tıklayarak düzenleyebilirsiniz.</span>
+          <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10"><i class="bi bi-palette2 me-1"></i>Tasarım Stüdyosu</span>
+          <span>Öğeleri sürükleyip sahneye yerleştirin. Düzenlemek için metinlere tıklayın.</span>
         </div>
-        <div class="preview-shell">
-          <div class="preview-stage" id="pvStage">
-            <div class="stage-scale" id="scaleBox">
-              <div class="preview-canvas" id="canvas" data-has-bg="<?=$canvasHasBg?>" data-initial-bg="<?= $BACKGROUND_URL ? h($BACKGROUND_URL) : '' ?>" style="<?=$canvasStyle?>">
-                <div id="pv-title" class="pv-title pv-editable" contenteditable="true" data-field="guest_title" style="left:<?= (int)$tPos['x']?>px; top:<?= (int)$tPos['y']?>px;"><?=h($TITLE)?></div>
-                <div id="pv-sub" class="pv-sub pv-editable" contenteditable="true" data-field="guest_subtitle" style="left:<?= (int)$sPos['x']?>px; top:<?= (int)$sPos['y']?>px;"><?=h($SUBTITLE)?></div>
-                <div id="pv-prompt" class="pv-prompt pv-editable" contenteditable="true" data-field="guest_prompt" style="left:<?= (int)$pPos['x']?>px; top:<?= (int)$pPos['y']?>px;"><?=h($PROMPT)?></div>
+
+        <div class="preview-device-frame">
+          <div class="preview-shell">
+            <div class="preview-stage" id="pvStage">
+              <div class="stage-scale" id="scaleBox">
+                <div class="preview-canvas" id="canvas" data-has-bg="<?=$canvasHasBg?>" data-initial-bg="<?= $BACKGROUND_URL ? h($BACKGROUND_URL) : '' ?>" style="<?=$canvasStyle?>">
+                  <div id="pv-title" class="pv-title pv-editable" contenteditable="true" data-field="guest_title" style="left:<?= (int)$tPos['x']?>px; top:<?= (int)$tPos['y']?>px;"><?=h($TITLE)?></div>
+                  <div id="pv-sub" class="pv-sub pv-editable" contenteditable="true" data-field="guest_subtitle" style="left:<?= (int)$sPos['x']?>px; top:<?= (int)$sPos['y']?>px;"><?=h($SUBTITLE)?></div>
+                  <div id="pv-prompt" class="pv-prompt pv-editable" contenteditable="true" data-field="guest_prompt" style="left:<?= (int)$pPos['x']?>px; top:<?= (int)$pPos['y']?>px;"><?=h($PROMPT)?></div>
+                </div>
               </div>
             </div>
           </div>
+        </div>
+        
+        <div class="mt-4 text-secondary small fw-medium d-flex align-items-center opacity-75">
+            <i class="bi bi-phone-landscape me-2"></i> Misafir Ekranı Simülasyonu
         </div>
       </div>
     </div>
@@ -1184,17 +1274,43 @@ a:hover{ text-decoration:none; }
 <script>
 (function(){
   const stage=document.getElementById('pvStage'), box=document.getElementById('scaleBox');
-  function fit(){ if(!stage||!box) return; const W=stage.clientWidth, S=W/960; box.style.setProperty('--s',S); stage.style.height=(540*S)+'px'; }
+  function fit(){ 
+    if(!stage||!box) return; 
+    // Parent'ın genişliğini baz al, stage'in kendi padding/margin'ini düş
+    // .preview-shell veya .preview-device-frame genişliği belirleyici olmalı
+    const parent = stage.parentElement; 
+    const W = parent ? parent.clientWidth : stage.clientWidth;
+    
+    // Eğer W çok küçükse (örn: gizliyken), varsayılan bir değer ata veya işlemi durdur
+    if (!W || W < 50) return;
+
+    const S = W/960; 
+    box.style.setProperty('--s',S); 
+    
+    // Yüksekliği set ederken container kısıtlamalarına dikkat et
+    // 540 * S = Scaled Height
+    stage.style.height=(540*S)+'px'; 
+    stage.style.width='100%';
+  }
+  
+  // İlk yüklemede ve sonraki değişimlerde tetikle
   window.addEventListener('resize',fit,{passive:true});
   if (window.ResizeObserver) {
     const ro = new ResizeObserver(fit);
     if (stage) ro.observe(stage);
+    if (stage.parentElement) ro.observe(stage.parentElement); // Parent değişimini de izle
   } else {
     window.addEventListener('orientationchange',fit,{passive:true});
-    setInterval(fit, 400);
+    setInterval(fit, 400); 
   }
-  fit();
+  
+  // Modal açılış animasyonu bittiğinde de tetiklenmesi için:
+  document.addEventListener('transitionend', fit);
+  
+  // Hemen çalıştır
+  requestAnimationFrame(fit);
 })();
+
 
 const fontMap = <?=safe_json_encode($fontConfigForJs)?>;
 const loadedFontImports = new Set(<?=safe_json_encode($FONT_IMPORTS)?>);
@@ -1549,24 +1665,68 @@ function clearPendingUpload(){
 
 function makeTextDraggable(el){
   if (!el) return;
-  let ox=0, oy=0, dragging=false;
-  el.style.cursor='move';
-  el.addEventListener('mousedown',e=>{ dragging=true; ox=e.offsetX; oy=e.offsetY; el.style.cursor='grabbing'; });
-  window.addEventListener('mousemove',e=>{
-    if(!dragging) return;
-    const rect=canvas.getBoundingClientRect();
-    let x=e.clientX-rect.left-ox, y=e.clientY-rect.top-oy;
-    x=Math.max(0,Math.min(940,x)); y=Math.max(0,Math.min(520,y));
-    el.style.left=x+'px'; el.style.top=y+'px';
-  });
-  window.addEventListener('mouseup',()=>{ if(!dragging) return; dragging=false; el.style.cursor='move'; saveHidden(); });
-  el.addEventListener('touchstart',(e)=>{
-    const touch=e.touches[0]; if(!touch) return; dragging=true; const rect=el.getBoundingClientRect(); ox=touch.clientX-rect.left; oy=touch.clientY-rect.top; el.style.cursor='grabbing';
-  },{passive:false});
-  window.addEventListener('touchmove',(e)=>{
-    if(!dragging) return; const touch=e.touches[0]; if(!touch) return; const rect=canvas.getBoundingClientRect(); let x=touch.clientX-rect.left-ox, y=touch.clientY-rect.top-oy; x=Math.max(0,Math.min(940,x)); y=Math.max(0,Math.min(520,y)); el.style.left=x+'px'; el.style.top=y+'px';
-  },{passive:false});
-  window.addEventListener('touchend',()=>{ if(!dragging) return; dragging=false; el.style.cursor='move'; saveHidden(); });
+  el.style.touchAction = 'none';
+  
+  let startLeft=0, startTop=0, startMouseX=0, startMouseY=0;
+  let pointerId = null;
+
+  const onPointerDown = (evt) => {
+    if (evt.button !== 0 && evt.pointerType === 'mouse') return;
+    
+    evt.preventDefault();
+    pointerId = evt.pointerId;
+    el.setPointerCapture(pointerId);
+    el.style.cursor = 'grabbing';
+
+    const rect = canvas.getBoundingClientRect();
+    const S = rect.width / 960;
+    
+    startMouseX = (evt.clientX - rect.left) / S;
+    startMouseY = (evt.clientY - rect.top) / S;
+    
+    // Check computed style if inline style is missing
+    const computed = window.getComputedStyle(el);
+    const cLeft = parseFloat(computed.left) || 20; // fallback default
+    const cTop  = parseFloat(computed.top) || 20;
+
+    startLeft = el.style.left ? (parseFloat(el.style.left) || 0) : cLeft;
+    startTop  = el.style.top  ? (parseFloat(el.style.top)  || 0) : cTop;
+  };
+
+  const onPointerMove = (evt) => {
+    if (pointerId === null) return;
+    if (evt.pointerId !== pointerId) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const S = rect.width / 960;
+    
+    const currMouseX = (evt.clientX - rect.left) / S;
+    const currMouseY = (evt.clientY - rect.top) / S;
+
+    let x = startLeft + (currMouseX - startMouseX);
+    let y = startTop + (currMouseY - startMouseY);
+
+    x = Math.max(-100, Math.min(1000, x));
+    y = Math.max(-100, Math.min(600, y));
+
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+  };
+
+  const onPointerUp = (evt) => {
+    if (pointerId === null) return;
+    if (evt.pointerId !== pointerId) return;
+    
+    el.releasePointerCapture(pointerId);
+    pointerId = null;
+    el.style.cursor = 'move';
+    saveHidden();
+  };
+
+  el.addEventListener('pointerdown', onPointerDown);
+  el.addEventListener('pointermove', onPointerMove);
+  el.addEventListener('pointerup', onPointerUp);
+  el.addEventListener('pointercancel', onPointerUp);
 }
 [titleEl,subEl,prEl].forEach(makeTextDraggable);
 
@@ -1628,25 +1788,39 @@ function makeStickerDraggable(el){
   if (!el) return;
   el.style.touchAction = 'none';
   let pointerId = null;
-  let ox = 0, oy = 0;
+  let startLeft=0, startTop=0, startMouseX=0, startMouseY=0;
+
   el.addEventListener('pointerdown',(evt)=>{
     evt.preventDefault();
     pointerId = evt.pointerId;
-    ox = evt.offsetX;
-    oy = evt.offsetY;
     el.setPointerCapture(pointerId);
+
+    const rect = canvas.getBoundingClientRect();
+    const S = rect.width / 960;
+    startMouseX = (evt.clientX - rect.left) / S;
+    startMouseY = (evt.clientY - rect.top) / S;
+    startLeft = parseFloat(el.style.left) || 0;
+    startTop = parseFloat(el.style.top) || 0;
+
     const idx = parseInt(el.dataset.index, 10);
     if (!Number.isNaN(idx)) {
       setActiveSticker(idx);
     }
   });
+
   el.addEventListener('pointermove',(evt)=>{
     if (pointerId === null) return;
     const rect = canvas.getBoundingClientRect();
-    let x = evt.clientX - rect.left - ox;
-    let y = evt.clientY - rect.top - oy;
+    const S = rect.width / 960;
+    const currMouseX = (evt.clientX - rect.left) / S;
+    const currMouseY = (evt.clientY - rect.top) / S;
+    
+    let x = startLeft + (currMouseX - startMouseX);
+    let y = startTop + (currMouseY - startMouseY);
+
     x = Math.max(0, Math.min(940, x));
     y = Math.max(0, Math.min(520, y));
+
     el.style.left = x + 'px';
     el.style.top  = y + 'px';
     const idx = parseInt(el.dataset.index, 10);
@@ -1655,6 +1829,7 @@ function makeStickerDraggable(el){
       stickerState[idx].y = y;
     }
   });
+
   const finishDrag = ()=>{
     if (pointerId === null) return;
     el.releasePointerCapture(pointerId);

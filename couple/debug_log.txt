@@ -1,0 +1,19 @@
+POST Process at 2025-12-21 21:29:04
+Files: Array
+(
+    [name] => eren  beyy.png
+    [full_path] => eren  beyy.png
+    [type] => image/png
+    [tmp_name] => C:\Users\agir_\AppData\Local\Temp\phpE895.tmp
+    [error] => 0
+    [size] => 125361
+)
+
+Pending Placement: Array
+(
+    [x] => 27
+    [y] => 97
+    [width] => 260
+)
+
+Store Result: 'includes/../storage/events/10/guest-overlay-20251221-212904-26286cda.png'
