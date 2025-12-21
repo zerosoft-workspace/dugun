@@ -1,4 +1,4 @@
 /uploads/
 /storage/
 *.log
-sitemap.xml
+/sitemap.xml
