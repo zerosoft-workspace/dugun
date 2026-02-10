@@ -4,6 +4,7 @@ require_once __DIR__.'/../includes/db.php';
 require_once __DIR__.'/../includes/functions.php';
 require_once __DIR__.'/../includes/guests.php';
 require_once __DIR__.'/../includes/couple_auth.php';
+require_once __DIR__.'/../includes/theme.php';
 require_once __DIR__.'/../includes/login_header.php';
 
 install_schema();
@@ -189,48 +190,75 @@ function portal_tab_link(string $tab, array $params = []): string {
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Misafir &amp; Etkinlik Girişi — <?=h(APP_NAME)?></title>
+  <?=site_head_favicon()?>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <?=theme_head_assets()?>
   <style>
     <?=login_header_styles()?>
-    :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#526070; }
+    :root{ --brand:#0ea5b5; --brand-dark:#0b8b98; --ink:#0f172a; --muted:#526070; --surface:#ffffff; --shell-shadow:0 40px 120px -55px rgba(15,23,42,.5); }
+    :root[data-theme="dark"]{ --brand:#38bdf8; --brand-dark:#0ea5b5; --ink:#e2e8f0; --muted:#94a3b8; --surface:rgba(15,23,42,.9); --shell-shadow:0 46px 120px -60px rgba(8,47,73,.85); }
     *{box-sizing:border-box;}
-    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(135deg,rgba(14,165,181,.12),rgba(148,163,184,.08));font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);}
+    body{margin:0;min-height:100vh;display:flex;flex-direction:column;background:linear-gradient(135deg,rgba(14,165,181,.12),rgba(148,163,184,.08));font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;color:var(--ink);transition:background .25s ease,color .25s ease;}
+    [data-theme="dark"] body{background:radial-gradient(circle at top,#0f172a 0%,#020617 50%,#010b17 100%);color:var(--ink);}
     .auth-layout{flex:1;width:100%;display:flex;align-items:center;justify-content:center;padding:2.5rem 1.5rem 3rem;}
-    .auth-shell{width:100%;max-width:1080px;background:#fff;border-radius:30px;box-shadow:0 40px 120px -55px rgba(15,23,42,.5);display:flex;overflow:hidden;border:1px solid rgba(148,163,184,.18);}
-    .auth-visual{flex:1.05;position:relative;padding:3.1rem;color:#fff;display:flex;flex-direction:column;justify-content:space-between;}
-    .auth-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(15,23,42,.15),rgba(15,23,42,.45));}
+    .auth-shell{width:100%;max-width:1080px;background:var(--surface);border-radius:30px;box-shadow:var(--shell-shadow);display:flex;overflow:hidden;border:1px solid rgba(148,163,184,.18);transition:background .25s ease,box-shadow .25s ease,border-color .25s ease;}
+    [data-theme="dark"] .auth-shell{border-color:rgba(148,163,184,.24);}
+    .auth-visual{flex:1.05;position:relative;padding:3.1rem;color:#fff;display:flex;flex-direction:column;justify-content:space-between;transition:color .25s ease,background .25s ease;background:var(--visual-bg, linear-gradient(150deg,rgba(14,165,181,.88),rgba(99,102,241,.7)));background-size:cover;background-position:center;background-repeat:no-repeat;}
+    .auth-visual::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(15,23,42,.15),rgba(15,23,42,.45));transition:background .25s ease,opacity .25s ease;}
+    [data-theme="dark"] .auth-visual{color:#f8fafc;box-shadow:inset 0 0 0 1px rgba(56,189,248,.12);}
+    [data-theme="dark"] .auth-visual::after{background:linear-gradient(160deg,rgba(8,47,73,.55),rgba(15,23,42,.7));opacity:.88;}
     .auth-visual > *{position:relative;z-index:1;}
     .badge{display:inline-flex;align-items:center;gap:.6rem;padding:.45rem 1.2rem;border-radius:999px;background:rgba(255,255,255,.18);font-weight:600;letter-spacing:.08em;text-transform:uppercase;font-size:.78rem;}
     .visual-title{font-size:2.2rem;font-weight:800;line-height:1.2;margin:1.6rem 0 1rem;max-width:440px;}
     .visual-text{font-size:1.04rem;line-height:1.7;color:rgba(255,255,255,.9);max-width:440px;}
+    [data-theme="dark"] .visual-text{color:rgba(226,232,240,.86);}
     .feature-list{list-style:none;padding:0;margin:1.8rem 0 0;display:flex;flex-direction:column;gap:1rem;}
     .feature-list li{display:flex;align-items:flex-start;gap:.75rem;font-weight:600;color:rgba(255,255,255,.92);}
     .feature-list span{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.2);font-size:1rem;}
     .visual-footer{font-size:.84rem;color:rgba(255,255,255,.78);max-width:360px;margin-top:2.7rem;}
+    [data-theme="dark"] .visual-footer{color:rgba(226,232,240,.72);}
     .auth-form{flex:.95;padding:3rem 3.1rem;display:flex;flex-direction:column;gap:1.8rem;justify-content:center;}
-    .brand{font-weight:800;font-size:1.65rem;letter-spacing:.15rem;margin-bottom:.25rem;}
+    .brand{font-weight:800;font-size:1.65rem;letter-spacing:.15rem;margin-bottom:.25rem;color:var(--ink);transition:color .25s ease;}
     .brand span{display:block;font-size:.95rem;font-weight:600;color:var(--muted);margin-top:.35rem;letter-spacing:0;}
-    .tab-switch{display:flex;gap:.75rem;border-radius:16px;background:rgba(14,165,181,.08);padding:.4rem;}
+    .tab-switch{display:flex;gap:.75rem;border-radius:16px;background:rgba(14,165,181,.08);padding:.4rem;transition:background .25s ease,box-shadow .25s ease;}
+    [data-theme="dark"] .tab-switch{background:rgba(15,23,42,.78);box-shadow:0 24px 60px -40px rgba(8,47,73,.82);}
     .tab-switch a{flex:1;padding:.75rem 1.1rem;border-radius:12px;font-weight:600;text-align:center;color:var(--muted);transition:all .2s ease;text-decoration:none;}
     .tab-switch a.active{background:#0ea5b5;color:#fff;box-shadow:0 18px 40px -22px rgba(14,165,181,.6);}
+    [data-theme="dark"] .tab-switch a{color:rgba(226,232,240,.75);}
+    [data-theme="dark"] .tab-switch a.active{background:linear-gradient(135deg,#38bdf8,#0ea5b5);color:#04121f;box-shadow:0 24px 52px -26px rgba(56,189,248,.55);}
     .tab-switch a:hover{color:#0b8b98;}
+    [data-theme="dark"] .tab-switch a:hover{color:#38bdf8;}
     .form-note{color:var(--muted);font-size:.95rem;line-height:1.6;}
-    .form-control{border-radius:14px;border:1px solid rgba(148,163,184,.32);padding:.8rem 1rem;font-size:1rem;}
+    .form-control{border-radius:14px;border:1px solid rgba(148,163,184,.32);padding:.8rem 1rem;font-size:1rem;background:#fff;color:var(--ink);transition:background .25s ease,border-color .25s ease,color .25s ease;}
     .form-control:focus{border-color:var(--brand);box-shadow:0 0 0 .25rem rgba(14,165,181,.18);}
-    .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:14px;padding:.85rem 1rem;font-weight:700;font-size:1rem;transition:transform .2s ease,box-shadow .2s ease;background-image:linear-gradient(135deg,#0ea5b5,#0b8b98);}
+    [data-theme="dark"] .form-control{background:rgba(2,8,23,.68);border-color:rgba(148,163,184,.36);color:var(--ink);}
+    [data-theme="dark"] .form-control::placeholder{color:rgba(148,163,184,.68);}
+    .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:14px;padding:.85rem 1rem;font-weight:700;font-size:1rem;transition:transform .2s ease,box-shadow .2s ease,background .2s ease,color .2s ease;background-image:linear-gradient(135deg,#0ea5b5,#0b8b98);}
     .btn-brand:hover{transform:translateY(-1px);box-shadow:0 20px 36px -24px rgba(14,165,181,.65);color:#fff;}
+    [data-theme="dark"] .btn-brand{background-image:linear-gradient(135deg,#38bdf8,#0ea5b5);color:#04121f;box-shadow:0 22px 46px -24px rgba(8,47,73,.78);}
+    [data-theme="dark"] .btn-brand:hover{color:#04121f;}
     .alert{border-radius:14px;font-weight:500;}
     .option-grid{display:flex;flex-direction:column;gap:1rem;}
-    .option-card{border:1px solid rgba(148,163,184,.24);border-radius:18px;padding:1.25rem 1.4rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;transition:transform .2s ease,box-shadow .2s ease;border-left:4px solid transparent;}
+    .option-card{border:1px solid rgba(148,163,184,.24);border-radius:18px;padding:1.25rem 1.4rem;display:flex;align-items:center;justify-content:space-between;gap:1rem;transition:transform .2s ease,box-shadow .2s ease,border-color .25s ease,background .25s ease; border-left:4px solid transparent;background:#fff;}
     .option-card:hover{transform:translateY(-2px);box-shadow:0 22px 50px -30px rgba(15,23,42,.3);border-left-color:var(--brand);}
+    [data-theme="dark"] .option-card{background:rgba(15,23,42,.82);border-color:rgba(56,189,248,.2);}
+    [data-theme="dark"] .option-card:hover{box-shadow:0 28px 60px -34px rgba(8,47,73,.8);border-left-color:#38bdf8;}
     .option-card h3{margin:0;font-size:1.1rem;font-weight:700;color:var(--ink);}
     .option-card time{display:block;font-size:.9rem;color:var(--muted);margin-top:.25rem;}
     .option-card button{min-width:160px;}
     .footer-links{display:flex;flex-wrap:wrap;gap:.75rem;font-weight:600;}
     .footer-links a{color:var(--brand);text-decoration:none;}
     .footer-links a:hover{text-decoration:underline;color:var(--brand-dark);}
+    [data-theme="dark"] .footer-links a{color:#38bdf8;}
+    [data-theme="dark"] .footer-links a:hover{color:#7dd3fc;}
     .muted-tip{font-size:.85rem;color:var(--muted);}
-    @media(max-width:992px){body{padding:1.5rem;} .auth-shell{flex-direction:column;} .auth-visual{padding:2.6rem;} .auth-form{padding:2.4rem;}}
+    [data-theme="dark"] .muted-tip{color:#94a3b8;}
+    @media(max-width:992px){
+      body{padding:1.5rem;}
+      .auth-shell{flex-direction:column;}
+      .auth-form{order:-1;padding:2.4rem;}
+      .auth-visual{padding:2.6rem;}
+    }
     @media(max-width:576px){.auth-form{padding:2rem;} .visual-title{font-size:1.75rem;}}
   </style>
 </head>
@@ -238,7 +266,7 @@ function portal_tab_link(string $tab, array $params = []): string {
   <?php render_login_header('guest'); ?>
   <main class="auth-layout">
     <div class="auth-shell">
-      <aside class="auth-visual" style="background: <?=$visualStyle?>;">
+      <aside class="auth-visual" style="--visual-bg: <?=$visualStyle?>;">
         <div>
           <span class="badge"><?=$copy['badge']?></span>
           <h1 class="visual-title"><?=$copy['headline']?></h1>
@@ -287,12 +315,13 @@ function portal_tab_link(string $tab, array $params = []): string {
               </div>
               <button type="submit" class="btn btn-brand mt-2"><?=$copy['button']?></button>
             </form>
-            <div class="muted-tip">Doğrulama bağlantısındaki şifre oluşturma adımını tamamladıktan sonra panel erişiminiz aktifleşir.</div>
+            <div class="muted-tip">Doğrulama bağlantısındaki şifre oluşturma adımını tamamladıktan sonra panel erişiminiz aktifleşir.<br>Birden fazla etkinliğe davetliyseniz girişten sonra listeden etkinliğinizi seçebilirsiniz.</div>
           <?php else: ?>
             <div class="d-flex justify-content-between align-items-center">
               <h2 class="h5 fw-semibold mb-0">Etkinlik Seçin</h2>
               <a class="small text-decoration-none" href="<?=h(portal_tab_link('guest', ['reset' => 1]))?>">Başka bir hesapla giriş yap</a>
             </div>
+            <p class="small text-muted mt-2 mb-0">Aynı şifre ile davet edildiğiniz tüm etkinlikleri buradan yönetebilirsiniz.</p>
             <div class="option-grid mt-3">
               <?php foreach ($guestChoices as $profileId => $event): ?>
                 <?php

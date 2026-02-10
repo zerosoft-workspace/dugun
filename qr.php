@@ -3,6 +3,10 @@ require_once __DIR__.'/config.php';
 require_once __DIR__.'/includes/db.php';
 require_once __DIR__.'/includes/functions.php';
 
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 $code=trim($_GET['code']??'');
 if ($code===''){ http_response_code(404); exit('QR yok'); }
 
@@ -11,7 +15,7 @@ $st->execute([$code]);
 $q=$st->fetch();
 if ($q && $q['ev_id']){
   $dest = public_upload_url((int)$q['ev_id']);
-  redirect($dest, 301);
+  redirect($dest);
 }
 
 $st2=pdo()->prepare("SELECT dc.*, e.id AS ev_id FROM dealer_codes dc LEFT JOIN events e ON e.id=dc.target_event_id WHERE dc.code=? LIMIT 1");
@@ -19,7 +23,7 @@ $st2->execute([$code]);
 $dc=$st2->fetch();
 if ($dc && $dc['ev_id']){
   $dest = public_upload_url((int)$dc['ev_id']);
-  redirect($dest, 301);
+  redirect($dest);
 }
 
 $st3=pdo()->prepare(
@@ -30,8 +34,9 @@ $st3=pdo()->prepare(
 $st3->execute([$code]);
 $dq=$st3->fetch();
 if ($dq && $dq['ev_id']){
-  $dest = public_upload_url((int)$dq['ev_id']);
-  redirect($dest, 301);
+  $eventId = (int)$dq['ev_id'];
+  $dest = BASE_URL.'/public/upload.php?event='.$eventId.'&code='.rawurlencode($dq['code']);
+  redirect($dest);
 }
 
 http_response_code(404);

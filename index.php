@@ -15,20 +15,92 @@ install_schema();
 
 $packages = site_public_packages();
 $content = site_public_content();
+$defaults = site_content_defaults();
 $faqItems = $content['faq_items'];
 $footerNav = $content['footer_nav_links'];
+$metaTitle = trim((string)($content['seo_meta_title'] ?? ''));
+$metaDescription = trim((string)($content['seo_meta_description'] ?? ''));
+$metaKeywords = trim((string)($content['seo_meta_keywords'] ?? ''));
+$heroBadge = trim((string)($content['hero_badge'] ?? ''));
+$heroTitle = trim((string)($content['hero_title'] ?? ''));
+$heroText = trim((string)($content['hero_text'] ?? ''));
+$heroPrimaryLabel = trim((string)($content['hero_primary_label'] ?? ''));
+$heroPrimaryUrl = site_resolve_button_url($content['hero_primary_url'] ?? '') ?? '';
+$heroSecondaryLabel = trim((string)($content['hero_secondary_label'] ?? ''));
+$heroSecondaryUrl = site_resolve_button_url($content['hero_secondary_url'] ?? '') ?? '';
+$heroMetrics = $content['hero_metrics'] ?? [];
+if (!is_array($heroMetrics) || !$heroMetrics) {
+  $heroMetrics = $defaults['hero_metrics'];
+}
 $heroImageMain = $content['hero_image_main'] ?? '';
 $heroImageSecondary = $content['hero_image_secondary'] ?? '';
 $aboutImage = $content['about_image'] ?? '';
+$aboutBadge = trim((string)($content['about_badge'] ?? ''));
+$aboutTitle = trim((string)($content['about_title'] ?? ''));
+$aboutText = trim((string)($content['about_text'] ?? ''));
+$aboutFeatures = $content['about_features'] ?? [];
+if (!is_array($aboutFeatures) || !$aboutFeatures) {
+  $aboutFeatures = $defaults['about_features'];
+}
+$featureBlocks = $content['feature_blocks'] ?? [];
+if (!is_array($featureBlocks) || !$featureBlocks) {
+  $featureBlocks = $defaults['feature_blocks'];
+}
+$timelineTitle = trim((string)($content['timeline_title'] ?? ''));
+$timelineText = trim((string)($content['timeline_text'] ?? ''));
+$timelineSteps = $content['timeline_steps'] ?? [];
+if (!is_array($timelineSteps) || !$timelineSteps) {
+  $timelineSteps = $defaults['timeline_steps'];
+}
+$packagesTitle = trim((string)($content['packages_title'] ?? ''));
+$packagesText = trim((string)($content['packages_text'] ?? ''));
+$packagesHighlights = $content['packages_highlights'] ?? [];
+if (!is_array($packagesHighlights) || !$packagesHighlights) {
+  $packagesHighlights = $defaults['packages_highlights'];
+}
 $galleryImages = $content['gallery_images'] ?? [];
 $galleryImages = is_array($galleryImages) ? $galleryImages : [];
 $dealerShowcaseImage = $content['dealer_showcase_image'] ?? '';
+$dealerBadge = trim((string)($content['dealer_badge'] ?? ''));
+$dealerTitle = trim((string)($content['dealer_title'] ?? ''));
+$dealerText = trim((string)($content['dealer_text'] ?? ''));
+$dealerHighlights = $content['dealer_highlights'] ?? [];
+if (!is_array($dealerHighlights) || !$dealerHighlights) {
+  $dealerHighlights = $defaults['dealer_highlights'];
+}
+$dealerButtonLabel = trim((string)($content['dealer_button_label'] ?? ''));
+$dealerButtonUrl = site_resolve_button_url($content['dealer_button_url'] ?? '') ?? '';
+$galleryTitle = trim((string)($content['gallery_title'] ?? ''));
+$galleryText = trim((string)($content['gallery_text'] ?? ''));
+$testimonials = $content['testimonials'] ?? [];
+if (!is_array($testimonials) || !$testimonials) {
+  $testimonials = $defaults['testimonials'];
+}
 $contactWebsiteUrl = site_normalize_url($content['contact_website'] ?? '') ?? '';
 $contactWebsiteLabel = $content['contact_website_label'] ?? '';
 $contactPhoneHref = site_phone_href($content['contact_phone'] ?? '') ?? '';
 $contactPrimaryUrl = site_resolve_button_url($content['contact_primary_url'] ?? '') ?? '';
 $contactSecondaryUrl = site_resolve_button_url($content['contact_secondary_url'] ?? '') ?? '';
 $contactCtaButtonUrl = site_resolve_button_url($content['contact_cta_button_url'] ?? '') ?? '';
+$ctaBannerTitle = trim((string)($content['cta_banner_title'] ?? ''));
+$ctaBannerText = trim((string)($content['cta_banner_text'] ?? ''));
+$ctaBannerButtonLabel = trim((string)($content['cta_banner_button_label'] ?? ''));
+$ctaBannerButtonUrl = site_resolve_button_url($content['cta_banner_button_url'] ?? '') ?? '';
+$blogBadge = trim((string)($content['blog_section_badge'] ?? ''));
+$blogTitle = trim((string)($content['blog_section_title'] ?? ''));
+$blogText = trim((string)($content['blog_section_text'] ?? ''));
+$blogPosts = $content['blog_posts'] ?? [];
+if (!is_array($blogPosts) || !$blogPosts) {
+  $blogPosts = $defaults['blog_posts'];
+}
+$leadFormTitle = trim((string)($content['lead_form_title'] ?? ''));
+$leadFormText = trim((string)($content['lead_form_text'] ?? ''));
+$leadFormBullets = $content['lead_form_bullets'] ?? [];
+if (!is_array($leadFormBullets) || !$leadFormBullets) {
+  $leadFormBullets = $defaults['lead_form_bullets'];
+}
+$leadFormNotice = trim((string)($content['lead_form_notice'] ?? ''));
+$leadFormSubmitLabel = trim((string)($content['lead_form_submit_label'] ?? ''));
 $formData = $_SESSION['lead_form'] ?? [
   'customer_name' => '',
   'customer_email' => '',
@@ -46,7 +118,19 @@ unset($_SESSION['lead_success']);
 ?>
 <!doctype html><html lang="tr"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?=h(APP_NAME)?> — Dijital Etkinlik Deneyiminiz</title>
+<?php $documentTitle = $metaTitle !== '' ? $metaTitle : (APP_NAME.' — Dijital Etkinlik Deneyiminiz'); ?>
+<title><?=h($documentTitle)?></title>
+<?php if ($metaDescription !== ''): ?>
+<meta name="description" content="<?=h($metaDescription)?>">
+<meta property="og:description" content="<?=h($metaDescription)?>">
+<?php endif; ?>
+<?php if ($metaKeywords !== ''): ?>
+<meta name="keywords" content="<?=h($metaKeywords)?>">
+<?php endif; ?>
+<meta property="og:title" content="<?=h($documentTitle)?>">
+<meta property="og:type" content="website">
+<meta property="og:url" content="<?=h(BASE_URL.'/index.php')?>">
+<?=site_head_favicon($content)?>
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <?=theme_head_assets()?>
 <style>
@@ -58,56 +142,145 @@ unset($_SESSION['lead_success']);
     --brand-dark:#0c8d9a;
     --card:#ffffff;
     --bg:#f4f7fb;
+    --border:rgba(14,165,181,0.14);
+  }
+  :root[data-theme="dark"] {
+    --ink:#e2e8f0;
+    --muted:#94a3b8;
+    --brand:#38bdf8;
+    --brand-dark:#0ea5b5;
+    --card:rgba(15,23,42,0.92);
+    --bg:#020617;
+    --border:rgba(148,163,184,0.26);
   }
   body{background:linear-gradient(180deg,var(--bg),#fff);font-family:'Inter',sans-serif;color:var(--ink);}
+  [data-theme="dark"] body{background:radial-gradient(circle at top,#0f172a 0%,#020617 46%,#010b17 100%);color:var(--ink);}
   .hero{position:relative;overflow:hidden;border-radius:36px;padding:96px 48px;background:linear-gradient(140deg,rgba(14,165,181,0.92),rgba(59,130,246,0.88));color:#fff;}
+  [data-theme="dark"] .hero{background:linear-gradient(145deg,rgba(14,165,181,0.28),rgba(15,23,42,0.88));box-shadow:0 42px 110px -54px rgba(8,47,73,0.9);}
   .hero::after{content:"";position:absolute;inset:-120px -60px auto 40%;width:420px;height:420px;background:rgba(255,255,255,0.12);filter:blur(0);border-radius:50%;}
+  [data-theme="dark"] .hero::after{background:radial-gradient(circle at center,rgba(56,189,248,0.22),transparent 68%);opacity:0.6;}
   .hero-visual{position:relative;z-index:1;}
   .hero-visual img{border-radius:24px;box-shadow:0 30px 90px rgba(15,118,110,0.35);}
+  [data-theme="dark"] .hero-visual img{box-shadow:0 36px 110px -48px rgba(8,47,73,0.85);border:1px solid rgba(148,163,184,0.25);}
   .hero-visual img:nth-child(2){position:absolute;top:40%;left:50%;width:220px;border:6px solid rgba(255,255,255,0.8);transform:translate(-30%, -10%);}
+  [data-theme="dark"] .hero-visual img:nth-child(2){border:6px solid rgba(15,23,42,0.82);background:rgba(15,23,42,0.92);}
   .metrics-card{border-radius:24px;background:rgba(255,255,255,0.16);padding:28px;backdrop-filter:blur(8px);}
+  [data-theme="dark"] .metrics-card{background:rgba(15,23,42,0.68);border:1px solid rgba(148,163,184,0.22);box-shadow:0 30px 90px -60px rgba(8,47,73,0.8);}
   .feature-card{border-radius:24px;background:#fff;box-shadow:0 24px 60px rgba(148,163,184,0.18);padding:32px;transition:transform .25s ease,box-shadow .25s ease;}
+  [data-theme="dark"] .feature-card{background:var(--card);border:1px solid var(--border);box-shadow:0 30px 70px -50px rgba(8,47,73,0.85);}
   .feature-card:hover{transform:translateY(-6px);box-shadow:0 36px 80px rgba(148,163,184,0.25);}
+  [data-theme="dark"] .feature-card:hover{box-shadow:0 42px 90px -52px rgba(8,47,73,0.9);}
   .feature-icon{width:56px;height:56px;border-radius:18px;background:rgba(14,165,181,0.12);display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:var(--brand);}
+  [data-theme="dark"] .feature-icon{background:rgba(56,189,248,0.16);color:var(--brand);box-shadow:0 18px 40px -28px rgba(8,47,73,0.65);}
   .timeline-step{display:flex;gap:16px;padding:16px;border-radius:18px;background:#fff;box-shadow:0 16px 40px rgba(15,118,110,0.12);}
+  [data-theme="dark"] .timeline-step{background:var(--card);border:1px solid var(--border);box-shadow:0 26px 70px -52px rgba(8,47,73,0.85);}
   .timeline-step span{width:44px;height:44px;border-radius:14px;background:rgba(14,165,181,0.12);color:var(--brand);display:flex;align-items:center;justify-content:center;font-weight:700;}
+  [data-theme="dark"] .timeline-step span{background:rgba(56,189,248,0.12);color:var(--brand);}
   .package-card{border-radius:24px;border:1px solid rgba(14,165,181,0.12);background:#fff;height:100%;padding:32px;transition:transform .2s ease,box-shadow .2s ease;}
+  [data-theme="dark"] .package-card{background:var(--card);border:1px solid var(--border);box-shadow:0 32px 80px -54px rgba(8,47,73,0.88);}
   .package-card:hover{transform:translateY(-6px);box-shadow:0 28px 70px rgba(15,118,110,0.18);}
+  [data-theme="dark"] .package-card:hover{box-shadow:0 40px 90px -56px rgba(8,47,73,0.9);}
   .package-price{font-size:1.9rem;font-weight:800;color:var(--brand);}
   .gallery-grid{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
   .gallery-grid img{width:100%;height:220px;object-fit:cover;border-radius:24px;box-shadow:0 18px 50px rgba(15,118,110,0.18);}
+  [data-theme="dark"] .gallery-grid img{box-shadow:0 26px 80px -60px rgba(8,47,73,0.82);border:1px solid rgba(148,163,184,0.22);}
   .testimonial{border-radius:24px;background:#fff;padding:32px;box-shadow:0 22px 60px rgba(15,118,110,0.16);position:relative;}
+  [data-theme="dark"] .testimonial{background:var(--card);border:1px solid var(--border);box-shadow:0 34px 90px -58px rgba(8,47,73,0.88);}
   .testimonial::before{content:'“';position:absolute;top:-16px;left:24px;font-size:5rem;color:rgba(14,165,181,0.2);}
+  [data-theme="dark"] .testimonial::before{color:rgba(56,189,248,0.24);}
+  .blog-section{border-radius:32px;background:rgba(255,255,255,0.92);padding:48px;box-shadow:0 32px 90px -60px rgba(15,118,110,0.22);}
+  [data-theme="dark"] .blog-section{background:rgba(15,23,42,0.86);border:1px solid rgba(148,163,184,0.24);box-shadow:0 40px 120px -64px rgba(8,47,73,0.9);}
+  .blog-card{border-radius:26px;background:#fff;box-shadow:0 24px 70px -55px rgba(15,118,110,0.18);overflow:hidden;display:flex;flex-direction:column;height:100%;transition:transform .2s ease,box-shadow .2s ease;}
+  .blog-card:hover{transform:translateY(-6px);box-shadow:0 34px 100px -60px rgba(15,118,110,0.28);}
+  [data-theme="dark"] .blog-card{background:var(--card);border:1px solid var(--border);box-shadow:0 30px 90px -60px rgba(8,47,73,0.88);}
+  [data-theme="dark"] .blog-card:hover{box-shadow:0 40px 120px -70px rgba(8,47,73,0.9);}
+  .blog-card__media{position:relative;min-height:220px;background-size:cover;background-position:center;border-radius:0;overflow:hidden;}
+  .blog-card__media::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.55));opacity:.65;transition:opacity .2s ease;}
+  .blog-card:hover .blog-card__media::after{opacity:.8;}
+  .blog-card__media--empty{background:linear-gradient(135deg,rgba(14,165,181,0.22),rgba(15,23,42,0.12));}
+  [data-theme="dark"] .blog-card__media--empty{background:linear-gradient(135deg,rgba(56,189,248,0.28),rgba(8,47,73,0.5));}
+  .blog-card__date{position:absolute;left:18px;bottom:18px;border-radius:999px;background:rgba(255,255,255,0.85);backdrop-filter:blur(8px);}
+  [data-theme="dark"] .blog-card__date{background:rgba(15,23,42,0.78);color:#38bdf8!important;border:1px solid rgba(56,189,248,0.24);}
+  .blog-card__body{padding:28px;display:flex;flex-direction:column;gap:1rem;height:100%;}
+  .blog-card__link{color:var(--brand);font-weight:600;text-decoration:none;display:inline-flex;align-items-center;gap:.45rem;}
+  .blog-card__link:hover{color:var(--brand-dark);text-decoration:underline;}
   .cta-section{border-radius:32px;background:linear-gradient(135deg,#0ea5b5,#6366f1);color:#fff;padding:48px;}
+  [data-theme="dark"] .cta-section{background:linear-gradient(135deg,rgba(56,189,248,0.18),rgba(14,116,198,0.42));backdrop-filter:blur(12px);border:1px solid rgba(148,163,184,0.2);}
   .form-section{border-radius:28px;background:#fff;box-shadow:0 32px 90px rgba(15,118,110,0.2);padding:48px;}
+  [data-theme="dark"] .form-section{background:var(--card);border:1px solid var(--border);box-shadow:0 34px 100px -60px rgba(8,47,73,0.9);}
   .input-rounded{border-radius:16px;border:1px solid #d7e4eb;padding:12px 16px;}
+  [data-theme="dark"] .input-rounded{background:rgba(15,23,42,0.82);border-color:rgba(148,163,184,0.26);color:var(--ink);}
   .btn-brand{background:var(--brand);color:#fff;border:none;border-radius:18px;padding:14px 32px;font-weight:700;}
   .btn-brand:hover{background:var(--brand-dark);color:#fff;}
+  [data-theme="dark"] .hero .btn-light{background:rgba(226,232,240,0.08);color:#f8fafc;border:1px solid rgba(226,232,240,0.24);}
+  [data-theme="dark"] .hero .btn-light:hover{background:rgba(226,232,240,0.16);color:#fff;}
+  [data-theme="dark"] .hero .btn-outline-light{color:#f8fafc;border-color:rgba(226,232,240,0.35);}
+  [data-theme="dark"] .hero .btn-outline-light:hover{background:rgba(226,232,240,0.16);color:#04121f;border-color:rgba(226,232,240,0.45);}
   .btn-guest{border-radius:999px;border:1px solid rgba(14,165,181,0.3);color:var(--brand);font-weight:600;padding:10px 22px;background:rgba(14,165,181,0.08);}
   .btn-guest:hover{color:#fff;background:var(--brand);border-color:var(--brand);}
   .muted{color:var(--muted);}
+  [data-theme="dark"] .muted{color:var(--muted);}
+  [data-theme="dark"] .badge.bg-light{background:rgba(56,189,248,0.16)!important;color:#38bdf8!important;}
+  [data-theme="dark"] .badge.bg-light.text-dark{color:#38bdf8!important;}
   .nav-link{font-weight:600;color:var(--muted)!important;}
   .nav-link:hover,.nav-link:focus,.nav-link.active{color:var(--brand)!important;}
   .site-navbar{backdrop-filter:blur(10px);}
+  [data-theme="dark"] .site-navbar{--nav-bg:rgba(15,23,42,0.88);background:var(--nav-bg) !important;border-bottom:1px solid rgba(148,163,184,0.18);box-shadow:0 26px 60px -44px rgba(8,47,73,0.85);}
+  [data-theme="dark"] .site-navbar .navbar-brand{color:#f8fafc;}
+  [data-theme="dark"] .site-navbar .nav-link{color:rgba(226,232,240,0.78)!important;}
+  [data-theme="dark"] .site-navbar .nav-link:hover,[data-theme="dark"] .site-navbar .nav-link:focus,[data-theme="dark"] .site-navbar .nav-link.active{color:#38bdf8!important;}
+  [data-theme="dark"] .site-navbar .btn-brand{background:linear-gradient(135deg,#38bdf8,#0ea5b5);color:#04121f;box-shadow:0 28px 70px -44px rgba(8,47,73,0.9);}
+  [data-theme="dark"] .site-navbar .btn-brand:hover,[data-theme="dark"] .site-navbar .btn-brand:focus{color:#04121f;}
   .contact-card{border-radius:24px;background:#fff;box-shadow:0 24px 60px rgba(15,118,110,0.18);padding:32px;}
+  [data-theme="dark"] .contact-card{background:var(--card);border:1px solid var(--border);box-shadow:0 34px 90px -58px rgba(8,47,73,0.88);}
   .contact-card ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:12px;}
   .contact-card ul li strong{color:var(--ink);min-width:84px;display:inline-block;}
   .contact-card ul li a{color:var(--brand);font-weight:600;text-decoration:none;}
   .contact-card ul li a:hover{color:var(--brand-dark);text-decoration:underline;}
   .contact-card .btn-outline-secondary{border-color:rgba(14,165,181,0.35);color:var(--brand);background:rgba(14,165,181,0.08);}
   .contact-card .btn-outline-secondary:hover{background:var(--brand);color:#fff;border-color:var(--brand);}
+  [data-theme="dark"] .contact-card .btn-outline-secondary{color:#f8fafc;border-color:rgba(148,163,184,0.35);background:rgba(148,163,184,0.12);}
+  [data-theme="dark"] .contact-card .btn-outline-secondary:hover{background:rgba(56,189,248,0.24);color:#04121f;border-color:rgba(56,189,248,0.45);}
+  .btn-cta{border:none;border-radius:999px;padding:14px 34px;font-weight:700;background:linear-gradient(135deg,#38bdf8,#0ea5b5);color:#031525;box-shadow:0 20px 40px -18px rgba(14,165,181,0.65);transition:transform .18s ease,box-shadow .18s ease,opacity .18s ease;}
+  .btn-cta:hover,.btn-cta:focus{color:#031525;transform:translateY(-2px);box-shadow:0 26px 55px -22px rgba(14,165,181,0.72);opacity:.95;}
+  [data-theme="dark"] .btn-cta{background:linear-gradient(135deg,#38bdf8,#0ea5b5);color:#031525;box-shadow:0 28px 60px -30px rgba(8,47,73,0.85);}
+  [data-theme="dark"] .btn-cta:hover,[data-theme="dark"] .btn-cta:focus{color:#031525;box-shadow:0 32px 70px -32px rgba(8,47,73,0.9);}
+  .faq-surface{background:var(--card);border-radius:32px;padding:48px;box-shadow:0 42px 120px -68px rgba(15,118,110,0.35);position:relative;overflow:hidden;}
+  .faq-surface::before{content:"";position:absolute;inset:-160px auto auto -120px;width:320px;height:320px;background:radial-gradient(circle at center,rgba(14,165,181,0.18),transparent 70%);}
+  .faq-surface::after{content:"";position:absolute;inset:auto -140px -120px auto;width:260px;height:260px;background:radial-gradient(circle at center,rgba(59,130,246,0.18),transparent 70%);}
+  [data-theme="dark"] .faq-surface{background:rgba(15,23,42,0.92);border:1px solid var(--border);box-shadow:0 60px 140px -80px rgba(8,47,73,0.85);}
+  [data-theme="dark"] .faq-surface::before{background:radial-gradient(circle at center,rgba(56,189,248,0.16),transparent 70%);}
+  [data-theme="dark"] .faq-surface::after{background:radial-gradient(circle at center,rgba(14,165,181,0.16),transparent 70%);}
+  .faq-surface .accordion{position:relative;z-index:1;}
+  .faq-surface .accordion-item{border:none;border-radius:20px;margin-bottom:12px;overflow:hidden;box-shadow:0 18px 50px -28px rgba(15,118,110,0.25);}
+  .faq-surface .accordion-item:last-child{margin-bottom:0;}
+  [data-theme="dark"] .faq-surface .accordion-item{background:rgba(15,23,42,0.82);box-shadow:0 28px 70px -42px rgba(8,47,73,0.8);}
+  .faq-surface .accordion-button{font-weight:600;padding:18px 24px;border:none;box-shadow:none;}
+  .faq-surface .accordion-button:not(.collapsed){background:rgba(14,165,181,0.12);color:var(--brand);box-shadow:none;}
+  [data-theme="dark"] .faq-surface .accordion-button:not(.collapsed){background:rgba(56,189,248,0.18);color:#38bdf8;}
+  .faq-surface .accordion-button:focus{box-shadow:none;border:none;}
+  .faq-surface .accordion-body{padding:0 24px 18px;color:var(--muted);}
   .cta-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  [data-theme="dark"] .site-navbar .navbar-brand img{filter:brightness(0) invert(1);}
   .navbar-toggler{border:none;box-shadow:none;}
+  [data-theme="dark"] .navbar-toggler{filter:invert(1);}
   footer{background:var(--brand);color:#f0fdfa;padding:48px 0 40px;margin-top:48px;}
+  [data-theme="dark"] footer{background:linear-gradient(180deg,#04121f,#020617);color:#e2e8f0;}
   footer h5, footer h6{color:#fff;}
+  [data-theme="dark"] footer h5,[data-theme="dark"] footer h6{color:#f8fafc;}
   footer a{color:rgba(255,255,255,0.9);font-weight:600;text-decoration:none;}
   footer a:hover{color:#0f172a;text-decoration:underline;}
+  [data-theme="dark"] footer a{color:rgba(226,232,240,0.82);}
+  [data-theme="dark"] footer a:hover{color:#38bdf8;}
   .footer-payment-logo{height:28px;filter:brightness(0) invert(1);opacity:0.85;transition:opacity .2s ease;}
   .footer-payment-logo:hover{opacity:1;}
+  [data-theme="dark"] .footer-payment-logo{opacity:0.65;}
   .footer-nav a{color:#fdfdfd;display:inline-block;margin-bottom:8px;}
+  [data-theme="dark"] .footer-nav a{color:rgba(226,232,240,0.86);}
   .footer-nav a:hover{color:#0f172a;}
+  [data-theme="dark"] .footer-nav a:hover{color:#38bdf8;}
   @media(max-width:992px){.hero{padding:72px 28px;}.hero-visual img:nth-child(2){display:none;}}
-  @media(max-width:768px){.form-section{padding:32px;}}
+  @media(max-width:768px){.form-section{padding:32px;}.faq-surface{padding:32px 24px;}}
 </style>
 </head><body>
 <?php site_public_header('home', $content); ?>
@@ -116,12 +289,22 @@ unset($_SESSION['lead_success']);
   <section class="hero mb-5">
     <div class="row align-items-center g-5 position-relative" style="z-index:2;">
       <div class="col-lg-6">
-        <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Yeni nesil misafir paylaşımı</span>
-        <h1 class="fw-bold display-5 mt-4 mb-3">Tek QR kodla tüm fotoğraf ve videoları toplayın</h1>
-        <p class="lead mb-4">BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak etkinlik panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.</p>
+        <?php if ($heroBadge !== ''): ?>
+          <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold"><?=h($heroBadge)?></span>
+        <?php endif; ?>
+        <?php if ($heroTitle !== ''): ?>
+          <h1 class="fw-bold display-5 mt-4 mb-3"><?=h($heroTitle)?></h1>
+        <?php endif; ?>
+        <?php if ($heroText !== ''): ?>
+          <p class="lead mb-4"><?=nl2br(h($heroText))?></p>
+        <?php endif; ?>
         <div class="d-flex flex-wrap gap-3">
-          <a class="btn btn-light text-dark fw-semibold" href="#paketler">Paketleri İncele</a>
-          <a class="btn btn-outline-light fw-semibold" href="#lead-form">Hemen Başlayın</a>
+          <?php if ($heroPrimaryUrl && $heroPrimaryLabel !== ''): ?>
+            <a class="btn btn-light text-dark fw-semibold" href="<?=h($heroPrimaryUrl)?>"><?=h($heroPrimaryLabel)?></a>
+          <?php endif; ?>
+          <?php if ($heroSecondaryUrl && $heroSecondaryLabel !== ''): ?>
+            <a class="btn btn-outline-light fw-semibold" href="<?=h($heroSecondaryUrl)?>"><?=h($heroSecondaryLabel)?></a>
+          <?php endif; ?>
         </div>
       </div>
       <div class="col-lg-6 hero-visual">
@@ -130,24 +313,20 @@ unset($_SESSION['lead_success']);
       </div>
     </div>
     <div class="row mt-5 g-4 position-relative" style="z-index:2;">
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">12.500+</div>
-          <div class="small">Toplanan fotoğraf ve videolar</div>
+      <?php foreach ($heroMetrics as $metric):
+        $metricValue = trim((string)($metric['value'] ?? ''));
+        $metricLabel = trim((string)($metric['label'] ?? ''));
+        if ($metricValue === '' && $metricLabel === '') {
+          continue;
+        }
+      ?>
+        <div class="col-md-4">
+          <div class="metrics-card h-100">
+            <?php if ($metricValue !== ''): ?><div class="h2 fw-bold mb-1"><?=h($metricValue)?></div><?php endif; ?>
+            <?php if ($metricLabel !== ''): ?><div class="small"><?=h($metricLabel)?></div><?php endif; ?>
+          </div>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">%98</div>
-          <div class="small">Misafir memnuniyeti</div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="metrics-card h-100">
-          <div class="h2 fw-bold mb-1">5 dk</div>
-          <div class="small">Ödeme sonrası panel hazır olma süresi</div>
-        </div>
-      </div>
+      <?php endforeach; ?>
     </div>
   </section>
 
@@ -162,71 +341,82 @@ unset($_SESSION['lead_success']);
         <img class="img-fluid rounded-4 shadow-lg" src="<?=h($aboutImage)?>" alt="Mutlu etkinlik sahipleri">
       </div>
       <div class="col-lg-6">
-        <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">BİKARE Hakkında</span>
-        <h2 class="fw-bold mt-3">Her anınızı dijital sahneye taşıyan çözüm ortağınız</h2>
-        <p class="muted">Zerosoft olarak düğün, nişan, kurumsal davet ve tüm özel etkinliklerinizde misafirlerinizle aynı anda nefes alan bir platform geliştirdik. BİKARE; yüksek yükleme kapasitesi, güçlü misafir etkileşim araçları ve otomatik QR kod altyapısıyla sizi teknik detaylardan kurtarır.</p>
-        <div class="row g-3">
-          <div class="col-sm-6">
-            <div class="feature-card h-100">
-              <h5 class="fw-semibold">Profesyonel destek</h5>
-              <p class="muted small mb-0">Kurulumdan canlı yayına kadar deneyimli ekibimizle yanınızdayız.</p>
-            </div>
+        <?php if ($aboutBadge !== ''): ?>
+          <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold"><?=h($aboutBadge)?></span>
+        <?php endif; ?>
+        <?php if ($aboutTitle !== ''): ?>
+          <h2 class="fw-bold mt-3"><?=h($aboutTitle)?></h2>
+        <?php endif; ?>
+        <?php if ($aboutText !== ''): ?>
+          <p class="muted"><?=nl2br(h($aboutText))?></p>
+        <?php endif; ?>
+        <?php if ($aboutFeatures): ?>
+          <div class="row g-3">
+            <?php foreach ($aboutFeatures as $feature):
+              $featureTitle = trim((string)($feature['title'] ?? ''));
+              $featureText = trim((string)($feature['text'] ?? ''));
+              if ($featureTitle === '' && $featureText === '') {
+                continue;
+              }
+            ?>
+              <div class="col-sm-6">
+                <div class="feature-card h-100">
+                  <?php if ($featureTitle !== ''): ?><h5 class="fw-semibold"><?=h($featureTitle)?></h5><?php endif; ?>
+                  <?php if ($featureText !== ''): ?><p class="muted small mb-0"><?=nl2br(h($featureText))?></p><?php endif; ?>
+                </div>
+              </div>
+            <?php endforeach; ?>
           </div>
-          <div class="col-sm-6">
-            <div class="feature-card h-100">
-              <h5 class="fw-semibold">Tamamen yerli altyapı</h5>
-              <p class="muted small mb-0">Verileriniz Türkiye lokasyonlu sunucularda güvenle saklanır.</p>
-            </div>
-          </div>
-        </div>
+        <?php endif; ?>
       </div>
     </div>
   </section>
 
   <section id="ozellikler" class="mb-5">
     <div class="row g-4">
-      <div class="col-md-4">
-        <div class="feature-card h-100">
-          <div class="feature-icon mb-3">📸</div>
-          <h4 class="fw-semibold mb-2">Anında QR Toplama</h4>
-          <p class="muted mb-0">Misafirleriniz QR kodu okutup doğrudan galerinize fotoğraf ve videoları yükler. Her yükleme etkinlik panelinizde otomatik görünür.</p>
+      <?php foreach ($featureBlocks as $block):
+        $icon = trim((string)($block['icon'] ?? ''));
+        $title = trim((string)($block['title'] ?? ''));
+        $text = trim((string)($block['text'] ?? ''));
+        if ($icon === '' && $title === '' && $text === '') {
+          continue;
+        }
+      ?>
+        <div class="col-md-4">
+          <div class="feature-card h-100">
+            <?php if ($icon !== ''): ?><div class="feature-icon mb-3"><?=h($icon)?></div><?php endif; ?>
+            <?php if ($title !== ''): ?><h4 class="fw-semibold mb-2"><?=h($title)?></h4><?php endif; ?>
+            <?php if ($text !== ''): ?><p class="muted mb-0"><?=nl2br(h($text))?></p><?php endif; ?>
+          </div>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="feature-card h-100">
-          <div class="feature-icon mb-3">✨</div>
-          <h4 class="fw-semibold mb-2">Sosyal Galeri Deneyimi</h4>
-          <p class="muted mb-0">Beğeniler, yıldızlar ve yorumlarla misafir galerisi sosyal medya tadında. Albümünüzü dilediğiniz gibi düzenleyin.</p>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="feature-card h-100">
-          <div class="feature-icon mb-3">🔒</div>
-          <h4 class="fw-semibold mb-2">Güvenli Online Ödeme</h4>
-          <p class="muted mb-0">PayTR altyapısıyla kart bilgileriniz güvende. Ödeme tamamlandığında paneliniz ve QR kodlarınız otomatik hazırlanır.</p>
-        </div>
-      </div>
+      <?php endforeach; ?>
     </div>
   </section>
 
   <section id="nasil" class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-6">
-        <h2 class="fw-bold mb-3">BİKARE nasıl çalışır?</h2>
-        <p class="muted">Basit 3 adımda etkinliğinizi dijitalleştiriyoruz. Kurulum ve teknik detaylarla vakit kaybetmenize gerek yok.</p>
+        <?php if ($timelineTitle !== ''): ?><h2 class="fw-bold mb-3"><?=h($timelineTitle)?></h2><?php endif; ?>
+        <?php if ($timelineText !== ''): ?><p class="muted"><?=nl2br(h($timelineText))?></p><?php endif; ?>
       </div>
       <div class="col-lg-6 d-flex flex-column gap-3">
-        <div class="timeline-step"><span>1</span><div><strong>Paketi seçin & ödeme yapın</strong><br><small class="text-muted">Formu doldurup güvenli ödeme adımında işlemi tamamlayın.</small></div></div>
-        <div class="timeline-step"><span>2</span><div><strong>Panel otomatik kurulsun</strong><br><small class="text-muted">Etkinlik paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.</small></div></div>
-        <div class="timeline-step"><span>3</span><div><strong>Misafirlerinizi davet edin</strong><br><small class="text-muted">QR kodu paylaşın, fotoğraflar ve videolar gerçek zamanlı olarak panelinize düşsün.</small></div></div>
+        <?php foreach ($timelineSteps as $idx => $step):
+          $stepTitle = trim((string)($step['title'] ?? ''));
+          $stepText = trim((string)($step['text'] ?? ''));
+          if ($stepTitle === '' && $stepText === '') {
+            continue;
+          }
+        ?>
+          <div class="timeline-step"><span><?=h((string)($idx + 1))?></span><div><?php if ($stepTitle !== ''): ?><strong><?=h($stepTitle)?></strong><?php endif; ?><?php if ($stepText !== ''): ?><br><small class="text-muted"><?=nl2br(h($stepText))?></small><?php endif; ?></div></div>
+        <?php endforeach; ?>
       </div>
     </div>
   </section>
 
   <section id="paketler" class="mb-5">
     <div class="text-center mb-4">
-      <h2 class="fw-bold">İhtiyacınıza uygun paketleri seçin</h2>
-      <p class="muted">Her paket güvenli online ödeme, otomatik panel kurulumu ve sınırsız misafir yüklemesi içerir.</p>
+      <?php if ($packagesTitle !== ''): ?><h2 class="fw-bold"><?=h($packagesTitle)?></h2><?php endif; ?>
+      <?php if ($packagesText !== ''): ?><p class="muted"><?=nl2br(h($packagesText))?></p><?php endif; ?>
     </div>
     <div class="row g-4">
       <?php foreach ($packages as $pkg): ?>
@@ -244,15 +434,25 @@ unset($_SESSION['lead_success']);
             <?php if (!empty($pkg['description'])): ?>
               <p class="muted small mb-4"><?=nl2br(h($pkg['description']))?></p>
             <?php endif; ?>
-            <ul class="small text-muted mb-0">
-              <li>Kalıcı ve etkinliğe özel QR kodlar</li>
-              <li>Etkinlik paneli otomatik kurulum ve e-posta bildirimi</li>
-              <li>Sosyal medya tarzı misafir galerisi</li>
-              <li>HD fotoğraf & video yükleme desteği</li>
-              <?php if ($pkg['cashback_rate'] > 0): ?>
-                <li>Referans koduyla %<?=number_format($pkg['cashback_rate'] * 100, 0)?> cashback</li>
-              <?php endif; ?>
-            </ul>
+            <?php
+              $packageHighlights = [];
+              if ($packagesHighlights) {
+                foreach ($packagesHighlights as $highlight) {
+                  $highlight = trim((string)$highlight);
+                  if ($highlight === '') {
+                    continue;
+                  }
+                  $packageHighlights[] = $highlight;
+                }
+              }
+            ?>
+            <?php if ($packageHighlights): ?>
+              <ul class="small text-muted mb-0">
+                <?php foreach ($packageHighlights as $highlight): ?>
+                  <li><?=h($highlight)?></li>
+                <?php endforeach; ?>
+              </ul>
+            <?php endif; ?>
           </div>
         </div>
       <?php endforeach; ?>
@@ -267,15 +467,24 @@ unset($_SESSION['lead_success']);
   <section id="bayi-avantaj" class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-6">
-        <span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold">Bayi Ağı</span>
-        <h2 class="fw-bold mt-3">Etkinlik sektöründeki iş ortaklarımız için kazandıran sistem</h2>
-        <p class="muted">Bayi panelinizden bakiye yönetebilir, PayTR entegrasyonlu paketler satın alabilir, etkinliklerinizi tek ekrandan yönetebilirsiniz. Referans kodu ile gerçekleştirdiğiniz satışlardan onay sonrası cashback kazanırsınız.</p>
-        <ul class="muted">
-          <li>Salon bazlı etkinlik yönetimi ve QR kod üretimi</li>
-          <li>Detaylı raporlama, bakiye ve cashback geçmişi</li>
-          <li>PayTR ile güvenli tahsilat ve hızlı aktivasyon</li>
-        </ul>
-        <a class="btn btn-brand" href="<?=BASE_URL?>/dealer/apply.php">Bayi Ağına Katıl</a>
+        <?php if ($dealerBadge !== ''): ?><span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold"><?=h($dealerBadge)?></span><?php endif; ?>
+        <?php if ($dealerTitle !== ''): ?><h2 class="fw-bold mt-3"><?=h($dealerTitle)?></h2><?php endif; ?>
+        <?php if ($dealerText !== ''): ?><p class="muted"><?=nl2br(h($dealerText))?></p><?php endif; ?>
+        <?php if ($dealerHighlights): ?>
+          <ul class="muted">
+            <?php foreach ($dealerHighlights as $highlight):
+              $highlight = trim((string)$highlight);
+              if ($highlight === '') {
+                continue;
+              }
+            ?>
+              <li><?=h($highlight)?></li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
+        <?php if ($dealerButtonUrl && $dealerButtonLabel !== ''): ?>
+          <a class="btn btn-brand" href="<?=h($dealerButtonUrl)?>"><?=h($dealerButtonLabel)?></a>
+        <?php endif; ?>
       </div>
       <div class="col-lg-6 text-center">
         <img class="img-fluid rounded-4 shadow-lg" src="<?=h($dealerShowcaseImage)?>" alt="Bayi paneli">
@@ -286,8 +495,8 @@ unset($_SESSION['lead_success']);
   <section class="mb-5">
     <div class="row g-4 align-items-center">
       <div class="col-lg-5">
-        <h2 class="fw-bold mb-3">Gerçek hikayelerden ilham alın</h2>
-        <p class="muted">Misafirleriniz sadece düğünlerde değil; nişan, kına, doğum günü ve kurumsal etkinliklerde de QR kodunuzla içerik paylaşabilir.</p>
+        <?php if ($galleryTitle !== ''): ?><h2 class="fw-bold mb-3"><?=h($galleryTitle)?></h2><?php endif; ?>
+        <?php if ($galleryText !== ''): ?><p class="muted"><?=nl2br(h($galleryText))?></p><?php endif; ?>
       </div>
       <div class="col-lg-7 gallery-grid">
         <?php foreach ($galleryImages as $galleryImage): ?>
@@ -300,32 +509,88 @@ unset($_SESSION['lead_success']);
 
   <section class="mb-5">
     <div class="row g-4">
-      <div class="col-md-6">
-        <div class="testimonial h-100">
-          <p class="mb-3">"Misafirlerimiz tüm fotoğrafları bir araya getirirken inanılmaz eğlendi. Panellerin otomatik kurulması bizim için büyük kolaylık sağladı."</p>
-          <div class="fw-semibold">İpek &amp; Cem</div>
-          <div class="small text-muted">İstanbul Boğazı Düğünü</div>
+      <?php foreach ($testimonials as $testimonial):
+        $quote = trim((string)($testimonial['quote'] ?? ''));
+        $author = trim((string)($testimonial['author'] ?? ''));
+        $role = trim((string)($testimonial['role'] ?? ''));
+        if ($quote === '' && $author === '' && $role === '') {
+          continue;
+        }
+      ?>
+        <div class="col-md-6">
+          <div class="testimonial h-100">
+            <?php if ($quote !== ''): ?><p class="mb-3"><?=nl2br(h($quote))?></p><?php endif; ?>
+            <?php if ($author !== ''): ?><div class="fw-semibold"><?=h($author)?></div><?php endif; ?>
+            <?php if ($role !== ''): ?><div class="small text-muted"><?=h($role)?></div><?php endif; ?>
+          </div>
         </div>
-      </div>
-      <div class="col-md-6">
-        <div class="testimonial h-100">
-          <p class="mb-3">"Kurumsal lansmanımızda katılımcıların videolarını toplamak bu kadar kolay olmamıştı. BİKARE ekibi her detayla ilgilendi."</p>
-          <div class="fw-semibold">Berna U.</div>
-          <div class="small text-muted">Etkinlik Ajansı Sahibi</div>
-        </div>
-      </div>
+      <?php endforeach; ?>
     </div>
   </section>
 
-  <section id="sss" class="mb-5">
-    <div class="row g-4">
-      <div class="col-lg-5">
-        <h2 class="fw-bold">Sıkça sorulan sorular</h2>
-        <p class="muted">BİKARE ile ilgili merak ettiğiniz konuları sizin için derledik. Daha fazlası için bizimle iletişime geçebilirsiniz.</p>
+  <?php if ($blogPosts): ?>
+  <section id="blog" class="mb-5">
+    <div class="blog-section">
+      <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-4 mb-4">
+        <div>
+          <?php if ($blogBadge !== ''): ?><span class="badge bg-info-subtle text-info-emphasis rounded-pill px-3 py-2 fw-semibold"><?=h($blogBadge)?></span><?php endif; ?>
+          <?php if ($blogTitle !== ''): ?><h2 class="fw-bold mt-3 mb-2"><?=h($blogTitle)?></h2><?php endif; ?>
+          <?php if ($blogText !== ''): ?><p class="muted mb-0"><?=nl2br(h($blogText))?></p><?php endif; ?>
+        </div>
       </div>
-      <div class="col-lg-7">
-        <?php if ($faqItems): ?>
-          <div class="accordion" id="faqAccordion">
+      <div class="row g-4">
+        <?php foreach ($blogPosts as $post):
+          $postTitle = trim((string)($post['title'] ?? ''));
+          $postDescription = trim((string)($post['description'] ?? ''));
+          $postUrl = trim((string)($post['url'] ?? ''));
+          if ($postTitle === '' || $postUrl === '') {
+            continue;
+          }
+          $postImage = trim((string)($post['image'] ?? ''));
+          $mediaClasses = 'blog-card__media'.($postImage === '' ? ' blog-card__media--empty' : '');
+          $mediaStyle = $postImage !== '' ? " style=\"background-image:url('".h($postImage)."');\"" : '';
+          $postDate = '';
+          if (!empty($post['published_at'])) {
+            try {
+              $dt = new DateTime($post['published_at']);
+              $postDate = $dt->format('d.m.Y');
+            } catch (Throwable $e) {
+              $postDate = '';
+            }
+          }
+        ?>
+          <div class="col-md-4">
+            <div class="blog-card h-100">
+              <div class="<?=$mediaClasses?>"<?=$mediaStyle?>>
+                <?php if ($postDate !== ''): ?><span class="blog-card__date badge text-bg-light text-dark px-3 py-2 fw-semibold"><?=$postDate?></span><?php endif; ?>
+              </div>
+              <div class="blog-card__body">
+                <h5 class="fw-bold mb-2"><?=h($postTitle)?></h5>
+                <?php if ($postDescription !== ''): ?><p class="muted mb-3"><?=nl2br(h($postDescription))?></p><?php endif; ?>
+                <a class="blog-card__link" href="<?=h($postUrl)?>">
+                  Devamını oku
+                  <i class="bi bi-arrow-right"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <section id="sss" class="mb-5">
+    <div class="faq-surface">
+      <div class="row g-4 align-items-start">
+        <div class="col-lg-5 position-relative" style="z-index:1;">
+          <span class="badge bg-light text-dark rounded-pill px-3 py-2 fw-semibold">Yanınızdayız</span>
+          <h2 class="fw-bold mt-3">Sıkça Sorulan Sorular</h2>
+          <p class="muted mb-0">BİKARE ile ilgili merak ettiğiniz konuları sizin için derledik. Yanıt bulamadığınızda ekibimiz sadece bir mesaj uzağınızda.</p>
+        </div>
+        <div class="col-lg-7">
+          <?php if ($faqItems): ?>
+            <div class="accordion" id="faqAccordion">
             <?php foreach ($faqItems as $i => $faq):
               $headingId = 'faqHeading'.$i;
               $collapseId = 'faqCollapse'.$i;
@@ -340,10 +605,11 @@ unset($_SESSION['lead_success']);
                 </div>
               </div>
             <?php endforeach; ?>
-          </div>
-        <?php else: ?>
-          <div class="alert alert-info">Henüz sıkça sorulan soru eklenmedi.</div>
-        <?php endif; ?>
+            </div>
+          <?php else: ?>
+            <div class="alert alert-info">Henüz sıkça sorulan soru eklenmedi.</div>
+          <?php endif; ?>
+        </div>
       </div>
     </div>
   </section>
@@ -393,7 +659,7 @@ unset($_SESSION['lead_success']);
               <p><?=nl2br(h($content['contact_cta_text']))?></p>
             <?php endif; ?>
             <?php if ($contactCtaButtonUrl && !empty($content['contact_cta_button_label'])): ?>
-              <a class="btn btn-light text-dark fw-semibold" href="<?=h($contactCtaButtonUrl)?>"><?=h($content['contact_cta_button_label'])?></a>
+              <a class="btn btn-cta" href="<?=h($contactCtaButtonUrl)?>"><?=h($content['contact_cta_button_label'])?></a>
             <?php endif; ?>
           </div>
         </div>
@@ -404,11 +670,13 @@ unset($_SESSION['lead_success']);
   <section class="cta-section mb-5 text-center text-lg-start">
     <div class="row g-4 align-items-center">
       <div class="col-lg-8">
-        <h2 class="fw-bold mb-2">Etkinliğiniz için hazırız</h2>
-        <p class="mb-0">Formu doldurup güvenli ödeme adımını tamamlayın, paneliniz birkaç dakika içinde aktif olsun. Anılarınızı kaybetmeyin, değerini artırın.</p>
+        <?php if ($ctaBannerTitle !== ''): ?><h2 class="fw-bold mb-2"><?=h($ctaBannerTitle)?></h2><?php endif; ?>
+        <?php if ($ctaBannerText !== ''): ?><p class="mb-0"><?=nl2br(h($ctaBannerText))?></p><?php endif; ?>
       </div>
       <div class="col-lg-4 text-lg-end">
-        <a class="btn btn-light text-dark fw-semibold px-4 py-3" href="#lead-form">Paket Seç &amp; Ödeme Yap</a>
+        <?php if ($ctaBannerButtonUrl && $ctaBannerButtonLabel !== ''): ?>
+          <a class="btn btn-light text-dark fw-semibold px-4 py-3" href="<?=h($ctaBannerButtonUrl)?>"><?=h($ctaBannerButtonLabel)?></a>
+        <?php endif; ?>
       </div>
     </div>
   </section>
@@ -416,13 +684,20 @@ unset($_SESSION['lead_success']);
   <section id="lead-form" class="form-section">
     <div class="row g-4 align-items-start">
       <div class="col-lg-5">
-        <h3 class="fw-bold mb-3">Sipariş Formu</h3>
-        <p class="muted">Paketinizi seçin, bilgilerinizi girin ve PayTR ile güvenli ödeme adımına yönlendirilin. Ödeme onaylandığında giriş bilgilerinizi otomatik olarak e-posta ile alacaksınız.</p>
-        <ul class="small text-muted ps-3">
-          <li>Misafir galerisi, QR kodlar ve etkinlik paneli otomatik hazırlanır.</li>
-          <li>Referans kodu alanı isteğe bağlıdır. Kod kullanırsanız ilgili bayi cashback kazanır.</li>
-          <li>Dilediğiniz zaman destek ekibimizle iletişime geçebilirsiniz.</li>
-        </ul>
+        <?php if ($leadFormTitle !== ''): ?><h3 class="fw-bold mb-3"><?=h($leadFormTitle)?></h3><?php endif; ?>
+        <?php if ($leadFormText !== ''): ?><p class="muted"><?=nl2br(h($leadFormText))?></p><?php endif; ?>
+        <?php if ($leadFormBullets): ?>
+          <ul class="small text-muted ps-3">
+            <?php foreach ($leadFormBullets as $bullet):
+              $bullet = trim((string)$bullet);
+              if ($bullet === '') {
+                continue;
+              }
+            ?>
+              <li><?=h($bullet)?></li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
       </div>
       <div class="col-lg-7">
         <form method="post" action="order.php" class="row g-3">
@@ -471,8 +746,8 @@ unset($_SESSION['lead_success']);
             <textarea name="notes" class="form-control input-rounded" rows="3" placeholder="Etkinlikle ilgili paylaşmak istediğiniz ek bilgiler"><?=h($formData['notes'])?></textarea>
           </div>
           <div class="col-12 d-flex flex-column flex-md-row gap-3 justify-content-between align-items-md-center pt-3">
-            <span class="muted small">Formu gönderdiğinizde PayTR güvenli ödeme sayfasına yönlendirileceksiniz.</span>
-            <button class="btn btn-brand" type="submit">Ödeme Adımına Geç</button>
+            <?php if ($leadFormNotice !== ''): ?><span class="muted small"><?=h($leadFormNotice)?></span><?php endif; ?>
+            <button class="btn btn-brand" type="submit"><?=h($leadFormSubmitLabel !== '' ? $leadFormSubmitLabel : 'Gönder')?></button>
           </div>
         </form>
       </div>

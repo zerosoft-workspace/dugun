@@ -20,11 +20,24 @@ function dealer_login(string $email, string $password): bool {
     return false;
   }
 
+  if (password_needs_rehash($dealer['password_hash'], PASSWORD_DEFAULT)) {
+    try {
+      $rehash = password_hash($password, PASSWORD_DEFAULT);
+      pdo()->prepare("UPDATE dealers SET password_hash=?, updated_at=? WHERE id=?")
+          ->execute([$rehash, now(), (int)$dealer['id']]);
+    } catch (Throwable $e) {
+      // ignore rehash failure
+    }
+  }
+
+  $supportsForceReset = table_supports_force_password_reset('dealers');
+
   $_SESSION['dealer'] = [
     'id'    => (int)$dealer['id'],
     'email' => $dealer['email'],
     'name'  => $dealer['name'],
     'since' => time(),
+    'force_reset' => $supportsForceReset ? (int)($dealer['force_password_reset'] ?? 0) : 0,
   ];
   dealer_update_last_login((int)$dealer['id']);
   return true;
@@ -86,8 +99,10 @@ function dealer_complete_password_reset(string $email, string $code, string $new
   }
 
   $hash = password_hash($newPassword, PASSWORD_DEFAULT);
+  $now = now();
   pdo()->prepare("UPDATE dealers SET password_hash=?, reset_code=NULL, reset_expires=NULL, updated_at=? WHERE id=?")
-      ->execute([$hash, now(), (int)$dealer['id']]);
+      ->execute([$hash, $now, (int)$dealer['id']]);
+  dealer_mark_password_changed((int)$dealer['id']);
 
   return true;
 }
@@ -105,6 +120,7 @@ function dealer_require_login(string $login_url = '/dealer/login.php'): void {
     $back = urlencode($_SERVER['REQUEST_URI'] ?? '/dealer/dashboard.php');
     redirect($login_url.'?next='.$back);
   }
+  dealer_require_password_change_if_needed();
 }
 
 function dealer_refresh_session(int $dealer_id): void {
@@ -113,15 +129,51 @@ function dealer_refresh_session(int $dealer_id): void {
     dealer_logout();
     return;
   }
+  $supportsForceReset = table_supports_force_password_reset('dealers');
+
   $_SESSION['dealer'] = [
     'id'    => (int)$dealer['id'],
     'email' => $dealer['email'],
     'name'  => $dealer['name'],
     'since' => time(),
+    'force_reset' => $supportsForceReset ? (int)($dealer['force_password_reset'] ?? 0) : 0,
   ];
 }
 
 function dealer_can_manage_events(array $dealer): bool {
   $status = dealer_event_creation_status($dealer);
   return $status['allowed'];
+}
+
+function dealer_session_requires_password_change(): bool {
+  if (!dealer_user()) {
+    return false;
+  }
+  if (!table_supports_force_password_reset('dealers')) {
+    $_SESSION['dealer']['force_reset'] = 0;
+    return false;
+  }
+  if (!isset($_SESSION['dealer']['force_reset'])) {
+    $dealerId = (int)($_SESSION['dealer']['id'] ?? 0);
+    if ($dealerId > 0) {
+      $st = pdo()->prepare("SELECT force_password_reset FROM dealers WHERE id=? LIMIT 1");
+      $st->execute([$dealerId]);
+      $flag = (int)$st->fetchColumn();
+      $_SESSION['dealer']['force_reset'] = $flag;
+    } else {
+      $_SESSION['dealer']['force_reset'] = 0;
+    }
+  }
+  return ((int)($_SESSION['dealer']['force_reset'] ?? 0)) === 1;
+}
+
+function dealer_require_password_change_if_needed(): void {
+  if (!dealer_session_requires_password_change()) {
+    return;
+  }
+  $script = $_SERVER['SCRIPT_NAME'] ?? '';
+  if (strpos($script, '/dealer/password.php') !== false) {
+    return;
+  }
+  redirect('password.php');
 }

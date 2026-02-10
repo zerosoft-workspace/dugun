@@ -30,6 +30,7 @@ if (!function_exists('representative_base_styles')) {
         min-height:100vh;
         display:flex;
         background:var(--rep-bg);
+        position:relative;
       }
 
       .rep-sidebar {
@@ -43,6 +44,10 @@ if (!function_exists('representative_base_styles')) {
         position:relative;
         overflow:hidden;
         z-index:20;
+      }
+
+      .rep-sidebar-backdrop {
+        display:none;
       }
 
       .rep-sidebar-header {
@@ -135,9 +140,23 @@ if (!function_exists('representative_base_styles')) {
         align-items:center;
         justify-content:space-between;
         gap:1.6rem;
+        flex-wrap:wrap;
         position:sticky;
         top:0;
         z-index:10;
+      }
+
+      .rep-sidebar-toggle {
+        display:none;
+        border:none;
+        background:var(--rep-surface);
+        color:var(--rep-ink);
+        border-radius:12px;
+        width:44px;
+        height:44px;
+        align-items:center;
+        justify-content:center;
+        box-shadow:0 16px 34px -28px rgba(15,23,42,.4);
       }
 
       .rep-topbar-info {
@@ -337,30 +356,82 @@ if (!function_exists('representative_base_styles')) {
         color:#0284c7;
       }
 
-      @media (max-width: 992px) {
-        .rep-app {
-          flex-direction:column;
+      @media (max-width: 1200px) {
+        .rep-topbar {
+          padding:1.6rem 2rem;
         }
 
+        .rep-topbar-actions {
+          gap:1rem;
+        }
+      }
+
+      @media (max-width: 1024px) {
         .rep-sidebar {
-          width:100%;
-          flex-direction:row;
-          align-items:center;
+          position:fixed;
+          inset:0 auto 0 0;
+          transform:translateX(-105%);
+          width:260px;
+          max-width:82vw;
+          padding:26px 24px 32px;
+          box-shadow:26px 0 60px -34px rgba(15,23,42,.55);
+          z-index:1040;
+          overflow-y:auto;
+          -webkit-overflow-scrolling:touch;
+        }
+
+        .rep-sidebar-backdrop {
+          display:block;
+          position:fixed;
+          inset:0;
+          background:rgba(15,23,42,.45);
+          z-index:1035;
+          opacity:0;
+          pointer-events:none;
+          transition:opacity .2s ease;
+        }
+
+        body.sidebar-open .rep-sidebar-backdrop {
+          opacity:1;
+          pointer-events:auto;
+        }
+
+        body.sidebar-open {
+          overflow:hidden;
+        }
+
+        body.sidebar-open .rep-sidebar {
+          transform:none;
+        }
+
+        .rep-sidebar-toggle {
+          display:inline-flex;
+        }
+
+        .rep-topbar {
+          padding:1.4rem 1.6rem;
           gap:1.2rem;
-          padding:20px 22px;
-          position:sticky;
-          top:0;
-          z-index:30;
+          align-items:flex-start;
         }
 
-        .rep-nav {
-          flex-direction:row;
-          flex-wrap:wrap;
-          margin-bottom:0;
+        .rep-topbar-info {
+          order:1;
+          width:100%;
         }
 
-        .rep-nav-link {
-          padding:10px 14px;
+        .rep-topbar-actions {
+          order:2;
+          width:100%;
+          justify-content:flex-start;
+        }
+
+        .rep-topbar-actions .rep-user-card {
+          width:100%;
+        }
+
+        .rep-topbar-actions .btn,
+        .rep-topbar-actions .rep-logout {
+          flex-shrink:0;
         }
 
         .rep-sidebar-meta {
@@ -373,22 +444,39 @@ if (!function_exists('representative_base_styles')) {
       }
 
       @media (max-width: 768px) {
-        .rep-topbar {
-          flex-direction:column;
-          align-items:flex-start;
+        .rep-topbar-actions {
+          flex-wrap:wrap;
+          gap:.75rem;
         }
 
-        .rep-topbar-actions {
+        .rep-topbar-actions .btn,
+        .rep-topbar-actions .rep-logout {
           width:100%;
-          justify-content:space-between;
+          justify-content:center;
         }
 
         .rep-container {
           padding:1.8rem 1.4rem 2.6rem;
         }
+
+        .rep-container .table-responsive,
+        .rep-container table.table {
+          width:100%;
+          overflow-x:auto;
+          display:block;
+          -webkit-overflow-scrolling:touch;
+        }
+
+        .rep-container table.table {
+          min-width:640px;
+        }
       }
 
       @media (max-width: 576px) {
+        .rep-topbar {
+          padding:1.3rem 1.2rem;
+        }
+
         .rep-user-card {
           width:100%;
           justify-content:flex-start;
@@ -396,7 +484,7 @@ if (!function_exists('representative_base_styles')) {
 
         .rep-topbar-actions {
           flex-direction:column;
-          align-items:flex-start;
+          align-items:stretch;
         }
 
         .rep-selector {
@@ -488,6 +576,7 @@ CSS;
     echo '<a class="rep-nav-link'.($activeNav === 'dashboard' ? ' active' : '').'" href="dashboard.php"><i class="bi bi-grid"></i><span>Ana Sayfa</span></a>';
     echo '<a class="rep-nav-link'.($activeNav === 'crm' ? ' active' : '').'" href="crm.php"><i class="bi bi-kanban"></i><span>CRM</span></a>';
     echo '<a class="rep-nav-link'.($activeNav === 'commissions' ? ' active' : '').'" href="commissions.php"><i class="bi bi-cash-coin"></i><span>Komisyonlar</span></a>';
+    echo '<a class="rep-nav-link'.($activeNav === 'password' ? ' active' : '').'" href="password.php"><i class="bi bi-shield-lock"></i><span>Şifre &amp; Güvenlik</span></a>';
     echo '</nav>';
     echo '<div class="rep-sidebar-meta">';
     echo '<div>'.h(date('d.m.Y')).' itibarıyla güncel.</div>';
@@ -495,8 +584,10 @@ CSS;
     echo '<div>Destek: <a href="mailto:'.h($supportEmail).'">'.h($supportEmail).'</a></div>';
     echo '</div>';
     echo '</aside>';
+    echo '<div class="rep-sidebar-backdrop" data-sidebar-toggle></div>';
     echo '<div class="rep-main">';
     echo '<header class="rep-topbar">';
+    echo '<button class="rep-sidebar-toggle" type="button" data-sidebar-toggle aria-label="Menüyü aç/kapat"><i class="bi bi-list"></i></button>';
     echo '<div class="rep-topbar-info">';
     echo '<h1>'.h($headerTitle).'</h1>';
     echo '<p>'.h($headerSubtitle).'</p>';
@@ -526,6 +617,7 @@ CSS;
     }
     echo '</div>';
     echo '</div>';
+    echo '<a class="btn btn-outline-primary" href="password.php" style="display:inline-flex;align-items:center;gap:.4rem;"><i class="bi bi-shield-lock"></i><span>Şifre Değiştir</span></a>';
     echo '<a class="rep-logout" href="'.h($logoutUrl).'"><i class="bi bi-box-arrow-right"></i><span>Çıkış Yap</span></a>';
     echo '</div>';
     echo '</header>';
@@ -545,6 +637,7 @@ CSS;
     echo '</div>';
     echo '</div>';
     echo '<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>';
+    echo '<script>(function(){var body=document.body;var sidebar=document.querySelector(".rep-sidebar");var mql=window.matchMedia("(max-width: 1024px)");function isMobile(){return mql.matches;}function closeSidebar(){body.classList.remove("sidebar-open");}function toggle(){if(!isMobile())return;body.classList.toggle("sidebar-open");}document.querySelectorAll("[data-sidebar-toggle]").forEach(function(btn){btn.addEventListener("click",function(ev){ev.preventDefault();toggle();});});document.addEventListener("click",function(ev){if(!body.classList.contains("sidebar-open"))return;if(sidebar && sidebar.contains(ev.target))return;if(ev.target.closest("[data-sidebar-toggle]"))return;closeSidebar();});function handleChange(){if(!isMobile()){closeSidebar();}}if(mql.addEventListener){mql.addEventListener("change",handleChange);}else if(mql.addListener){mql.addListener(handleChange);}})();</script>';
     echo '</body></html>';
   }
 }

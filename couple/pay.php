@@ -15,9 +15,22 @@ $VID=(int)$ev['venue_id'];
 $cid = (int)($_POST['campaign_id'] ?? 0);
 if ($cid<=0) { exit('Kampanya ID gelmedi (campaign_id).'); }
 $cs = pdo()->prepare("SELECT * FROM campaigns WHERE id=? AND venue_id=? AND is_active=1");
-$cs->execute([$cid,$VID]); 
+$cs->execute([$cid,$VID]);
 $camp=$cs->fetch();
 if(!$camp){ exit("Kampanya bulunamadı. (Salon=$VID, Kampanya ID=$cid)"); }
+
+$paytrConfig = site_payment_config();
+if (empty($paytrConfig['enabled'])) {
+  exit('Online ödeme sistemi geçici olarak pasif. Lütfen yönetici ile iletişime geçin.');
+}
+$creds = paytr_credentials();
+$merchantId = trim($creds['merchant_id']);
+$merchantKey = trim($creds['merchant_key']);
+$merchantSalt = trim($creds['merchant_salt']);
+if ($merchantId === '' || $merchantKey === '' || $merchantSalt === '') {
+  exit('PAYTR ayarları eksik. Yönetici panelinden ödeme anahtarlarını kontrol edin.');
+}
+$testMode = paytr_is_test_mode();
 
 $tl = (int)$camp['price']; if ($tl < 1) exit('Fiyat 1 TL altında olamaz.');
 $amount = $tl * 100;
@@ -36,7 +49,7 @@ if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) { $ip = '1.2.3.4'; }
 $oid = 'EV'.$event_id.'C'.$cid.strtoupper(bin2hex(random_bytes(6)));
 $oid = substr(preg_replace('/[^A-Za-z0-9]/','', $oid), 0, 64);
 
-if (paytr_is_test_mode()) {
+if ($testMode) {
   $merchant_oid = 'TEST-'.$oid;
   $now = now();
   pdo()->prepare("INSERT INTO purchases (venue_id,event_id,campaign_id,status,amount,currency,paytr_oid,items_json,created_at,updated_at,paid_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
@@ -60,12 +73,12 @@ if (paytr_is_test_mode()) {
   exit;
 }
 
-$no_installment=0; $max_installment=0; $currency='TL'; $test=(int)PAYTR_TEST_MODE;
-$hash_str = PAYTR_MERCHANT_ID . $ip . $oid . $email . $amount . $user_basket . $no_installment . $max_installment . $currency . $test;
-$paytr_token = base64_encode(hash_hmac('sha256', $hash_str . PAYTR_MERCHANT_SALT, PAYTR_MERCHANT_KEY, true));
+$no_installment=0; $max_installment=0; $currency='TL'; $test=$testMode ? 1 : 0;
+$hash_str = $merchantId . $ip . $oid . $email . $amount . $user_basket . $no_installment . $max_installment . $currency . $test;
+$paytr_token = base64_encode(hash_hmac('sha256', $hash_str . $merchantSalt, $merchantKey, true));
 
 $post = [
-  'merchant_id'=>PAYTR_MERCHANT_ID,'user_ip'=>$ip,'merchant_oid'=>$oid,'email'=>$email,
+  'merchant_id'=>$merchantId,'user_ip'=>$ip,'merchant_oid'=>$oid,'email'=>$email,
   'payment_amount'=>$amount,'paytr_token'=>$paytr_token,'user_basket'=>$user_basket,
   'no_installment'=>$no_installment,'max_installment'=>$max_installment,
   'user_name'=>$user_name,'user_address'=>$user_address,'user_phone'=>$user_phone,

@@ -10,6 +10,7 @@ require_once __DIR__.'/partials/ui.php';
 
 require_admin();
 $admin = admin_user();
+require_admin_permission('finance');
 install_schema();
 
 $action = $_POST['do'] ?? '';

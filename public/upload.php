@@ -24,6 +24,15 @@ function client_ip(){
 function is_image_mime($m){ return (bool)preg_match('~^image/(jpeg|png|webp|gif)$~i',$m); }
 function is_video_mime($m){ return (bool)preg_match('~^video/(mp4|quicktime|webm)$~i',$m); }
 
+function dealer_qr_code_matches_event(string $code, int $eventId): bool {
+  if ($code === '' || $eventId <= 0) {
+    return false;
+  }
+  $st = pdo()->prepare('SELECT 1 FROM dealer_qr_codes WHERE code=? AND target_event_id=? LIMIT 1');
+  $st->execute([$code, $eventId]);
+  return (bool)$st->fetchColumn();
+}
+
 $event_id = (int)($_GET['event'] ?? 0);
 $token    = trim($_GET['t'] ?? '');
 if ($event_id <= 0){ http_response_code(400); exit('Geçersiz istek'); }
@@ -42,21 +51,47 @@ $ACCENT   = $ev['theme_accent']  ?: '#e0f7fb';
 $CAN_VIEW = (int)$ev['allow_guest_view']===1;
 $CAN_DOWN = (int)$ev['allow_guest_download']===1;
 
-$layout   = $ev['layout_json'] ?: '{"title":{"x":24,"y":24},"subtitle":{"x":24,"y":60},"prompt":{"x":24,"y":396}}';
-$stickers = $ev['stickers_json'] ?: '[]';
-$layoutArr   = json_decode($layout,true);
-$stickersArr = json_decode($stickers,true);
-if(!is_array($layoutArr)){
-  $layoutArr = array('title'=>array('x'=>24,'y'=>24),'subtitle'=>array('x'=>24,'y'=>60),'prompt'=>array('x'=>24,'y'=>396));
+$layoutRaw = $ev['layout_json'] ?: '{"title":{"x":24,"y":24},"subtitle":{"x":24,"y":60},"prompt":{"x":24,"y":396}}';
+$layoutArr = normalize_event_layout(json_decode($layoutRaw, true));
+$tPos = $layoutArr['title'];
+$sPos = $layoutArr['subtitle'];
+$pPos = $layoutArr['prompt'];
+$stickersRaw = $ev['stickers_json'] ?: '[]';
+$decodedStickers = json_decode($stickersRaw, true);
+$stickerAssetUrls = [];
+$stickersArr = normalize_event_stickers(is_array($decodedStickers) ? $decodedStickers : [], $event_id, $stickerAssetUrls);
+$GUEST_FONTS = guest_font_options();
+$TITLE_FONT_KEY = trim((string)($ev['guest_title_font'] ?? '')) ?: 'inter';
+if (!isset($GUEST_FONTS[$TITLE_FONT_KEY])) { $TITLE_FONT_KEY = 'inter'; }
+$SUBTITLE_FONT_KEY = trim((string)($ev['guest_subtitle_font'] ?? '')) ?: $TITLE_FONT_KEY;
+if (!isset($GUEST_FONTS[$SUBTITLE_FONT_KEY])) { $SUBTITLE_FONT_KEY = $TITLE_FONT_KEY; }
+$PROMPT_FONT_KEY = trim((string)($ev['guest_prompt_font'] ?? '')) ?: $SUBTITLE_FONT_KEY;
+if (!isset($GUEST_FONTS[$PROMPT_FONT_KEY])) { $PROMPT_FONT_KEY = $SUBTITLE_FONT_KEY; }
+$TITLE_FONT_STACK = guest_font_stack($TITLE_FONT_KEY);
+$SUBTITLE_FONT_STACK = guest_font_stack($SUBTITLE_FONT_KEY);
+$PROMPT_FONT_STACK = guest_font_stack($PROMPT_FONT_KEY);
+$FONT_IMPORTS = guest_font_imports([$TITLE_FONT_KEY, $SUBTITLE_FONT_KEY, $PROMPT_FONT_KEY]);
+$TITLE_FONT_STACK_ESC = htmlspecialchars($TITLE_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$SUBTITLE_FONT_STACK_ESC = htmlspecialchars($SUBTITLE_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$PROMPT_FONT_STACK_ESC = htmlspecialchars($PROMPT_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$BACKGROUND_PATH = trim((string)($ev['guest_background_path'] ?? ''));
+if (!event_guest_background_exists($BACKGROUND_PATH)) { $BACKGROUND_PATH = ''; }
+$BACKGROUND_URL = $BACKGROUND_PATH !== '' ? event_guest_background_url($BACKGROUND_PATH) : null;
+$canvasStyle = '--zs:'.htmlspecialchars($PRIMARY, ENT_QUOTES, 'UTF-8').'; --zs-soft:'.htmlspecialchars($ACCENT, ENT_QUOTES, 'UTF-8').';';
+if ($BACKGROUND_URL) {
+  $canvasStyle .= ' background-image:url('.htmlspecialchars($BACKGROUND_URL, ENT_QUOTES, 'UTF-8').');';
 }
-if(!is_array($stickersArr)){ $stickersArr = array(); }
-$tPos = isset($layoutArr['title'])    ? $layoutArr['title']    : array('x'=>24,'y'=>24);
-$sPos = isset($layoutArr['subtitle']) ? $layoutArr['subtitle'] : array('x'=>24,'y'=>60);
-$pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'y'=>396);
+$canvasHasBg = $BACKGROUND_URL ? '1' : '0';
 
+$permaCode = trim($_GET['code'] ?? '');
+$permaCodeActive = dealer_qr_code_matches_event($permaCode, $event_id);
+$token_ok = token_valid($event_id, $token);
+if ($permaCodeActive) {
+  $token = make_token($event_id, current_slot());
+  $token_ok = true;
+}
 $profile = guest_profile_current($event_id);
 $hostPreview = $profile ? guest_profile_is_host_preview($profile) : false;
-$token_ok = token_valid($event_id, $token);
 $pageCsrf = csrf_token();
 
 $wheelEntries = event_wheel_entries_list($event_id, true);
@@ -179,6 +214,55 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['ajax'])) {
       ];
       json_ok(['comment' => $payload]);
 
+    case 'guest_register':
+      $name = trim((string)($_POST['name'] ?? ''));
+      $emailInput = (string)($_POST['email'] ?? '');
+      $email = guest_profile_normalize_email($emailInput);
+      $marketing = isset($_POST['marketing']) && $_POST['marketing'] === '1';
+      if ($name === '' || mb_strlen($name) < 2) {
+        json_fail('input', 'Lütfen adınızı ve soyadınızı yazın.');
+      }
+      if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        json_fail('input', 'Geçerli bir e-posta adresi yazın.');
+      }
+      try {
+        $createdProfile = guest_profile_upsert($event_id, $name, $email, $marketing);
+      } catch (Throwable $e) {
+        json_fail('error', 'Misafir kaydı oluşturulamadı. Lütfen daha sonra tekrar deneyin.');
+      }
+      if (!$createdProfile) {
+        json_fail('error', 'Misafir kaydı oluşturulamadı. Lütfen daha sonra tekrar deneyin.');
+      }
+
+      $status = 'pending';
+      $message = 'Doğrulama bağlantısı e-posta adresinize gönderildi. Lütfen gelen kutunuzu kontrol edin.';
+
+      if ((int)$createdProfile['is_verified'] === 1) {
+        if (!empty($createdProfile['password_hash'])) {
+          $status = 'verified';
+          $message = 'Bu e-posta ile daha önce giriş yapmışsınız. Misafir girişi sayfasından şifrenizle devam edebilirsiniz.';
+        } else {
+          $status = 'needs_password';
+          $message = 'E-posta adresiniz doğrulandı. Şifrenizi belirlemek için doğrulama e-postasındaki bağlantıyı kullanabilir veya Misafir Girişi sayfasındaki “Şifremi unuttum” bağlantısından ilerleyebilirsiniz.';
+        }
+      } else {
+        $sent = false;
+        try {
+          $sent = guest_profile_send_verification($createdProfile, $ev);
+        } catch (Throwable $e) {
+          $sent = false;
+        }
+        if (!$sent) {
+          $status = 'pending_retry';
+          $message = 'Doğrulama e-postası şu anda gönderilemedi. Lütfen birkaç dakika sonra tekrar deneyin.';
+        }
+      }
+
+      json_ok([
+        'status' => $status,
+        'message' => $message,
+      ]);
+
     case 'load_conversation':
       $profile = ensure_profile($profile);
       $otherId = (int)($_POST['profile_id'] ?? 0);
@@ -269,7 +353,10 @@ if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='quiz_answer'){
 if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='upload'){
   csrf_or_die();
   $p_token = trim($_POST['t']??'');
-  if(!token_valid($event_id,$p_token)){
+  $postedCode = trim($_POST['code'] ?? '');
+  $postedCodeValid = dealer_qr_code_matches_event($postedCode, $event_id);
+  $tokenValid = token_valid($event_id,$p_token);
+  if(!$tokenValid && !$postedCodeValid){
     $errors[]='Güvenlik anahtarı zaman aşımına uğradı. Lütfen QR’ı yeniden okutun.';
   }else{
     $guest = trim($_POST['guest_name']??'');
@@ -302,7 +389,10 @@ if($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='upload'){
       }
     }
   }
-  $to=BASE_URL.'/public/upload.php?event='.$event_id.'&t='.rawurlencode($token);
+  $redirectToken = make_token($event_id, current_slot());
+  $to = $postedCodeValid
+    ? BASE_URL.'/public/upload.php?event='.$event_id.'&code='.rawurlencode($postedCode)
+    : BASE_URL.'/public/upload.php?event='.$event_id.'&t='.rawurlencode($redirectToken);
   if($okCount>0){ flash('ok',$okCount.' dosya yüklendi. Teşekkürler!'); header('Location:'.$to); exit; }
   if($errors){ flash('err',implode('<br>',array_map('h',$errors))); header('Location:'.$to); exit; }
 }
@@ -330,9 +420,12 @@ $directory = $profile ? guest_event_profile_directory($event_id, (int)$profile['
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <meta name="csrf" content="<?=h($pageCsrf)?>">
+<?php foreach ($FONT_IMPORTS as $import): ?>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=<?=h($import)?>&display=swap">
+<?php endforeach; ?>
 <style>
-:root{ --zs:<?=h($PRIMARY)?>; --zs-soft:<?=h($ACCENT)?>; --ink:#0f172a; --muted:#64748b; --card:#ffffff; --border:#e2e8f0; }
-body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter","Segoe UI",system-ui,-apple-system,sans-serif; color:var(--ink); }
+:root{ --zs:<?=h($PRIMARY)?>; --zs-soft:<?=h($ACCENT)?>; --ink:#0f172a; --muted:#64748b; --card:#ffffff; --border:#e2e8f0; --guest-title-font: <?=$TITLE_FONT_STACK_ESC?>; --guest-subtitle-font: <?=$SUBTITLE_FONT_STACK_ESC?>; --guest-prompt-font: <?=$PROMPT_FONT_STACK_ESC?>; }
+body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:var(--guest-subtitle-font, "Inter","Segoe UI",system-ui,-apple-system,sans-serif); color:var(--ink); }
 .page-shell{ max-width:1200px; margin:0 auto; }
 .card-lite{ border:1px solid rgba(148,163,184,.22); border-radius:24px; background:var(--card); box-shadow:0 25px 70px -45px rgba(15,23,42,.4); }
 .card-lite h5{ font-weight:700; }
@@ -360,14 +453,18 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
 .pill{ display:inline-flex; align-items:center; gap:.45rem; font-size:.82rem; font-weight:600; padding:.35rem .75rem; border-radius:999px; background:rgba(255,255,255,.16); backdrop-filter:blur(6px); }
 .muted-link{ color:var(--muted); text-decoration:none; }
 .muted-link:hover{ text-decoration:underline; }
-.preview-shell{ width:min(100%,960px); margin:0 auto; }
-.preview-stage{ position:relative; width:100%; border:1px dashed rgba(148,163,184,.45); border-radius:22px; background:#fff; overflow:hidden; }
+.preview-shell{ position:relative; width:min(100%,960px); margin:0 auto; padding:1.5rem; border-radius:26px; background:linear-gradient(135deg, rgba(14,165,181,.1), rgba(79,70,229,.06)); border:1px solid rgba(148,163,184,.2); box-shadow:0 34px 70px -58px rgba(14,165,181,.35); }
+.preview-shell::after{ content:''; position:absolute; inset:0; border-radius:inherit; background:transparent; pointer-events:none; }
+.preview-stage{ position:relative; width:100%; border-radius:24px; background:rgba(255,255,255,.96); overflow:hidden; border:1px solid rgba(148,163,184,.24); box-shadow:0 36px 72px -60px rgba(15,23,42,.4); }
 .stage-scale{ position:absolute; left:0; top:0; width:960px; height:540px; transform-origin:top left; transform:scale(var(--s,1)); }
-.preview-canvas{ position:absolute; inset:0; background:linear-gradient(180deg,var(--zs-soft),#fff); }
-.pv-title{ position:absolute; font-size:28px; font-weight:800; color:#111; }
-.pv-sub{ position:absolute; color:#334155; font-size:16px; }
-.pv-prompt{ position:absolute; color:#0f172a; font-size:16px; }
-.sticker{ position:absolute; user-select:none; pointer-events:none; }
+.preview-canvas{ position:absolute; inset:0; background:linear-gradient(180deg,var(--zs-soft),#fff); background-size:cover; background-position:center; transition:background-image .35s ease, background-color .35s ease; }
+.preview-canvas::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.1)); opacity:0; transition:opacity .3s ease; pointer-events:none; }
+.preview-canvas[data-has-bg="1"]::after{ opacity:1; }
+.pv-title{ position:absolute; font-size:30px; font-weight:800; color:#0f172a; letter-spacing:.015em; font-family:var(--guest-title-font); text-shadow:0 12px 30px rgba(15,23,42,.18); }
+.pv-sub{ position:absolute; color:#334155; font-size:18px; font-weight:600; max-width:520px; line-height:1.45; font-family:var(--guest-subtitle-font); }
+.pv-prompt{ position:absolute; color:#0f172a; font-size:16px; font-weight:500; letter-spacing:.01em; background:transparent; padding:0; font-family:var(--guest-prompt-font); }
+.sticker{ position:absolute; user-select:none; pointer-events:none; filter:drop-shadow(0 8px 18px rgba(15,23,42,.25)); }
+.sticker-img img{ display:block; pointer-events:none; user-select:none; }
 .note-card{ border-radius:20px; border:1px solid rgba(148,163,184,.28); padding:1.8rem; background:#f8fafc; }
 .note-card textarea{ border-radius:16px; border:1px solid rgba(148,163,184,.32); padding:1rem; font-size:.98rem; }
 .note-card textarea:focus{ border-color:var(--zs); box-shadow:0 0 0 .25rem rgba(14,165,181,.2); }
@@ -437,17 +534,29 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
     <div class="preview-shell">
       <div class="preview-stage" id="pvStage">
         <div class="stage-scale" id="scaleBox">
-          <div class="preview-canvas">
+          <div class="preview-canvas" data-has-bg="<?=$canvasHasBg?>" style="<?=$canvasStyle?>">
             <div class="pv-title"  style="left:<?= (int)$tPos['x']?>px; top:<?= (int)$tPos['y']?>px;"><?=h($TITLE)?></div>
             <div class="pv-sub"    style="left:<?= (int)$sPos['x']?>px; top:<?= (int)$sPos['y']?>px;"><?=h($SUBTITLE)?></div>
             <div class="pv-prompt" style="left:<?= (int)$pPos['x']?>px; top:<?= (int)$pPos['y']?>px;"><?=h($PROMPT)?></div>
-            <?php foreach($stickersArr as $st){
-              $txt = isset($st['txt'])?$st['txt']:'💍';
-              $x   = isset($st['x'])?(int)$st['x']:20;
-              $y   = isset($st['y'])?(int)$st['y']:90;
-              $sz  = isset($st['size'])?(int)$st['size']:32; ?>
-              <div class="sticker" style="left:<?=$x?>px; top:<?=$y?>px; font-size:<?=$sz?>px"><?=$txt?></div>
-            <?php } ?>
+            <?php foreach($stickersArr as $st):
+              $type = $st['type'] ?? 'emoji';
+              $x    = isset($st['x']) ? (int)$st['x'] : 20;
+              $y    = isset($st['y']) ? (int)$st['y'] : 90;
+              if ($type === 'image') {
+                $path = $st['path'] ?? '';
+                $width = isset($st['width']) ? (int)$st['width'] : 220;
+                $url = ($path !== '' && isset($stickerAssetUrls[$path])) ? $stickerAssetUrls[$path] : null;
+                if ($url): ?>
+                  <div class="sticker sticker-img" style="left:<?=$x?>px; top:<?=$y?>px;">
+                    <img src="<?=h($url)?>" alt="" style="width:<?=$width?>px;">
+                  </div>
+                <?php endif;
+              } else {
+                $txt = $st['txt'] ?? '💍';
+                $size = isset($st['size']) ? (int)$st['size'] : 32; ?>
+                <div class="sticker" style="left:<?=$x?>px; top:<?=$y?>px; font-size:<?=$size?>px"><?=$txt?></div>
+              <?php }
+            endforeach; ?>
           </div>
         </div>
       </div>
@@ -478,13 +587,19 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
           <a class="small text-decoration-none fw-semibold" href="<?=BASE_URL?>/public/guest_logout.php?event=<?=$event_id?>">Çıkış Yap</a>
         </div>
       <?php else: ?>
-        <a class="btn btn-zs-outline" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
+        <div class="d-flex flex-column flex-md-row align-items-md-center gap-2">
+          <a class="btn btn-zs-outline" href="<?=BASE_URL?>/public/guest_login.php">Misafir Girişi</a>
+          <button class="btn btn-zs" type="button" data-bs-toggle="modal" data-bs-target="#guestRegisterModal">Misafir Kaydı Oluştur</button>
+        </div>
       <?php endif; ?>
     </div>
     <form method="post" enctype="multipart/form-data" id="upForm" class="vstack gap-3">
       <input type="hidden" name="csrf" value="<?=h(csrf_token())?>">
       <input type="hidden" name="do" value="upload">
       <input type="hidden" name="t" value="<?=h($token)?>">
+      <?php if($permaCode !== ''): ?>
+        <input type="hidden" name="code" value="<?=h($permaCode)?>">
+      <?php endif; ?>
       <div>
         <label class="form-label">Adınız</label>
         <input class="form-control" name="guest_name" placeholder="Ad Soyad" required <?= !$token_ok?'disabled':'' ?>>
@@ -508,15 +623,15 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
     </form>
   </div>
 
-  <?php if($profile): ?>
-    <div class="note-card mb-4">
-      <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
-        <div>
-          <h5 class="mb-1">Etkinlik sahibine mesaj gönder</h5>
-          <div class="smallmuted">Güzel dileklerinizi veya teşekkürlerinizi iletebilirsiniz.</div>
-        </div>
-        <button class="btn btn-zs-outline" type="button" data-bs-toggle="offcanvas" data-bs-target="#messagesPanel">Misafirlerle Mesajlaş</button>
+  <div class="note-card mb-4">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+      <div>
+        <h5 class="mb-1">Etkinlik sahibine mesaj gönder</h5>
+        <div class="smallmuted">Güzel dileklerinizi veya teşekkürlerinizi iletebilirsiniz.</div>
       </div>
+      <button class="btn btn-zs-outline" type="button" data-bs-toggle="offcanvas" data-bs-target="#messagesPanel">Misafirlerle Mesajlaş</button>
+    </div>
+    <?php if($profile): ?>
       <form id="hostNoteForm" class="vstack gap-3">
         <textarea name="note" rows="3" placeholder="Mesajınızı yazın..."></textarea>
         <div class="d-flex align-items-center justify-content-between gap-3 flex-wrap">
@@ -524,8 +639,18 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
           <button class="btn btn-zs" type="submit">Mesajı Gönder</button>
         </div>
       </form>
-    </div>
-  <?php endif; ?>
+    <?php else: ?>
+      <div class="alert alert-light border d-flex flex-column flex-md-row align-items-md-center gap-3 mb-0" style="border-radius:18px;">
+        <div>
+          Misafir hesabınızla giriş yaptıktan sonra etkinlik sahibine özel mesaj gönderebilirsiniz.
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <a class="btn btn-sm btn-zs-outline" href="<?=BASE_URL?>/public/guest_login.php">Giriş Yap</a>
+          <button class="btn btn-sm btn-zs" type="button" data-bs-toggle="modal" data-bs-target="#guestRegisterModal">Kayıt Ol</button>
+        </div>
+      </div>
+    <?php endif; ?>
+  </div>
 
   <div class="row g-4 mb-4 align-items-stretch">
     <div class="col-xl-7">
@@ -705,28 +830,75 @@ body{ background:linear-gradient(180deg,var(--zs-soft),#fff); font-family:"Inter
   </div>
 </div>
 
-<?php if($profile): ?>
+<div class="modal fade" id="guestRegisterModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content" style="border-radius:24px; border:none;">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title">Misafir Kaydı Oluştur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <p class="smallmuted">Etkinlik sahibi tarafından davet edildiyseniz adınızı ve e-posta adresinizi yazarak panel erişimi talep edebilirsiniz. Doğrulama bağlantısı e-posta adresinize gönderilir.</p>
+        <form id="guestRegisterForm" class="vstack gap-3">
+          <div>
+            <label class="form-label">Ad Soyad</label>
+            <input type="text" class="form-control" name="name" placeholder="Adınız Soyadınız" required>
+          </div>
+          <div>
+            <label class="form-label">E-posta</label>
+            <input type="email" class="form-control" name="email" placeholder="ornek@eposta.com" required>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="1" id="guestRegisterMarketing" name="marketing">
+            <label class="form-check-label small" for="guestRegisterMarketing">
+              BİKARE'nin etkinlik ve kampanya duyurularını e-posta ile almak istiyorum.
+            </label>
+          </div>
+          <div id="guestRegisterStatus" class="alert d-none" role="alert"></div>
+          <div class="d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-zs-outline" data-bs-dismiss="modal">Vazgeç</button>
+            <button type="submit" class="btn btn-zs" id="guestRegisterSubmit">Kayıt Ol</button>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <div class="smallmuted">Zaten hesabınız var mı? <a class="text-decoration-none" href="<?=BASE_URL?>/public/guest_login.php">Misafir girişi yapın.</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="offcanvas offcanvas-end offcanvas-bikare" tabindex="-1" id="messagesPanel">
   <div class="offcanvas-header">
     <h5 class="offcanvas-title">Mesajlar</h5>
     <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
   </div>
   <div class="offcanvas-body d-flex flex-column gap-3">
-    <div>
-      <div class="smallmuted mb-2">Misafir listesi</div>
-      <div id="chatUsers" class="d-flex flex-column gap-1"></div>
-    </div>
-    <div>
-      <div class="smallmuted mb-2" id="chatHeading">Mesaj seçilmedi</div>
-      <div class="chat-window" id="chatWindow"></div>
-    </div>
-    <form id="chatForm" class="chat-form vstack gap-2">
-      <textarea id="chatMessage" rows="2" placeholder="Mesajınızı yazın..." required></textarea>
-      <button class="btn btn-zs" type="submit">Gönder</button>
-    </form>
+    <?php if($profile): ?>
+      <div>
+        <div class="smallmuted mb-2">Misafir listesi</div>
+        <div id="chatUsers" class="d-flex flex-column gap-1"></div>
+      </div>
+      <div>
+        <div class="smallmuted mb-2" id="chatHeading">Mesaj seçilmedi</div>
+        <div class="chat-window" id="chatWindow"></div>
+      </div>
+      <form id="chatForm" class="chat-form vstack gap-2">
+        <textarea id="chatMessage" rows="2" placeholder="Mesajınızı yazın..." required></textarea>
+        <button class="btn btn-zs" type="submit">Gönder</button>
+      </form>
+    <?php else: ?>
+      <div class="alert alert-light border" style="border-radius:18px;">
+        <h6 class="fw-semibold">Mesajlaşmak için giriş yapın</h6>
+        <p class="mb-3 smallmuted">Diğer misafirlerle sohbet etmek için hesabınızı doğrulayıp giriş yapmanız gerekir.</p>
+        <div class="d-flex flex-wrap gap-2">
+          <a class="btn btn-zs" href="<?=BASE_URL?>/public/guest_login.php">Giriş Yap</a>
+          <button class="btn btn-zs-outline" type="button" data-bs-toggle="modal" data-bs-target="#guestRegisterModal" data-bs-dismiss="offcanvas">Kayıt Ol</button>
+        </div>
+      </div>
+    <?php endif; ?>
   </div>
 </div>
-<?php endif; ?>
 
 <?php if($wheelEntries): ?>
   <button class="spin-trigger" type="button" data-bs-toggle="modal" data-bs-target="#wheelModal"><i class="bi bi-record-circle me-2"></i>Çarkı Çevir</button>
@@ -770,6 +942,93 @@ fm?.addEventListener('submit',e=>{ const name=fm.querySelector('[name=guest_name
 
 const csrfMeta=document.querySelector('meta[name="csrf"]');
 const csrfToken=csrfMeta?csrfMeta.content:'';
+const registerModalEl=document.getElementById('guestRegisterModal');
+const registerForm=document.getElementById('guestRegisterForm');
+const registerStatus=document.getElementById('guestRegisterStatus');
+const registerSubmit=document.getElementById('guestRegisterSubmit');
+const registerDefaultLabel=registerSubmit?registerSubmit.textContent:'Kayıt Ol';
+
+function clearRegisterStatus(){
+  if(!registerStatus) return;
+  registerStatus.textContent='';
+  registerStatus.classList.add('d-none');
+  registerStatus.classList.remove('alert-success','alert-danger','alert-warning');
+}
+
+function setRegisterStatus(kind,message){
+  if(!registerStatus) return;
+  registerStatus.textContent=message;
+  registerStatus.classList.remove('d-none');
+  registerStatus.classList.remove('alert-success','alert-danger','alert-warning');
+  registerStatus.classList.add('alert-'+kind);
+}
+
+registerForm?.addEventListener('submit',ev=>{
+  ev.preventDefault();
+  const nameInput=registerForm.querySelector('input[name="name"]');
+  const emailInput=registerForm.querySelector('input[name="email"]');
+  const marketingInput=registerForm.querySelector('input[name="marketing"]');
+  const name=(nameInput?.value||'').trim();
+  const email=(emailInput?.value||'').trim();
+  clearRegisterStatus();
+  if(!name || name.length<2){
+    setRegisterStatus('danger','Adınızı ve soyadınızı yazın.');
+    nameInput?.focus();
+    return;
+  }
+  if(!email){
+    setRegisterStatus('danger','Geçerli bir e-posta adresi yazın.');
+    emailInput?.focus();
+    return;
+  }
+  if(registerSubmit){
+    registerSubmit.disabled=true;
+    registerSubmit.textContent='Gönderiliyor...';
+  }
+  const payload=new URLSearchParams({ajax:'1',action:'guest_register',csrf:csrfToken,name,email});
+  if(marketingInput?.checked){
+    payload.append('marketing','1');
+  }
+  fetch(window.location.href,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Requested-With':'XMLHttpRequest'},body:payload})
+    .then(r=>r.json())
+    .then(data=>{
+      if(!data.ok) throw new Error(data.message||'Bir hata oluştu');
+      const status=data.status||'pending';
+      let kind='success';
+      if(status==='pending_retry'){ kind='warning'; }
+      setRegisterStatus(kind, data.message || 'Talebiniz alındı.');
+      registerForm.reset();
+    })
+    .catch(err=>{
+      setRegisterStatus('danger', err.message || 'Kayıt sırasında bir sorun oluştu.');
+    })
+    .finally(()=>{
+      if(registerSubmit){
+        registerSubmit.disabled=false;
+        registerSubmit.textContent=registerDefaultLabel;
+      }
+    });
+});
+
+if(registerModalEl){
+  registerModalEl.addEventListener('shown.bs.modal',()=>{
+    clearRegisterStatus();
+    if(registerForm){
+      registerForm.reset();
+    }
+    registerSubmit?.removeAttribute('disabled');
+    registerSubmit && (registerSubmit.textContent=registerDefaultLabel);
+    const nameInput=registerForm?.querySelector('input[name="name"]');
+    setTimeout(()=>{ nameInput?.focus(); },120);
+  });
+  registerModalEl.addEventListener('hidden.bs.modal',()=>{
+    clearRegisterStatus();
+    registerForm?.reset();
+    registerSubmit?.removeAttribute('disabled');
+    registerSubmit && (registerSubmit.textContent=registerDefaultLabel);
+  });
+}
+
 const galleryModal=document.getElementById('uploadModal');
 const modalTitle=document.getElementById('modalTitle');
 const modalMedia=document.getElementById('modalMedia');

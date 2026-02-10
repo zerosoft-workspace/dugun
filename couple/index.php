@@ -12,6 +12,35 @@ if (!$ev) {
   redirect(BASE_URL.'/couple/login.php');
 }
 
+$GUEST_FONTS = guest_font_options();
+$supportsGuestFonts = events_support_guest_fonts();
+$supportsGuestBackground = events_support_guest_backgrounds();
+$currentBackgroundPath = $supportsGuestBackground ? trim((string)($ev['guest_background_path'] ?? '')) : '';
+
+$layoutDecoded = json_decode($ev['layout_json'] ?? '', true);
+$layoutArr = normalize_event_layout($layoutDecoded);
+$layoutJson = json_encode($layoutArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$tPos = $layoutArr['title'];
+$sPos = $layoutArr['subtitle'];
+$pPos = $layoutArr['prompt'];
+
+$existingStickerMap = [];
+$stickersDecoded = json_decode($ev['stickers_json'] ?? '[]', true);
+$stickersArr = normalize_event_stickers($stickersDecoded, $EVENT_ID, $existingStickerMap);
+if (!is_array($stickersArr)) {
+  $stickersArr = [];
+}
+$stickersJson = json_encode($stickersArr, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$existingImagePaths = [];
+foreach ($stickersArr as $entry) {
+  if (!is_array($entry)) {
+    continue;
+  }
+  if (($entry['type'] ?? '') === 'image' && !empty($entry['path'])) {
+    $existingImagePaths[] = $entry['path'];
+  }
+}
+
 // Lisans kur / kontrol et
 license_ensure_active($EVENT_ID);
 $license_active = license_is_active($EVENT_ID);
@@ -44,11 +73,98 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='save_settings')
   $prompt    = trim($_POST['guest_prompt'] ?? '');
   $primary   = trim($_POST['theme_primary'] ?? '#0ea5b5');
   $accent    = trim($_POST['theme_accent'] ?? '#e0f7fb');
+  $titleFont = $_POST['guest_title_font'] ?? ($ev['guest_title_font'] ?? 'inter');
+  $subFont   = $_POST['guest_subtitle_font'] ?? ($ev['guest_subtitle_font'] ?? $titleFont);
+  $promptFont= $_POST['guest_prompt_font'] ?? ($ev['guest_prompt_font'] ?? $subFont);
+  $titleFont = isset($GUEST_FONTS[$titleFont]) ? $titleFont : 'inter';
+  $subFont   = isset($GUEST_FONTS[$subFont])   ? $subFont   : $titleFont;
+  $promptFont= isset($GUEST_FONTS[$promptFont])? $promptFont: $subFont;
+  if (!$supportsGuestFonts) {
+    $titleFont = 'inter';
+    $subFont   = $titleFont;
+    $promptFont= $subFont;
+  }
   $view      = isset($_POST['allow_guest_view']) ? 1 : 0;
   $download  = isset($_POST['allow_guest_download']) ? 1 : 0;
   $delete    = isset($_POST['allow_guest_delete']) ? 1 : 0;
   $layout    = $_POST['layout_json'] ?? null;
   $stickers  = $_POST['stickers_json'] ?? null;
+
+  $layoutPayload = json_decode((string)$layout, true);
+  $layoutNormalized = normalize_event_layout($layoutPayload);
+  $layout = json_encode($layoutNormalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+  $stickersPayload = json_decode((string)$stickers, true);
+  $stickerAssetUrls = [];
+  $pendingStickerPlacement = null;
+  if (is_array($stickersPayload)) {
+    foreach ($stickersPayload as $payloadEntry) {
+      if (!is_array($payloadEntry)) {
+        continue;
+      }
+      $isPending = !empty($payloadEntry['pending']) || ($payloadEntry['path'] ?? '') === '__pending__';
+      if ($isPending && strtolower((string)($payloadEntry['type'] ?? '')) === 'image') {
+        $px = isset($payloadEntry['x']) ? (int)$payloadEntry['x'] : 40;
+        $py = isset($payloadEntry['y']) ? (int)$payloadEntry['y'] : 300;
+        $pw = isset($payloadEntry['width']) ? (int)$payloadEntry['width'] : (isset($payloadEntry['size']) ? (int)$payloadEntry['size'] : 260);
+        $pendingStickerPlacement = [
+          'x' => max(0, min(940, $px)),
+          'y' => max(0, min(520, $py)),
+          'width' => max(80, min(560, $pw)),
+        ];
+        break;
+      }
+    }
+  }
+  $stickersNormalized = normalize_event_stickers($stickersPayload ?: [], $EVENT_ID, $stickerAssetUrls);
+
+  $newOverlayPath = null;
+  if (!empty($_FILES['sticker_image']) && is_array($_FILES['sticker_image'])) {
+    $newOverlayPath = event_guest_overlay_store($EVENT_ID, $_FILES['sticker_image']);
+    if ($newOverlayPath) {
+      $newStickerX = $pendingStickerPlacement['x'] ?? 40;
+      $newStickerY = $pendingStickerPlacement['y'] ?? 300;
+      $newStickerW = $pendingStickerPlacement['width'] ?? 260;
+      $stickersNormalized[] = [
+        'type'  => 'image',
+        'path'  => $newOverlayPath,
+        'x'     => $newStickerX,
+        'y'     => $newStickerY,
+        'width' => $newStickerW,
+      ];
+      $newOverlayUrl = event_guest_overlay_url($newOverlayPath);
+      if ($newOverlayUrl) {
+        $stickerAssetUrls[$newOverlayPath] = $newOverlayUrl;
+      }
+    }
+  }
+  $stickersNormalized = array_values($stickersNormalized);
+  $stickers = json_encode($stickersNormalized, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+  $newImagePaths = [];
+  foreach ($stickersNormalized as $entry) {
+    if (($entry['type'] ?? '') === 'image' && !empty($entry['path'])) {
+      $newImagePaths[$entry['path']] = true;
+    }
+  }
+  foreach ($existingImagePaths as $oldPath) {
+    if (!isset($newImagePaths[$oldPath])) {
+      event_guest_overlay_delete($oldPath);
+    }
+  }
+
+  $backgroundPath = $supportsGuestBackground ? $currentBackgroundPath : '';
+  if ($supportsGuestBackground) {
+    $removeBg  = ($_POST['remove_guest_background'] ?? '') === '1';
+    if ($removeBg && $backgroundPath !== '') {
+      event_guest_background_delete($backgroundPath);
+      $backgroundPath = '';
+    }
+    if (!empty($_FILES['guest_background']) && is_array($_FILES['guest_background'])) {
+      $backgroundPath = event_guest_background_store($EVENT_ID, $_FILES['guest_background'], $backgroundPath ?: null) ?: $backgroundPath;
+    }
+  }
+
 
   $contact   = trim($_POST['contact_email'] ?? '');
   $phone     = trim($_POST['couple_phone'] ?? '');
@@ -57,21 +173,63 @@ if ($_SERVER['REQUEST_METHOD']==='POST' && ($_POST['do']??'')==='save_settings')
   $inv_vkn   = trim($_POST['invoice_vkn'] ?? '');
   $inv_addr  = trim($_POST['invoice_address'] ?? '');
 
-  pdo()->prepare("UPDATE events SET
-    guest_title=?, guest_subtitle=?, guest_prompt=?,
-    theme_primary=?, theme_accent=?,
-    allow_guest_view=?, allow_guest_download=?, allow_guest_delete=?,
-    layout_json=?, stickers_json=?,
-    contact_email=?, couple_phone=?, couple_tckn=?, invoice_title=?, invoice_vkn=?, invoice_address=?,
-    updated_at=?
-  WHERE id=?")->execute([
-    $title?:null,$subtitle?:null,$prompt?:null,
-    $primary,$accent,$view,$download,$delete,
-    $layout?:null,$stickers?:null,
-    $contact?:null,$phone?:null,$tckn?:null,$inv_title?:null,$inv_vkn?:null,$inv_addr?:null,
-    now(), $EVENT_ID
-  ]);
+  $updateParts = [];
+  $updateValues = [];
 
+  $updateParts[] = 'guest_title=?';
+  $updateValues[] = $title ?: null;
+  $updateParts[] = 'guest_subtitle=?';
+  $updateValues[] = $subtitle ?: null;
+  $updateParts[] = 'guest_prompt=?';
+  $updateValues[] = $prompt ?: null;
+
+  if ($supportsGuestFonts) {
+    $updateParts[] = 'guest_title_font=?';
+    $updateValues[] = $titleFont ?: null;
+    $updateParts[] = 'guest_subtitle_font=?';
+    $updateValues[] = $subFont ?: null;
+    $updateParts[] = 'guest_prompt_font=?';
+    $updateValues[] = $promptFont ?: null;
+  }
+
+  $updateParts[] = 'theme_primary=?';
+  $updateValues[] = $primary;
+  $updateParts[] = 'theme_accent=?';
+  $updateValues[] = $accent;
+  $updateParts[] = 'allow_guest_view=?';
+  $updateValues[] = $view;
+  $updateParts[] = 'allow_guest_download=?';
+  $updateValues[] = $download;
+  $updateParts[] = 'allow_guest_delete=?';
+  $updateValues[] = $delete;
+  $updateParts[] = 'layout_json=?';
+  $updateValues[] = $layout ?: null;
+
+  if ($supportsGuestBackground) {
+    $updateParts[] = 'guest_background_path=?';
+    $updateValues[] = $backgroundPath ?: null;
+  }
+
+  $updateParts[] = 'stickers_json=?';
+  $updateValues[] = $stickers ?: null;
+  $updateParts[] = 'contact_email=?';
+  $updateValues[] = $contact ?: null;
+  $updateParts[] = 'couple_phone=?';
+  $updateValues[] = $phone ?: null;
+  $updateParts[] = 'couple_tckn=?';
+  $updateValues[] = $tckn ?: null;
+  $updateParts[] = 'invoice_title=?';
+  $updateValues[] = $inv_title ?: null;
+  $updateParts[] = 'invoice_vkn=?';
+  $updateValues[] = $inv_vkn ?: null;
+  $updateParts[] = 'invoice_address=?';
+  $updateValues[] = $inv_addr ?: null;
+  $updateParts[] = 'updated_at=?';
+  $updateValues[] = now();
+
+  $updateValues[] = $EVENT_ID;
+  $sql = 'UPDATE events SET '.implode(', ', $updateParts).' WHERE id=?';
+  pdo()->prepare($sql)->execute($updateValues);
   flash('ok','Ayarlar kaydedildi.');
   redirect($_SERVER['REQUEST_URI']);
 }
@@ -157,18 +315,35 @@ $PROMPT   = $ev['guest_prompt'] ?: 'Adınızı yazıp anınızı yükleyin.';
 $PRIMARY  = $ev['theme_primary'] ?: '#0ea5b5';
 $ACCENT   = $ev['theme_accent']  ?: '#e0f7fb';
 
-// Layout & stickers (null-safe, eski PHP uyumlu)
-$layoutJson   = $ev['layout_json'] ?: '{"title":{"x":24,"y":24},"subtitle":{"x":24,"y":60},"prompt":{"x":24,"y":396}}';
-$stickersJson = $ev['stickers_json'] ?: '[]';
-$layoutArr    = json_decode($layoutJson, true);
-$stickersArr  = json_decode($stickersJson, true);
-if(!is_array($layoutArr)){
-  $layoutArr = array('title'=>array('x'=>24,'y'=>24),'subtitle'=>array('x'=>24,'y'=>60),'prompt'=>array('x'=>24,'y'=>396));
+$TITLE_FONT_KEY = trim((string)($ev['guest_title_font'] ?? ''));
+if ($TITLE_FONT_KEY === '' || !isset($GUEST_FONTS[$TITLE_FONT_KEY])) { $TITLE_FONT_KEY = 'inter'; }
+$SUBTITLE_FONT_KEY = trim((string)($ev['guest_subtitle_font'] ?? ''));
+if ($SUBTITLE_FONT_KEY === '' || !isset($GUEST_FONTS[$SUBTITLE_FONT_KEY])) { $SUBTITLE_FONT_KEY = $TITLE_FONT_KEY; }
+$PROMPT_FONT_KEY = trim((string)($ev['guest_prompt_font'] ?? ''));
+if ($PROMPT_FONT_KEY === '' || !isset($GUEST_FONTS[$PROMPT_FONT_KEY])) { $PROMPT_FONT_KEY = $SUBTITLE_FONT_KEY; }
+$TITLE_FONT_STACK = guest_font_stack($TITLE_FONT_KEY);
+$SUBTITLE_FONT_STACK = guest_font_stack($SUBTITLE_FONT_KEY);
+$PROMPT_FONT_STACK = guest_font_stack($PROMPT_FONT_KEY);
+$FONT_IMPORTS = guest_font_imports([$TITLE_FONT_KEY, $SUBTITLE_FONT_KEY, $PROMPT_FONT_KEY]);
+$TITLE_FONT_STACK_ESC = htmlspecialchars($TITLE_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$SUBTITLE_FONT_STACK_ESC = htmlspecialchars($SUBTITLE_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$PROMPT_FONT_STACK_ESC = htmlspecialchars($PROMPT_FONT_STACK, ENT_NOQUOTES, 'UTF-8');
+$BACKGROUND_PATH = $supportsGuestBackground ? trim((string)($ev['guest_background_path'] ?? '')) : '';
+if ($BACKGROUND_PATH !== '' && !event_guest_background_exists($BACKGROUND_PATH)) { $BACKGROUND_PATH = ''; }
+$BACKGROUND_URL = $BACKGROUND_PATH !== '' ? event_guest_background_url($BACKGROUND_PATH) : null;
+$canvasStyle = '--zs:'.htmlspecialchars($PRIMARY, ENT_QUOTES, 'UTF-8').'; --zs-soft:'.htmlspecialchars($ACCENT, ENT_QUOTES, 'UTF-8').';';
+if ($BACKGROUND_URL) {
+  $canvasStyle .= ' background-image:url('.htmlspecialchars($BACKGROUND_URL, ENT_QUOTES, 'UTF-8').');';
 }
-if(!is_array($stickersArr)){ $stickersArr=array(); }
-$tPos = isset($layoutArr['title'])    ? $layoutArr['title']    : array('x'=>24,'y'=>24);
-$sPos = isset($layoutArr['subtitle']) ? $layoutArr['subtitle'] : array('x'=>24,'y'=>60);
-$pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'y'=>396);
+$canvasHasBg = $BACKGROUND_URL ? '1' : '0';
+$bgPreviewStyle = $BACKGROUND_URL ? 'background-image:url('.htmlspecialchars($BACKGROUND_URL, ENT_QUOTES, 'UTF-8').');' : '';
+$fontConfigForJs = [];
+foreach ($GUEST_FONTS as $key => $fontMeta) {
+  $fontConfigForJs[$key] = [
+    'stack' => $fontMeta['stack'],
+    'import' => $fontMeta['import'] ?? '',
+  ];
+}
 ?>
 <!doctype html>
 <html lang="tr">
@@ -179,6 +354,9 @@ $pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <?=theme_head_assets()?>
+<?php foreach ($FONT_IMPORTS as $import): ?>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=<?=h($import)?>&display=swap">
+<?php endforeach; ?>
 <style>
 :root{
   --ink:#0f172a;
@@ -187,16 +365,21 @@ $pPos = isset($layoutArr['prompt'])   ? $layoutArr['prompt']   : array('x'=>24,'
   --brand-soft:<?=h($ACCENT)?>;
   --zs:<?=h($PRIMARY)?>;
   --zs-soft:<?=h($ACCENT)?>;
+  --guest-title-font: <?=$TITLE_FONT_STACK_ESC?>;
+  --guest-subtitle-font: <?=$SUBTITLE_FONT_STACK_ESC?>;
+  --guest-prompt-font: <?=$PROMPT_FONT_STACK_ESC?>;
 }
 *,*::before,*::after{ box-sizing:border-box; }
 body{
-  font-family:'Inter','Segoe UI','Helvetica Neue',sans-serif;
+  font-family:var(--guest-subtitle-font, 'Inter','Segoe UI','Helvetica Neue',sans-serif);
   background:radial-gradient(circle at top left, rgba(148,197,255,.25), transparent 35%),
              radial-gradient(circle at bottom right, rgba(14,165,181,.18), transparent 45%),
              #f5f7fb;
   color:var(--ink);
   margin:0;
+  transition:overflow .2s ease;
 }
+body.preview-modal-open{ overflow:hidden; }
 a{ color:inherit; text-decoration:none; }
 a:hover{ text-decoration:none; }
 .portal-shell{
@@ -328,16 +511,90 @@ a:hover{ text-decoration:none; }
 .gallery-metrics .badge{ border-radius:999px; padding:.55rem 1.1rem; font-weight:600; font-size:.85rem; }
 .gallery-metrics .badge-count{ background:rgba(37,99,235,.12); color:#1d4ed8; }
 .gallery-metrics .badge-size{ background:rgba(79,70,229,.12); color:#4338ca; }
-.preview-shell{ width:min(100%,980px); margin:0 auto; }
-.preview-stage{ position:relative; width:100%; border:1px dashed rgba(148,163,184,.35); border-radius:22px; background:#fff; overflow:hidden; }
+.preview-launch{ display:flex; flex-direction:column; gap:1.5rem; }
+.preview-launch-grid{ display:flex; gap:2rem; align-items:stretch; flex-wrap:wrap; }
+.preview-launch-copy{ flex:1 1 320px; display:flex; flex-direction:column; gap:1rem; }
+.preview-launch-pill{ display:inline-flex; align-items:center; gap:.4rem; font-size:.8rem; font-weight:600; background:rgba(14,165,181,.16); color:var(--brand); padding:.45rem 1rem; border-radius:999px; }
+.preview-launch-meta{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:.55rem; font-size:.9rem; color:var(--muted); }
+.preview-launch-meta li{ display:flex; align-items:center; gap:.6rem; }
+.preview-launch-meta i{ color:var(--brand); }
+.preview-launch-cta{ flex:0 1 260px; display:flex; flex-direction:column; gap:1rem; align-items:stretch; }
+.preview-launch-thumb{ width:100%; aspect-ratio:4/3; border-radius:20px; border:1px solid rgba(148,163,184,.24); background:linear-gradient(135deg, rgba(14,165,181,.18), rgba(148,163,184,.08)); display:flex; align-items:center; justify-content:center; color:var(--muted); font-weight:600; position:relative; overflow:hidden; box-shadow:0 26px 60px -48px rgba(15,23,42,.4); }
+.preview-launch-thumb.has-image{ background-size:cover; background-position:center; color:#fff; }
+.preview-launch-thumb::after{ content:''; position:absolute; inset:0; background:linear-gradient(140deg, rgba(15,23,42,.35), rgba(255,255,255,.15)); mix-blend-mode:soft-light; pointer-events:none; }
+.preview-launch-thumb.has-image::after{ background:linear-gradient(140deg, rgba(15,23,42,.55), rgba(255,255,255,.05)); }
+.preview-launch-thumb-label{ position:relative; z-index:1; }
+.preview-modal{ position:fixed; inset:0; z-index:1100; display:none; }
+.preview-modal.is-open{ display:block; }
+.preview-modal-backdrop{ position:absolute; inset:0; background:rgba(15,23,42,.72); backdrop-filter:blur(14px); }
+.preview-modal-dialog{ position:relative; z-index:1; margin:auto; width:min(1200px, 100%); height:min(92vh, 860px); background:rgba(15,23,42,.06); border-radius:34px; border:1px solid rgba(148,163,184,.25); box-shadow:0 60px 120px -48px rgba(15,23,42,.6); display:flex; flex-direction:column; overflow:hidden; }
+.preview-modal-header{ padding:1.5rem 1.75rem; display:flex; flex-wrap:wrap; gap:1rem; justify-content:space-between; align-items:center; background:rgba(255,255,255,.95); border-bottom:1px solid rgba(148,163,184,.2); }
+.preview-modal-title{ font-size:1.25rem; font-weight:700; color:var(--ink); }
+.preview-modal-sub{ margin:0; color:var(--muted); font-size:.92rem; max-width:560px; }
+.preview-modal-actions{ display:flex; gap:.75rem; align-items:center; }
+.preview-modal-body{ flex:1; display:flex; gap:1.5rem; padding:1.5rem 1.75rem 1.75rem; background:linear-gradient(140deg, rgba(239,246,255,.85), rgba(236,253,245,.82)); overflow:auto; min-height:0; align-items:flex-start; }
+.preview-modal-sidebar{ flex:0 0 320px; display:flex; flex-direction:column; gap:1rem; overflow-y:auto; padding-right:.5rem; }
+.preview-modal-stage{ flex:1; min-width:0; display:flex; flex-direction:column; gap:1.25rem; align-items:center; justify-content:flex-start; position:relative; }
+.preview-modal-hint{ display:flex; align-items:center; gap:.65rem; background:rgba(255,255,255,.85); border:1px solid rgba(148,163,184,.25); border-radius:999px; padding:.45rem 1rem; font-size:.85rem; font-weight:600; color:var(--ink); box-shadow:0 20px 40px -32px rgba(15,23,42,.35); }
+.preview-modal-footer{ padding:1rem 1.75rem 1.5rem; font-size:.85rem; color:var(--muted); background:rgba(255,255,255,.92); border-top:1px solid rgba(148,163,184,.2); }
+.preview-shell{ position:relative; width:min(100%,980px); margin:0 auto; padding:1.8rem; border-radius:28px; background:linear-gradient(135deg, rgba(14,165,181,.08), rgba(79,70,229,.06)); border:1px solid rgba(148,163,184,.2); box-shadow:0 42px 80px -60px rgba(14,165,181,.38); display:flex; flex-direction:column; gap:1.25rem; max-height:100%; }
+.preview-shell::after{ content:''; position:absolute; inset:0; border-radius:inherit; background:transparent; pointer-events:none; }
+.preview-stage{ position:relative; width:100%; border-radius:26px; background:rgba(255,255,255,.95); overflow:hidden; border:1px solid rgba(148,163,184,.22); box-shadow:0 45px 90px -68px rgba(15,23,42,.42); flex:1; }
+.preview-card{ position:relative; overflow:hidden; }
+.preview-grid{ display:flex; flex-direction:column; gap:24px; }
+.preview-controls{ display:flex; flex-direction:column; gap:18px; }
+.preview-control{ border-radius:20px; padding:18px 20px; background:rgba(255,255,255,.9); border:1px solid rgba(148,163,184,.18); box-shadow:0 28px 60px -48px rgba(15,23,42,.35); display:flex; flex-direction:column; gap:14px; }
+.preview-control--accent{ background:linear-gradient(140deg, rgba(14,165,181,.12), rgba(79,70,229,.08)); border-color:rgba(14,165,181,.28); box-shadow:0 32px 68px -48px rgba(14,165,181,.45); }
+.preview-control-head{ display:flex; flex-direction:column; gap:4px; }
+.preview-control-title{ font-weight:700; font-size:.95rem; color:var(--ink); }
+.preview-control-sub{ font-size:.85rem; color:var(--muted); }
+.preview-hint{ display:flex; align-items:center; gap:.65rem; background:rgba(255,255,255,.85); border:1px solid rgba(148,163,184,.2); border-radius:999px; padding:.45rem .9rem; font-size:.85rem; font-weight:600; color:var(--ink); box-shadow:0 20px 40px -32px rgba(15,23,42,.35); }
+.preview-form{ display:flex; flex-direction:column; gap:12px; }
+.preview-form-label{ font-weight:600; font-size:.85rem; color:var(--ink); }
+.preview-form-control{ border-radius:14px; border:1px solid rgba(148,163,184,.35); background:rgba(255,255,255,.92); box-shadow:0 16px 32px -28px rgba(15,23,42,.28); }
+.preview-form-control:focus{ border-color:var(--brand); box-shadow:0 0 0 4px rgba(14,165,181,.18); }
+.preview-font-grid{ display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); }
+.preview-font-field select option{ font-weight:600; }
+.preview-font-field select option[data-font-stack]{ font-family:inherit; }
+.preview-bg-grid{ display:flex; flex-wrap:wrap; gap:16px; align-items:center; }
+.preview-bg-actions{ flex:1; display:flex; flex-direction:column; gap:12px; }
+.preview-bg-actions .btn{ border-radius:12px; }
+.preview-bg-actions .form-text{ font-size:.8rem; color:var(--muted); }
+.pv-editable{ cursor:text; outline:none; }
+.pv-editable:focus{ box-shadow:0 0 0 4px rgba(14,165,181,.25); border-radius:12px; padding:.2rem .4rem; margin:-.2rem -.4rem; background:rgba(255,255,255,.8); }
 .stage-scale{ position:absolute; left:0; top:0; width:960px; height:540px; transform-origin:top left; transform:scale(var(--s,1)); }
-.preview-canvas{ position:absolute; inset:0; background:linear-gradient(180deg,var(--zs-soft),#fff); }
-#pv-title{ position:absolute; font-size:28px; font-weight:800; color:#111; }
-#pv-sub{ position:absolute; color:#334155; font-size:16px; }
-#pv-prompt{ position:absolute; color:#0f172a; font-size:16px; }
-.sticker{ position:absolute; user-select:none; cursor:move; }
-sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
+.preview-canvas{ position:absolute; inset:0; background:linear-gradient(180deg,var(--zs-soft),#fff); background-size:cover; background-position:center; transition:background-image .35s ease, background-color .35s ease; }
+.preview-canvas::after{ content:''; position:absolute; inset:0; background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.1)); opacity:0; transition:opacity .3s ease; pointer-events:none; }
+.preview-canvas[data-has-bg="1"]::after{ opacity:1; }
+#pv-title{ position:absolute; font-size:30px; font-weight:800; color:#0f172a; letter-spacing:.015em; font-family:var(--guest-title-font); text-shadow:0 12px 30px rgba(15,23,42,.18); }
+#pv-sub{ position:absolute; color:#334155; font-size:18px; font-weight:600; max-width:520px; line-height:1.45; font-family:var(--guest-subtitle-font); }
+#pv-prompt{ position:absolute; color:#0f172a; font-size:16px; font-weight:500; letter-spacing:.01em; background:transparent; padding:0; font-family:var(--guest-prompt-font); }
+.sticker{ position:absolute; user-select:none; cursor:move; filter:drop-shadow(0 8px 18px rgba(15,23,42,.25)); transition:transform .18s ease; touch-action:none; }
+.sticker.is-active{ outline:2px dashed var(--brand); outline-offset:6px; }
+.sticker-pending{ outline:2px dashed var(--brand); outline-offset:8px; background:rgba(14,165,181,.1); border-radius:18px; }
+.sticker-pending img{ box-shadow:0 28px 60px -42px rgba(15,23,42,.35); }
+.sticker-placeholder{ display:grid; place-items:center; font-weight:600; font-size:.8rem; color:rgba(15,23,42,.65); min-width:140px; min-height:120px; border-radius:18px; background:rgba(255,255,255,.82); border:1px dashed rgba(148,163,184,.55); }
+.sticker-img img{ display:block; max-width:520px; pointer-events:none; user-select:none; }
+.sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
 .sticker-actions .btn{ border-radius:12px; padding:.45rem .85rem; font-weight:600; }
+.sticker-size-tool .form-range{ --bs-form-range-thumb-bg: var(--brand); }
+.sticker-size-tool .form-range:disabled{ opacity:.4; }
+.font-chooser-grid{ display:grid; gap:16px; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
+.font-chooser{ border-radius:18px; border:1px solid rgba(148,163,184,.2); background:rgba(255,255,255,.85); padding:18px 20px; display:flex; flex-direction:column; gap:12px; box-shadow:0 24px 48px -40px rgba(15,23,42,.35); }
+.font-chooser-head{ display:flex; flex-direction:column; gap:4px; }
+.font-chooser-title{ font-weight:700; color:var(--ink); }
+.font-chooser-sub{ font-size:.85rem; color:var(--muted); }
+.font-chip-list{ display:flex; flex-wrap:wrap; gap:10px; }
+.font-chip{ border:1px solid rgba(148,163,184,.35); border-radius:12px; padding:.6rem .85rem; background:rgba(255,255,255,.82); font-weight:600; transition:all .2s ease; color:var(--ink); }
+.font-chip:hover{ border-color:var(--brand); box-shadow:0 12px 24px -18px rgba(14,165,181,.45); transform:translateY(-1px); }
+.font-chip.active{ border-color:var(--brand); background:rgba(14,165,181,.12); color:var(--brand); box-shadow:0 18px 36px -24px rgba(14,165,181,.45); }
+.font-chip-label{ pointer-events:none; }
+.preview-controls .btn{ border-radius:12px; font-weight:600; }
+.bg-preview{ width:170px; height:120px; border-radius:18px; border:1px solid rgba(148,163,184,.25); background:linear-gradient(135deg, rgba(14,165,181,.12), rgba(14,165,181,.02)); display:flex; align-items:center; justify-content:center; color:var(--muted); font-weight:600; position:relative; overflow:hidden; transition:transform .25s ease, box-shadow .25s ease; }
+.bg-preview span{ z-index:1; }
+.bg-preview::after{ content:''; position:absolute; inset:0; background:linear-gradient(135deg, rgba(14,165,181,.18), rgba(14,165,181,0)); opacity:.35; transition:opacity .25s ease; }
+.bg-preview.has-image{ background-size:cover; background-position:center; color:#fff; box-shadow:0 28px 60px -48px rgba(15,23,42,.55); }
+.bg-preview.has-image::after{ opacity:.6; }
 .badge-soft{ background:#eef2ff; color:#334155; border-radius:999px; padding:.45rem 1rem; font-weight:600; }
 @media (max-width:1199px){
   .portal-shell{ flex-direction:column; padding:32px clamp(1.5rem,5vw,3rem); }
@@ -345,10 +602,16 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
   .sidebar-nav{ flex-direction:row; flex-wrap:wrap; gap:18px 28px; flex:1; }
   .nav-group{ min-width:200px; }
   .sidebar-footer{ flex-direction:row; flex-wrap:wrap; }
+  .preview-modal-sidebar{ flex:0 0 280px; }
 }
 @media (max-width:991px){
   .portal-header-card{ padding:28px; }
   .portal-header-content{ gap:24px; }
+  .preview-launch-grid{ flex-direction:column; }
+  .preview-modal-dialog{ width:calc(100% - 3rem); height:min(95vh, 820px); }
+  .preview-modal-body{ flex-direction:column; padding:1.25rem 1.35rem 1.5rem; }
+  .preview-modal-sidebar{ flex:none; width:100%; max-height:260px; padding-right:0; }
+  .preview-modal-stage{ width:100%; }
 }
 @media (max-width:767px){
   .portal-shell{ padding:28px 1.25rem 40px; }
@@ -358,6 +621,9 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
   .hero-title{ font-size:1.8rem; }
   .hero-license .form-select{ min-width:0; flex:1; }
   .portal-container{ gap:24px; }
+  .preview-modal-dialog{ width:calc(100% - 1.5rem); height:95vh; border-radius:22px; }
+  .preview-modal-header, .preview-modal-body, .preview-modal-footer{ padding:1.1rem 1.25rem; }
+  .preview-modal-footer{ padding-bottom:1.25rem; }
 }
 @media (max-width:575px){
   .nav-group{ min-width:0; width:100%; }
@@ -513,7 +779,7 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
                   </div>
                   <a class="btn btn-zs-outline align-self-start" href="list.php"><i class="bi bi-images me-1"></i>Yüklemeleri Aç</a>
                 </div>
-                <form method="post" class="row g-3">
+                <form id="settingsForm" method="post" class="row g-3" enctype="multipart/form-data">
                   <input type="hidden" name="_csrf" value="<?=h(csrf_token())?>">
                   <input type="hidden" name="do" value="save_settings">
                   <div class="col-12">
@@ -536,6 +802,68 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
                     <label class="form-label">Aksan Renk</label>
                     <input type="color" class="form-control form-control-color" name="theme_accent" value="<?=h($ACCENT)?>" oninput="applyTheme()">
                   </div>
+                  <div class="col-12">
+                    <label class="form-label mb-2">Tipografi</label>
+                    <div class="font-chooser-grid">
+                      <div class="font-chooser" data-font-input="guest_title_font">
+                        <div class="font-chooser-head">
+                          <span class="font-chooser-title">Başlık</span>
+                          <span class="font-chooser-sub">Hero metninin karakterini seçin.</span>
+                        </div>
+                        <select class="form-select d-none" name="guest_title_font" id="guest_title_font" data-font-select data-css-var="--guest-title-font" data-preview-target="pv-title">
+                          <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                            <option value="<?=h($fontKey)?>" <?=$TITLE_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                          <?php endforeach; ?>
+                        </select>
+                        <div class="font-chip-list">
+                          <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                            <button type="button" class="font-chip<?=$TITLE_FONT_KEY === $fontKey ? ' active' : ''?>" data-font-chip data-font="<?=h($fontKey)?>" style="font-family:<?=h($fontMeta['stack'])?>;">
+                              <span class="font-chip-label"><?=h($fontMeta['label'])?></span>
+                            </button>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
+                      <div class="font-chooser" data-font-input="guest_subtitle_font">
+                        <div class="font-chooser-head">
+                          <span class="font-chooser-title">Alt Başlık</span>
+                          <span class="font-chooser-sub">Davet notunuzun tonu.</span>
+                        </div>
+                        <select class="form-select d-none" name="guest_subtitle_font" id="guest_subtitle_font" data-font-select data-css-var="--guest-subtitle-font" data-preview-target="pv-sub">
+                          <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                            <option value="<?=h($fontKey)?>" <?=$SUBTITLE_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                          <?php endforeach; ?>
+                        </select>
+                        <div class="font-chip-list">
+                          <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                            <button type="button" class="font-chip<?=$SUBTITLE_FONT_KEY === $fontKey ? ' active' : ''?>" data-font-chip data-font="<?=h($fontKey)?>" style="font-family:<?=h($fontMeta['stack'])?>;">
+                              <span class="font-chip-label"><?=h($fontMeta['label'])?></span>
+                            </button>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
+                      <div class="font-chooser" data-font-input="guest_prompt_font">
+                        <div class="font-chooser-head">
+                          <span class="font-chooser-title">Mesaj</span>
+                          <span class="font-chooser-sub">Yükleme talimatının stili.</span>
+                        </div>
+                        <select class="form-select d-none" name="guest_prompt_font" id="guest_prompt_font" data-font-select data-css-var="--guest-prompt-font" data-preview-target="pv-prompt">
+                          <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                            <option value="<?=h($fontKey)?>" <?=$PROMPT_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                          <?php endforeach; ?>
+                        </select>
+                        <div class="font-chip-list">
+                          <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                            <button type="button" class="font-chip<?=$PROMPT_FONT_KEY === $fontKey ? ' active' : ''?>" data-font-chip data-font="<?=h($fontKey)?>" style="font-family:<?=h($fontMeta['stack'])?>;">
+                              <span class="font-chip-label"><?=h($fontMeta['label'])?></span>
+                            </button>
+                          <?php endforeach; ?>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <input type="hidden" name="remove_guest_background" id="removeBgFlag" value="0">
+
                   <div class="col-md-12">
                     <label class="form-label">İletişim E-postası</label>
                     <input type="email" class="form-control" name="contact_email" value="<?=h($ev['contact_email'] ?? '')?>">
@@ -673,41 +1001,27 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
                 </div>
               </div>
 
-              <div class="card-lite filled p-4">
-                <h2 class="card-title mb-1">Misafir Sayfası Önizleme</h2>
-                <p class="card-subtitle mb-3">Metinleri sürükleyerek ve renkleri değiştirerek gerçek görünümü test edin.</p>
-                <div class="preview-shell">
-                  <div class="preview-stage" id="pvStage">
-                    <div class="stage-scale" id="scaleBox">
-                      <div class="preview-canvas" id="canvas" style="--zs:<?=h($PRIMARY)?>; --zs-soft:<?=h($ACCENT)?>;">
-                        <div id="pv-title" style="left:<?= (int)$tPos['x']?>px; top:<?= (int)$tPos['y']?>px;"><?=h($TITLE)?></div>
-                        <div id="pv-sub" style="left:<?= (int)$sPos['x']?>px; top:<?= (int)$sPos['y']?>px;"><?=h($SUBTITLE)?></div>
-                        <div id="pv-prompt" style="left:<?= (int)$pPos['x']?>px; top:<?= (int)$pPos['y']?>px;"><?=h($PROMPT)?></div>
-                        <?php foreach($stickersArr as $i=>$st){
-                          $txt = isset($st['txt'])?$st['txt']:'💍';
-                          $x   = isset($st['x'])?(int)$st['x']:20;
-                          $y   = isset($st['y'])?(int)$st['y']:90;
-                          $sz  = isset($st['size'])?(int)$st['size']:32; ?>
-                          <div class="sticker" data-i="<?=$i?>" style="left:<?=$x?>px; top:<?=$y?>px; font-size:<?=$sz?>px"><?=$txt?></div>
-                        <?php } ?>
-                      </div>
-                    </div>
+              <div class="card-lite filled p-4 preview-launch">
+                <div class="preview-launch-grid">
+                  <div class="preview-launch-copy">
+                    <div class="preview-launch-pill"><i class="bi bi-stars me-1"></i>Misafir sayfası stüdyosu</div>
+                    <h2 class="card-title mb-1">Tasarımı aç ve canva hissiyle düzenle</h2>
+                    <p class="card-subtitle mb-3">Misafir sayfanızı tam ekran düzenleyicide açarak metinleri, fontları, arka planı ve sticker'ları hızlıca güncelleyebilirsiniz.</p>
+                    <ul class="preview-launch-meta">
+                      <li><i class="bi bi-type"></i><span><?=h($GUEST_FONTS[$TITLE_FONT_KEY]['label'] ?? 'Inter')?> başlık fontu</span></li>
+                      <li><i class="bi bi-palette"></i><span><?= $BACKGROUND_URL ? 'Özel arka plan aktif' : 'Varsayılan arka plan' ?></span></li>
+                      <li><i class="bi bi-magic"></i><span>Sahne üzerindeki metinleri sürükleyip bırakın</span></li>
+                    </ul>
                   </div>
-                </div>
-                <p class="small text-muted mt-3 mb-0">Not: Bu önizleme gerçek misafir sayfasının birebir yansımasıdır.</p>
-              </div>
-
-              <div class="card-lite filled p-4">
-                <h2 class="card-title mb-1">Sticker ve Simgeler</h2>
-                <p class="card-subtitle mb-3">Misafir sayfanızı renklendirmek için aşağıdan simge ekleyebilirsiniz.</p>
-                <div class="sticker-actions">
-                  <?php foreach(['💍','💐','🎉','🎶','📸','❤️','✨','🎈','🥂','👰','🤵','🍰','🌟','🎊','💞','🕊️'] as $em): ?>
-                    <button class="btn btn-sm btn-zs-outline add-sticker" data-emoji="<?=h($em)?>"><?=$em?></button>
-                  <?php endforeach; ?>
-                </div>
-                <div class="d-flex flex-wrap gap-2 mt-3">
-                  <button class="btn btn-sm btn-outline-danger" id="clearStickers"><i class="bi bi-trash me-1"></i>Tüm simgeleri kaldır</button>
-                  <button class="btn btn-sm btn-outline-secondary" id="resetLayout"><i class="bi bi-arrow-counterclockwise me-1"></i>Yerleşimi sıfırla</button>
+                  <div class="preview-launch-cta">
+                    <div class="preview-launch-thumb<?= $BACKGROUND_URL ? ' has-image' : ''?>"<?=$bgPreviewStyle ? ' style="'.$bgPreviewStyle.'"' : ''?>>
+                      <?php if(!$BACKGROUND_URL): ?>
+                        <span class="preview-launch-thumb-label">Canlı önizleme</span>
+                      <?php endif; ?>
+                    </div>
+                    <button type="button" class="btn btn-zs btn-lg w-100" id="openPreviewBtn"><i class="bi bi-easel me-1"></i>Önizlemeyi Aç</button>
+                    <p class="small text-muted mb-0">Tüm değişiklikler kaydet butonuna bastığınızda etkin olur.</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -717,16 +1031,530 @@ sticker-actions{ display:flex; flex-wrap:wrap; gap:.75rem; margin-top:1.1rem; }
     </div>
   </main>
 </div>
-</body>
+<div class="preview-modal" id="previewModal" aria-hidden="true">
+  <div class="preview-modal-backdrop" data-close-preview></div>
+  <div class="preview-modal-dialog" role="dialog" aria-modal="true">
+    <div class="preview-modal-header">
+      <div>
+        <div class="preview-modal-title">Misafir Sayfası Tasarım Stüdyosu</div>
+        <p class="preview-modal-sub">Metinleri, fontları ve arka planı gerçek zamanlı düzenleyin; kaydettiğinizde misafir sayfasına yansır.</p>
+      </div>
+      <div class="preview-modal-actions">
+        <button type="button" class="btn btn-outline-secondary" data-close-preview><i class="bi bi-x-lg me-1"></i>Kapat</button>
+        <button type="submit" class="btn btn-zs" form="settingsForm"><i class="bi bi-save me-1"></i>Kaydet</button>
+      </div>
+    </div>
+    <div class="preview-modal-body">
+      <aside class="preview-modal-sidebar">
+        <div class="preview-control preview-control--accent">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Hızlı düzenleme</span>
+            <span class="preview-control-sub">Metinleri burada güncelleyin; değişiklikler anında sahneye yansır.</span>
+          </div>
+          <div class="preview-form">
+            <label class="preview-form-label" for="quickTitle">Başlık</label>
+            <input type="text" id="quickTitle" class="form-control preview-form-control" placeholder="Örn. Mutluluğumuza Ortak Olun" data-sync-field="guest_title" value="<?=h($TITLE)?>">
+            <label class="preview-form-label" for="quickSubtitle">Alt Başlık</label>
+            <textarea id="quickSubtitle" class="form-control preview-form-control" rows="2" data-sync-field="guest_subtitle" placeholder="Davet metninizi buraya yazın."><?=h($SUBTITLE)?></textarea>
+            <label class="preview-form-label" for="quickPrompt">Yükleme Mesajı</label>
+            <textarea id="quickPrompt" class="form-control preview-form-control" rows="3" data-sync-field="guest_prompt" placeholder="Misafirleriniz için açıklama ekleyin."><?=h($PROMPT)?></textarea>
+          </div>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Tipografi</span>
+            <span class="preview-control-sub">Favori fontlarınızı seçin ve anında deneyin.</span>
+          </div>
+          <div class="preview-font-grid">
+            <div class="preview-font-field">
+              <label class="preview-form-label" for="quickFontTitle">Başlık fontu</label>
+              <select id="quickFontTitle" class="form-select preview-form-control" data-sync-font="guest_title_font">
+                <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                  <option value="<?=h($fontKey)?>" <?=$TITLE_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="preview-font-field">
+              <label class="preview-form-label" for="quickFontSub">Alt başlık fontu</label>
+              <select id="quickFontSub" class="form-select preview-form-control" data-sync-font="guest_subtitle_font">
+                <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                  <option value="<?=h($fontKey)?>" <?=$SUBTITLE_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+            <div class="preview-font-field">
+              <label class="preview-form-label" for="quickFontPrompt">Mesaj fontu</label>
+              <select id="quickFontPrompt" class="form-select preview-form-control" data-sync-font="guest_prompt_font">
+                <?php foreach($GUEST_FONTS as $fontKey => $fontMeta): ?>
+                  <option value="<?=h($fontKey)?>" <?=$PROMPT_FONT_KEY === $fontKey ? 'selected' : ''?>><?=h($fontMeta['label'])?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Arka plan ve vitrin</span>
+            <span class="preview-control-sub">Etkinlik temanızla uyumlu görsel ve renkleri seçin.</span>
+          </div>
+          <div class="preview-bg-grid">
+            <div class="bg-preview<?= $BACKGROUND_URL ? ' has-image' : ''?>" id="bgPreview"<?=$bgPreviewStyle ? ' style="'.$bgPreviewStyle.'"' : ''?>>
+              <span id="bgPreviewLabel"><?= $BACKGROUND_URL ? 'Yüklenen görsel' : 'Varsayılan' ?></span>
+            </div>
+            <div class="preview-bg-actions">
+              <input class="d-none" type="file" name="guest_background" id="guestBackground" accept="image/*" form="settingsForm">
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-sm btn-zs" type="button" data-trigger-upload="guestBackground"><i class="bi bi-upload me-1"></i>Yeni görsel ekle</button>
+                <button class="btn btn-sm btn-outline-danger" type="button" id="removeBgBtn" <?=$BACKGROUND_URL ? '' : 'disabled'?>>
+                  <i class="bi bi-trash me-1"></i>Varsayılanı kullan
+                </button>
+              </div>
+              <p class="form-text mb-0">JPG, PNG veya WEBP görselleri yükleyebilirsiniz. Minimum 1920×1080 önerilir.</p>
+            </div>
+          </div>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Sahne kısayolları</span>
+            <span class="preview-control-sub">Metinlerin üzerine çift tıklayın veya aşağıdaki butonlarla odaklanın.</span>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-title">Başlığı seç</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-sub">Alt başlığı seç</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-focus-preview="pv-prompt">Mesajı seç</button>
+          </div>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Sticker & görsel boyutu</span>
+            <span class="preview-control-sub">Bir öğeye tıkladığınızda buradan boyutunu değiştirebilirsiniz.</span>
+          </div>
+          <div class="sticker-size-tool">
+            <input type="range" class="form-range" id="stickerSizeRange" min="20" max="200" step="2" disabled>
+            <div class="small text-muted" id="stickerSizeValue">Bir sticker seçin</div>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-sm btn-outline-danger" id="deleteStickerBtn" disabled><i class="bi bi-trash me-1"></i>Seçili öğeyi sil</button>
+            <label class="btn btn-sm btn-zs-outline mb-0">
+              <i class="bi bi-image me-1"></i>Özel görsel yükle
+              <input type="file" name="sticker_image" accept="image/*" class="d-none" form="settingsForm">
+            </label>
+          </div>
+          <p class="form-text mb-0">PNG, JPG, WEBP, GIF veya SVG yükleyebilirsiniz. Dosyayı seçtiğinizde sahneye eklenir; konumunu ayarlayıp kaydetmeyi unutmayın.</p>
+        </div>
+        <div class="preview-control">
+          <div class="preview-control-head">
+            <span class="preview-control-title">Sticker kitaplığı</span>
+            <span class="preview-control-sub">Bir tıklamayla sahneye ekleyin, sürükleyerek konumlandırın.</span>
+          </div>
+          <div class="sticker-actions">
+            <?php foreach(['💍','💐','🎉','🎶','📸','❤️','✨','🎈','🥂','👰','🤵','🍰','🌟','🎊','💞','🕊️'] as $em): ?>
+              <button class="btn btn-sm btn-zs-outline add-sticker" data-emoji="<?=h($em)?>"><?=$em?></button>
+            <?php endforeach; ?>
+          </div>
+          <div class="d-flex flex-wrap gap-2 mt-3">
+            <button class="btn btn-sm btn-outline-danger" type="button" id="clearStickers"><i class="bi bi-trash me-1"></i>Tüm simgeleri kaldır</button>
+            <button class="btn btn-sm btn-outline-secondary" type="button" id="resetLayout"><i class="bi bi-arrow-counterclockwise me-1"></i>Yerleşimi sıfırla</button>
+          </div>
+        </div>
+      </aside>
+<style>
+  .preview-modal-stage {
+    background: radial-gradient(circle at center, #f1f5f9 0%, #e2e8f0 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative; overflow: hidden; padding: 2rem;
+    flex: 1; /* Fill parent */
+    width: 100%; 
+  }
+  .preview-device-frame {
+    background: #2d3436;
+    padding: 12px 14px;
+    border-radius: 32px;
+    box-shadow: 
+      0 50px 100px -20px rgba(50,50,93,0.25), 
+      0 30px 60px -30px rgba(0,0,0,0.3), 
+      inset 0 0 0 2px rgba(255,255,255,0.1);
+    position: relative; 
+    transition: transform 0.3s ease;
+    
+    /* Critical Fixes for Layout Collapse */
+    width: 90%; 
+    max-width: 1000px; /* Max logical width */
+    aspect-ratio: 16/9; /* Force aspect ratio to match canvas */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  /* Decorative camera/sensor */
+  .preview-device-frame::after {
+    content:''; position: absolute; top: 50%; left: 6px; transform: translateY(-50%);
+    width: 4px; height: 30px; background: rgba(255,255,255,0.1); border-radius: 4px;
+  }
+
+  .preview-shell {
+    border-radius: 20px; overflow: hidden; background: #fff;
+    box-shadow: inset 0 0 20px rgba(0,0,0,0.05);
+    width: 100%;
+    height: 100%;
+    position: relative;
+  }
+  
+  /* Editables Styling */
+  .pv-editable {
+    background-color: transparent !important;
+    border: 1px dashed rgba(0,0,0,0.15); 
+    border-radius: 8px;
+    padding: 6px 10px; 
+    transition: all 0.2s cubic-bezier(0.165, 0.84, 0.44, 1); 
+    cursor: grab;
+    min-width: 50px; min-height: 24px; 
+  }
+  .pv-editable:hover { 
+    background-color: rgba(255,255,255,0.5) !important; 
+    border-color: var(--brand, #0ea5b5); 
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  }
+  .pv-editable:focus {
+    background-color: #fff !important; 
+    border-color: var(--brand, #0ea5b5); 
+    color:#2d3436 !important;
+    box-shadow: 0 8px 24px rgba(14, 165, 181, 0.15); 
+    outline: none; cursor: text;
+    z-index: 10;
+  }
+  
+  /* Modern Hint Badge */
+  .preview-modal-hint {
+    background: #fff; padding: 8px 16px; border-radius: 100px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 24px;
+    font-size: 0.9rem; color: #64748b; font-weight: 500;
+    display: flex; align-items: center; gap: 10px; border: 1px solid rgba(0,0,0,0.04);
+  }
+  
+  /* Canvas fixes */
+  .preview-canvas { 
+    overflow: hidden; 
+    -webkit-font-smoothing: antialiased;
+  }
+  .sticker.is-active { 
+    outline: 2px solid var(--brand, #0ea5b5); 
+    box-shadow: 0 0 0 4px rgba(14, 165, 181, 0.15);
+  }
+</style>
+      <div class="preview-modal-stage">
+        <div class="preview-modal-hint">
+          <span class="badge rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-10"><i class="bi bi-palette2 me-1"></i>Tasarım Stüdyosu</span>
+          <span>Öğeleri sürükleyip sahneye yerleştirin. Düzenlemek için metinlere tıklayın.</span>
+        </div>
+
+        <div class="preview-device-frame">
+          <div class="preview-shell">
+            <div class="preview-stage" id="pvStage">
+              <div class="stage-scale" id="scaleBox">
+                <div class="preview-canvas" id="canvas" data-has-bg="<?=$canvasHasBg?>" data-initial-bg="<?= $BACKGROUND_URL ? h($BACKGROUND_URL) : '' ?>" style="<?=$canvasStyle?>">
+                  <div id="pv-title" class="pv-title pv-editable" contenteditable="true" data-field="guest_title" style="left:<?= (int)$tPos['x']?>px; top:<?= (int)$tPos['y']?>px;"><?=h($TITLE)?></div>
+                  <div id="pv-sub" class="pv-sub pv-editable" contenteditable="true" data-field="guest_subtitle" style="left:<?= (int)$sPos['x']?>px; top:<?= (int)$sPos['y']?>px;"><?=h($SUBTITLE)?></div>
+                  <div id="pv-prompt" class="pv-prompt pv-editable" contenteditable="true" data-field="guest_prompt" style="left:<?= (int)$pPos['x']?>px; top:<?= (int)$pPos['y']?>px;"><?=h($PROMPT)?></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mt-4 text-secondary small fw-medium d-flex align-items-center opacity-75">
+            <i class="bi bi-phone-landscape me-2"></i> Misafir Ekranı Simülasyonu
+        </div>
+      </div>
+    </div>
+    <div class="preview-modal-footer">
+      Not: Misafir sayfası düzenleyicisi kaydettiğinizde etkin olur, kapattığınızda değişiklikler korunur.
+    </div>
+  </div>
+</div>
 <script>
-// 960x540 sahneyi container'a orantılı sığdır (upload.php ile aynı hesap)
 (function(){
   const stage=document.getElementById('pvStage'), box=document.getElementById('scaleBox');
-  function fit(){ if(!stage||!box) return; const W=stage.clientWidth, S=W/960; box.style.setProperty('--s',S); stage.style.height=(540*S)+'px'; }
-  window.addEventListener('resize',fit,{passive:true}); new ResizeObserver(fit).observe(stage); fit();
+  function fit(){ 
+    if(!stage||!box) return; 
+    // Parent'ın genişliğini baz al, stage'in kendi padding/margin'ini düş
+    // .preview-shell veya .preview-device-frame genişliği belirleyici olmalı
+    const parent = stage.parentElement; 
+    const W = parent ? parent.clientWidth : stage.clientWidth;
+    
+    // Eğer W çok küçükse (örn: gizliyken), varsayılan bir değer ata veya işlemi durdur
+    if (!W || W < 50) return;
+
+    const S = W/960; 
+    box.style.setProperty('--s',S); 
+    
+    // Yüksekliği set ederken container kısıtlamalarına dikkat et
+    // 540 * S = Scaled Height
+    stage.style.height=(540*S)+'px'; 
+    stage.style.width='100%';
+  }
+  
+  // İlk yüklemede ve sonraki değişimlerde tetikle
+  window.addEventListener('resize',fit,{passive:true});
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(fit);
+    if (stage) ro.observe(stage);
+    if (stage.parentElement) ro.observe(stage.parentElement); // Parent değişimini de izle
+  } else {
+    window.addEventListener('orientationchange',fit,{passive:true});
+    setInterval(fit, 400); 
+  }
+  
+  // Modal açılış animasyonu bittiğinde de tetiklenmesi için:
+  document.addEventListener('transitionend', fit);
+  
+  // Hemen çalıştır
+  requestAnimationFrame(fit);
 })();
 
-// Sadece önizleme alanına tema uygula
+
+const fontMap = <?=safe_json_encode($fontConfigForJs)?>;
+const loadedFontImports = new Set(<?=safe_json_encode($FONT_IMPORTS)?>);
+const headEl = document.head || document.getElementsByTagName('head')[0];
+const canvas = document.getElementById('canvas');
+const bgInput = document.getElementById('guestBackground');
+const bgPreview = document.getElementById('bgPreview');
+const bgPreviewLabel = document.getElementById('bgPreviewLabel');
+const removeBgBtn = document.getElementById('removeBgBtn');
+const removeBgFlag = document.getElementById('removeBgFlag');
+const layoutField = document.getElementById('layout_json');
+const stickersField = document.getElementById('stickers_json');
+const stickerSizeRange = document.getElementById('stickerSizeRange');
+const stickerSizeValue = document.getElementById('stickerSizeValue');
+const deleteStickerBtn = document.getElementById('deleteStickerBtn');
+const stickerAssetMap = <?=safe_json_encode($existingStickerMap)?>;
+const stickerUploadInput = document.querySelector('input[name="sticker_image"]');
+let stickerState = <?=(string)$stickersJson?>;
+try { stickerState = Array.isArray(stickerState) ? stickerState : JSON.parse(stickerState || '[]'); }
+catch(e){ stickerState = []; }
+let activeStickerIndex = null;
+const previewModal = document.getElementById('previewModal');
+const openPreviewBtn = document.getElementById('openPreviewBtn');
+let pendingStickerUrl = null;
+
+function openPreviewModal(){
+  if (!previewModal) return;
+  previewModal.classList.add('is-open');
+  document.body.classList.add('preview-modal-open');
+  previewModal.setAttribute('aria-hidden','false');
+  setTimeout(()=>{ window.dispatchEvent(new Event('resize')); }, 30);
+}
+
+function closePreviewModal(){
+  if (!previewModal) return;
+  previewModal.classList.remove('is-open');
+  document.body.classList.remove('preview-modal-open');
+  previewModal.setAttribute('aria-hidden','true');
+  if (openPreviewBtn) {
+    openPreviewBtn.focus({ preventScroll:true });
+  }
+}
+
+if (openPreviewBtn) {
+  openPreviewBtn.addEventListener('click',(e)=>{
+    e.preventDefault();
+    openPreviewModal();
+  });
+}
+
+document.querySelectorAll('[data-close-preview]').forEach((btn)=>{
+  btn.addEventListener('click',(e)=>{
+    e.preventDefault();
+    closePreviewModal();
+  });
+});
+
+document.addEventListener('keydown',(e)=>{
+  if (e.key === 'Escape' && previewModal && previewModal.classList.contains('is-open')) {
+    closePreviewModal();
+  }
+});
+
+function ensureFontLoaded(key){
+  const cfg = fontMap[key];
+  if (!cfg) return;
+  const imp = cfg.import || '';
+  if (!imp || loadedFontImports.has(imp)) return;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family='+imp+'&display=swap';
+  link.dataset.fontImport = imp;
+  headEl && headEl.appendChild(link);
+  loadedFontImports.add(imp);
+}
+
+function markFontChipActive(inputName, key){
+  if (!inputName) return;
+  document.querySelectorAll(`[data-font-input="${inputName}"] .font-chip`).forEach((btn)=>{
+    if (btn.dataset.font === key) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+}
+
+function updateFont(select){
+  const key = select.value;
+  const cfg = fontMap[key];
+  if (!cfg) return;
+  ensureFontLoaded(key);
+  const cssVar = select.dataset.cssVar;
+  const target = select.dataset.previewTarget;
+  if (cssVar) {
+    document.documentElement.style.setProperty(cssVar, cfg.stack);
+  }
+  if (target) {
+    const el = document.getElementById(target);
+    if (el) {
+      el.style.fontFamily = cfg.stack;
+    }
+  }
+  const inputName = select.getAttribute('name');
+  markFontChipActive(inputName, key);
+}
+
+document.querySelectorAll('[data-font-select]').forEach((select)=>{
+  select.addEventListener('change', ()=>{ updateFont(select); saveHidden(); });
+  updateFont(select);
+});
+
+document.querySelectorAll('[data-font-chip]').forEach((chip)=>{
+  chip.addEventListener('click', ()=>{
+    const wrapper = chip.closest('[data-font-input]');
+    if (!wrapper) return;
+    const inputName = wrapper.dataset.fontInput;
+    if (!inputName) return;
+    const select = document.querySelector(`select[name="${inputName}"]`);
+    if (!select) return;
+    select.value = chip.dataset.font;
+    updateFont(select);
+    saveHidden();
+  });
+});
+
+const quickTextInputs = {};
+document.querySelectorAll('[data-sync-field]').forEach((input)=>{
+  const field = input.dataset.syncField;
+  if (!field) return;
+  quickTextInputs[field] = input;
+  const formInput = document.querySelector(`[name=${field}]`);
+  const preview = document.querySelector(`[data-field=${field}]`);
+  if (formInput) {
+    input.value = formInput.value || '';
+    input.addEventListener('input', ()=>{
+      formInput.value = input.value;
+      if (preview) preview.textContent = input.value;
+      saveHidden();
+    });
+    formInput.addEventListener('input', ()=>{
+      if (document.activeElement === input) return;
+      input.value = formInput.value || '';
+    });
+  }
+});
+
+function styleQuickSelectOptions(select){
+  Array.from(select.options || []).forEach((opt)=>{
+    const cfg = fontMap[opt.value];
+    if (cfg) {
+      opt.style.fontFamily = cfg.stack;
+      opt.dataset.fontStack = cfg.stack;
+    }
+  });
+}
+
+document.querySelectorAll('[data-sync-font]').forEach((select)=>{
+  styleQuickSelectOptions(select);
+  const targetName = select.dataset.syncFont;
+  if (!targetName) return;
+  const formSelect = document.querySelector(`select[name=${targetName}]`);
+  if (!formSelect) return;
+  select.value = formSelect.value;
+  select.addEventListener('change', ()=>{
+    formSelect.value = select.value;
+    formSelect.dispatchEvent(new Event('change', { bubbles:true }));
+  });
+  formSelect.addEventListener('change', ()=>{
+    if (select.value !== formSelect.value) {
+      select.value = formSelect.value;
+    }
+  });
+});
+
+document.querySelectorAll('[data-trigger-upload]').forEach((btn)=>{
+  btn.addEventListener('click', ()=>{
+    const target = btn.dataset.triggerUpload;
+    if (!target) return;
+    const input = document.getElementById(target);
+    if (input) input.click();
+  });
+});
+
+function setCanvasBackground(url, skipFlagUpdate){
+  if (!canvas) return;
+  if (url) {
+    canvas.style.backgroundImage = `url(${url.replace(/"/g,'\"')})`;
+    canvas.dataset.hasBg = '1';
+    if (bgPreview) {
+      bgPreview.style.backgroundImage = `url(${url})`;
+      bgPreview.classList.add('has-image');
+    }
+    if (bgPreviewLabel) {
+      bgPreviewLabel.textContent = 'Yüklenen görsel';
+    }
+    if (removeBgBtn) removeBgBtn.disabled = false;
+    if (!skipFlagUpdate && removeBgFlag) removeBgFlag.value = '0';
+  } else {
+    canvas.style.backgroundImage = '';
+    canvas.dataset.hasBg = '0';
+    if (bgPreview) {
+      bgPreview.style.backgroundImage = '';
+      bgPreview.classList.remove('has-image');
+    }
+    if (bgPreviewLabel) {
+      bgPreviewLabel.textContent = 'Varsayılan';
+    }
+    if (removeBgBtn) removeBgBtn.disabled = true;
+    if (!skipFlagUpdate && removeBgFlag) removeBgFlag.value = '1';
+  }
+}
+
+if (bgInput) {
+  bgInput.addEventListener('change', ()=>{
+    const file = bgInput.files && bgInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt)=>{
+      const url = evt && evt.target ? evt.target.result : '';
+      setCanvasBackground(url || '', false);
+    };
+    reader.readAsDataURL(file);
+    if (removeBgFlag) removeBgFlag.value = '0';
+  });
+}
+
+if (removeBgBtn) {
+  removeBgBtn.addEventListener('click', ()=>{
+    if (!confirm('Arka plan görselini kaldırmak istediğinize emin misiniz?')) return;
+    if (bgInput) bgInput.value = '';
+    if (removeBgFlag) removeBgFlag.value = '1';
+    setCanvasBackground('', false);
+  });
+}
+
+if (canvas) {
+  if (canvas.dataset.hasBg === '1' && canvas.dataset.initialBg) {
+    setCanvasBackground(canvas.dataset.initialBg, true);
+  } else if (canvas.dataset.hasBg !== '1') {
+    setCanvasBackground('', true);
+  }
+}
+
 function applyTheme(){
   const primaryField=document.querySelector('[name=theme_primary]');
   const accentField=document.querySelector('[name=theme_accent]');
@@ -737,97 +1565,450 @@ function applyTheme(){
   document.documentElement.style.setProperty('--brand-soft',a);
   document.documentElement.style.setProperty('--zs',p);
   document.documentElement.style.setProperty('--zs-soft',a);
-  const canvas=document.getElementById('canvas');
   if(canvas){ canvas.style.setProperty('--zs',p); canvas.style.setProperty('--zs-soft',a); }
 }
 
-// Metin -> preview (canlı)
-[['guest_title','pv-title'],['guest_subtitle','pv-sub'],['guest_prompt','pv-prompt']]
-.forEach(([n,id])=>{
-  const el=document.querySelector(`[name=${n}]`);
-  if(el) el.addEventListener('input',()=>{ document.getElementById(id).innerText = el.value || ''; saveHidden(); });
+const textBindings = [
+  { field:'guest_title', previewId:'pv-title' },
+  { field:'guest_subtitle', previewId:'pv-sub' },
+  { field:'guest_prompt', previewId:'pv-prompt' },
+];
+textBindings.forEach(({field, previewId})=>{
+  const input = document.querySelector(`[name=${field}]`);
+  const preview = document.getElementById(previewId);
+  if (!preview) return;
+  if (input) {
+    input.addEventListener('input', ()=>{
+      preview.textContent = input.value || '';
+      const quick = quickTextInputs[field];
+      if (quick && document.activeElement !== quick) {
+        quick.value = input.value || '';
+      }
+      saveHidden();
+    });
+  }
+  preview.addEventListener('keydown', (evt)=>{
+    if (evt.key === 'Enter') { evt.preventDefault(); preview.blur(); }
+  });
+  preview.addEventListener('input', ()=>{
+    const value = preview.textContent.replace(/\s+/g,' ').trim();
+    if (input) input.value = value;
+    const quick = quickTextInputs[field];
+    if (quick && document.activeElement !== quick) {
+      quick.value = value;
+    }
+    saveHidden();
+  });
+  preview.addEventListener('blur', ()=>{
+    const value = preview.textContent.replace(/\s+/g,' ').trim();
+    preview.textContent = value;
+    if (input) input.value = value;
+    const quick = quickTextInputs[field];
+    if (quick && document.activeElement !== quick) {
+      quick.value = value;
+    }
+    saveHidden();
+  });
 });
 
-// Sürükle & bırak konumlandırma (birebir)
-const canvas=document.getElementById('canvas');
+document.querySelectorAll('[data-focus-preview]').forEach((btn)=>{
+  btn.addEventListener('click', ()=>{
+    const id = btn.dataset.focusPreview;
+    const target = document.getElementById(id);
+    if (!target) return;
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+    target.focus();
+  });
+});
+
 const titleEl=document.getElementById('pv-title');
 const subEl  =document.getElementById('pv-sub');
 const prEl   =document.getElementById('pv-prompt');
 
-let layout   = <?=(string)$layoutJson?>;
-let stickers = <?=(string)$stickersJson?>;
+let layout = {};
+try { layout = layoutField && layoutField.value ? JSON.parse(layoutField.value) : {}; }
+catch(e){ layout = {}; }
 
 function saveHidden(){
-  // Güncel DOM konumlarını JSON’a yaz
-  layout = {
-    title   : {x:parseInt(titleEl.style.left)||24, y:parseInt(titleEl.style.top)||24},
-    subtitle: {x:parseInt(subEl.style.left)||24,   y:parseInt(subEl.style.top)||60},
-    prompt  : {x:parseInt(prEl.style.left)||24,    y:parseInt(prEl.style.top)||396}
-  };
-  const st = [];
-  document.querySelectorAll('.sticker').forEach((d)=>{
-    st.push({ txt:d.textContent, x:parseInt(d.style.left)||20, y:parseInt(d.style.top)||90, size:parseInt(d.style.fontSize)||32 });
-  });
-  document.getElementById('layout_json').value   = JSON.stringify(layout);
-  document.getElementById('stickers_json').value = JSON.stringify(st);
-}
-function makeDraggable(el){
-  let ox=0, oy=0, dragging=false;
-  el.style.cursor='move';
-  el.addEventListener('mousedown',e=>{ dragging=true; ox=e.offsetX; oy=e.offsetY; el.style.cursor='grabbing'; });
-  window.addEventListener('mousemove',e=>{
-    if(!dragging) return;
-    const rect=canvas.getBoundingClientRect();
-    let x=e.clientX-rect.left-ox, y=e.clientY-rect.top-oy;
-    x=Math.max(0,Math.min(960-20,x)); y=Math.max(0,Math.min(540-20,y));
-    el.style.left=x+'px'; el.style.top=y+'px';
-  });
-  window.addEventListener('mouseup',()=>{ if(!dragging) return; dragging=false; el.style.cursor='move'; saveHidden(); });
-}
-[titleEl,subEl,prEl].forEach(makeDraggable);
-
-function addSticker(txt){
-  const d=document.createElement('div');
-  d.className='sticker';
-  d.textContent=txt||'💍';
-  d.style.left='20px'; d.style.top='90px'; d.style.fontSize='32px';
-  canvas.appendChild(d);
-  makeDraggable(d);
-  saveHidden();
-}
-document.querySelectorAll('.add-sticker').forEach(b=>b.addEventListener('click',e=>{
-  e.preventDefault(); addSticker(b.dataset.emoji);
-}));
-
-document.getElementById('clearStickers').onclick=(e)=>{
-  e.preventDefault();
-  document.querySelectorAll('.sticker').forEach(n=>n.remove());
-  saveHidden();
-};
-document.getElementById('resetLayout').onclick=(e)=>{
-  e.preventDefault();
-  titleEl.style.left='24px'; titleEl.style.top='24px';
-  subEl.style.left='24px';   subEl.style.top='60px';
-  prEl.style.left='24px';    prEl.style.top='396px';
-  saveHidden();
-};
-
-// Mevcut stickerları DOM’a bas (draggable olsun)
-(function initStickers(){
-  try{
-    const arr = Array.isArray(stickers)? stickers : JSON.parse(stickers||'[]');
-    arr.forEach(s=>{
-      const d=document.createElement('div');
-      d.className='sticker';
-      d.textContent = s.txt || '💍';
-      d.style.left  = (s.x||20)+'px';
-      d.style.top   = (s.y||90)+'px';
-      d.style.fontSize = (s.size||32)+'px';
-      canvas.appendChild(d);
-      makeDraggable(d);
+  if (titleEl && subEl && prEl && layoutField) {
+    layout = {
+      title   : {x:parseInt(titleEl.style.left)||24, y:parseInt(titleEl.style.top)||24},
+      subtitle: {x:parseInt(subEl.style.left)||24,   y:parseInt(subEl.style.top)||60},
+      prompt  : {x:parseInt(prEl.style.left)||24,    y:parseInt(prEl.style.top)||396}
+    };
+    layoutField.value = JSON.stringify(layout);
+  }
+  if (stickersField) {
+    const serialized = stickerState.map((st)=>{
+      if (!st || typeof st !== 'object') return st;
+      const clone = Object.assign({}, st);
+      if (clone.previewUrl) delete clone.previewUrl;
+      return clone;
     });
-  }catch(e){}
-})();
+    stickersField.value = JSON.stringify(serialized);
+  }
+}
+
+function clearPendingUpload(){
+  if (stickerUploadInput) {
+    stickerUploadInput.value = '';
+  }
+  if (pendingStickerUrl) {
+    URL.revokeObjectURL(pendingStickerUrl);
+    pendingStickerUrl = null;
+  }
+}
+
+function makeTextDraggable(el){
+  if (!el) return;
+  el.style.touchAction = 'none';
+  
+  let startLeft=0, startTop=0, startMouseX=0, startMouseY=0;
+  let pointerId = null;
+
+  const onPointerDown = (evt) => {
+    if (evt.button !== 0 && evt.pointerType === 'mouse') return;
+    
+    evt.preventDefault();
+    pointerId = evt.pointerId;
+    el.setPointerCapture(pointerId);
+    el.style.cursor = 'grabbing';
+
+    const rect = canvas.getBoundingClientRect();
+    const S = rect.width / 960;
+    
+    startMouseX = (evt.clientX - rect.left) / S;
+    startMouseY = (evt.clientY - rect.top) / S;
+    
+    // Check computed style if inline style is missing
+    const computed = window.getComputedStyle(el);
+    const cLeft = parseFloat(computed.left) || 20; // fallback default
+    const cTop  = parseFloat(computed.top) || 20;
+
+    startLeft = el.style.left ? (parseFloat(el.style.left) || 0) : cLeft;
+    startTop  = el.style.top  ? (parseFloat(el.style.top)  || 0) : cTop;
+  };
+
+  const onPointerMove = (evt) => {
+    if (pointerId === null) return;
+    if (evt.pointerId !== pointerId) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const S = rect.width / 960;
+    
+    const currMouseX = (evt.clientX - rect.left) / S;
+    const currMouseY = (evt.clientY - rect.top) / S;
+
+    let x = startLeft + (currMouseX - startMouseX);
+    let y = startTop + (currMouseY - startMouseY);
+
+    x = Math.max(-100, Math.min(1000, x));
+    y = Math.max(-100, Math.min(600, y));
+
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+  };
+
+  const onPointerUp = (evt) => {
+    if (pointerId === null) return;
+    if (evt.pointerId !== pointerId) return;
+    
+    el.releasePointerCapture(pointerId);
+    pointerId = null;
+    el.style.cursor = 'move';
+    saveHidden();
+  };
+
+  el.addEventListener('pointerdown', onPointerDown);
+  el.addEventListener('pointermove', onPointerMove);
+  el.addEventListener('pointerup', onPointerUp);
+  el.addEventListener('pointercancel', onPointerUp);
+}
+[titleEl,subEl,prEl].forEach(makeTextDraggable);
+
+function createStickerNode(st, idx){
+  const type = st && st.type === 'image' ? 'image' : 'emoji';
+  const node = document.createElement('div');
+  node.className = type === 'image' ? 'sticker sticker-img' : 'sticker';
+  node.dataset.index = idx;
+  node.dataset.type = type;
+  const left = st && typeof st.x === 'number' ? st.x : 20;
+  const top = st && typeof st.y === 'number' ? st.y : 90;
+  node.style.left = left + 'px';
+  node.style.top  = top + 'px';
+  node.addEventListener('click',(evt)=>{ evt.preventDefault(); evt.stopPropagation(); setActiveSticker(idx); });
+  if (type === 'image') {
+    const path = st && st.path ? st.path : '';
+    const width = st && st.width ? st.width : 220;
+    node.dataset.path = path;
+    node.dataset.width = width;
+    const isPending = !!(st && (st.pending || path === '__pending__'));
+    node.dataset.pending = isPending ? '1' : '0';
+    if (isPending) {
+      node.classList.add('sticker-pending');
+    }
+    let src = '';
+    if (isPending && st && st.previewUrl) {
+      src = st.previewUrl;
+    } else if (stickerAssetMap && path) {
+      src = stickerAssetMap[path] || '';
+    }
+    if (!src && st && st.previewDataUrl) {
+      src = st.previewDataUrl;
+    }
+    node.style.width = width + 'px';
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      img.draggable = false;
+      img.style.width = width + 'px';
+      node.appendChild(img);
+    } else {
+      node.classList.add('sticker-placeholder');
+      node.textContent = 'Görsel yükleniyor';
+    }
+  } else {
+    const txt = st && st.txt ? st.txt : '💍';
+    const size = st && st.size ? st.size : 32;
+    node.dataset.size = size;
+    node.dataset.text = txt;
+    node.style.fontSize = size + 'px';
+    node.textContent = txt;
+  }
+  makeStickerDraggable(node);
+  return node;
+}
+
+function makeStickerDraggable(el){
+  if (!el) return;
+  el.style.touchAction = 'none';
+  let pointerId = null;
+  let startLeft=0, startTop=0, startMouseX=0, startMouseY=0;
+
+  el.addEventListener('pointerdown',(evt)=>{
+    evt.preventDefault();
+    pointerId = evt.pointerId;
+    el.setPointerCapture(pointerId);
+
+    const rect = canvas.getBoundingClientRect();
+    const S = rect.width / 960;
+    startMouseX = (evt.clientX - rect.left) / S;
+    startMouseY = (evt.clientY - rect.top) / S;
+    startLeft = parseFloat(el.style.left) || 0;
+    startTop = parseFloat(el.style.top) || 0;
+
+    const idx = parseInt(el.dataset.index, 10);
+    if (!Number.isNaN(idx)) {
+      setActiveSticker(idx);
+    }
+  });
+
+  el.addEventListener('pointermove',(evt)=>{
+    if (pointerId === null) return;
+    const rect = canvas.getBoundingClientRect();
+    const S = rect.width / 960;
+    const currMouseX = (evt.clientX - rect.left) / S;
+    const currMouseY = (evt.clientY - rect.top) / S;
+    
+    let x = startLeft + (currMouseX - startMouseX);
+    let y = startTop + (currMouseY - startMouseY);
+
+    x = Math.max(0, Math.min(940, x));
+    y = Math.max(0, Math.min(520, y));
+
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    const idx = parseInt(el.dataset.index, 10);
+    if (!Number.isNaN(idx) && stickerState[idx]) {
+      stickerState[idx].x = x;
+      stickerState[idx].y = y;
+    }
+  });
+
+  const finishDrag = ()=>{
+    if (pointerId === null) return;
+    el.releasePointerCapture(pointerId);
+    pointerId = null;
+    saveHidden();
+  };
+  el.addEventListener('pointerup', finishDrag);
+  el.addEventListener('pointercancel', finishDrag);
+}
+
+function setActiveSticker(idx){
+  if (canvas) {
+    canvas.querySelectorAll('.sticker').forEach((node)=>node.classList.remove('is-active'));
+  }
+  if (typeof idx !== 'number' || !stickerState[idx]) {
+    activeStickerIndex = null;
+    if (stickerSizeRange) {
+      stickerSizeRange.disabled = true;
+      stickerSizeRange.value = stickerSizeRange.min || 20;
+    }
+    if (stickerSizeValue) stickerSizeValue.textContent = 'Bir sticker seçin';
+    if (deleteStickerBtn) deleteStickerBtn.disabled = true;
+    return;
+  }
+  activeStickerIndex = idx;
+  if (canvas) {
+    const node = canvas.querySelector(`.sticker[data-index="${idx}"]`);
+    if (node) node.classList.add('is-active');
+  }
+  const st = stickerState[idx];
+  if (!stickerSizeRange || !stickerSizeValue) return;
+  if (st.type === 'image') {
+    stickerSizeRange.min = 80;
+    stickerSizeRange.max = 520;
+    stickerSizeRange.step = 4;
+    stickerSizeRange.value = st.width || 220;
+    stickerSizeValue.textContent = `Genişlik: ${stickerSizeRange.value}px`;
+  } else {
+    stickerSizeRange.min = 20;
+    stickerSizeRange.max = 160;
+    stickerSizeRange.step = 2;
+    stickerSizeRange.value = st.size || 32;
+    stickerSizeValue.textContent = `Boyut: ${stickerSizeRange.value}px`;
+  }
+  stickerSizeRange.disabled = false;
+  if (deleteStickerBtn) deleteStickerBtn.disabled = false;
+}
+
+function renderStickers(){
+  if (!canvas) return;
+  canvas.querySelectorAll('.sticker').forEach((node)=>node.remove());
+  stickerState.forEach((st, idx)=>{
+    const node = createStickerNode(st, idx);
+    if (node) canvas.appendChild(node);
+  });
+  if (activeStickerIndex !== null && !stickerState[activeStickerIndex]) {
+    activeStickerIndex = null;
+  }
+  if (activeStickerIndex !== null) {
+    setActiveSticker(activeStickerIndex);
+  } else {
+    setActiveSticker(null);
+  }
+}
+
+if (stickerSizeRange) {
+  stickerSizeRange.addEventListener('input', ()=>{
+    if (activeStickerIndex === null) return;
+    const st = stickerState[activeStickerIndex];
+    if (!st) return;
+    const value = parseInt(stickerSizeRange.value, 10) || 0;
+    if (st.type === 'image') {
+      st.width = value;
+      const wrapper = canvas && canvas.querySelector(`.sticker[data-index="${activeStickerIndex}"]`);
+      if (wrapper) {
+        wrapper.dataset.width = value;
+        wrapper.style.width = value + 'px';
+        const img = wrapper.querySelector('img');
+        if (img) img.style.width = value + 'px';
+      }
+      stickerSizeValue.textContent = `Genişlik: ${value}px`;
+    } else {
+      st.size = value;
+      const node = canvas && canvas.querySelector(`.sticker[data-index="${activeStickerIndex}"]`);
+      if (node) node.style.fontSize = value + 'px';
+      stickerSizeValue.textContent = `Boyut: ${value}px`;
+    }
+    saveHidden();
+  });
+}
+
+if (deleteStickerBtn) {
+  deleteStickerBtn.addEventListener('click', ()=>{
+    if (activeStickerIndex === null) return;
+    const removed = stickerState.splice(activeStickerIndex, 1);
+    activeStickerIndex = null;
+    renderStickers();
+    saveHidden();
+    const removedEntry = removed && removed[0];
+    if (removedEntry && removedEntry.pending) {
+      clearPendingUpload();
+    }
+  });
+}
+
+document.querySelectorAll('.add-sticker').forEach((btn)=>{
+  btn.addEventListener('click',(e)=>{
+    e.preventDefault();
+    const emoji = btn.dataset.emoji || '💍';
+    stickerState.push({ type:'emoji', txt:emoji, x:20, y:90, size:32 });
+    renderStickers();
+    setActiveSticker(stickerState.length - 1);
+    saveHidden();
+  });
+});
+
+const clearBtn = document.getElementById('clearStickers');
+if (clearBtn) {
+  clearBtn.addEventListener('click',(e)=>{
+    e.preventDefault();
+    const hadPending = stickerState.some((st)=>st && st.pending);
+    stickerState = [];
+    activeStickerIndex = null;
+    renderStickers();
+    saveHidden();
+    if (hadPending) {
+      clearPendingUpload();
+    }
+  });
+}
+
+if (stickerUploadInput) {
+  stickerUploadInput.addEventListener('change', ()=>{
+    const file = stickerUploadInput.files && stickerUploadInput.files[0];
+    if (!file) {
+      return;
+    }
+    let previousPending = null;
+    stickerState = stickerState.filter((st)=>{
+      if (st && st.pending) {
+        previousPending = st;
+        return false;
+      }
+      return true;
+    });
+    if (pendingStickerUrl) {
+      URL.revokeObjectURL(pendingStickerUrl);
+      pendingStickerUrl = null;
+    }
+    const blobUrl = URL.createObjectURL(file);
+    pendingStickerUrl = blobUrl;
+    const pendingSticker = {
+      type: 'image',
+      path: '__pending__',
+      pending: true,
+      previewUrl: blobUrl,
+      width: previousPending && typeof previousPending.width === 'number' ? previousPending.width : 260,
+      x: previousPending && typeof previousPending.x === 'number' ? previousPending.x : 40,
+      y: previousPending && typeof previousPending.y === 'number' ? previousPending.y : 300,
+    };
+    stickerState.push(pendingSticker);
+    activeStickerIndex = stickerState.length - 1;
+    renderStickers();
+    saveHidden();
+  });
+}
+
+const resetBtn = document.getElementById('resetLayout');
+if (resetBtn) {
+  resetBtn.addEventListener('click',(e)=>{
+    e.preventDefault();
+    if (titleEl) { titleEl.style.left='24px'; titleEl.style.top='24px'; }
+    if (subEl) { subEl.style.left='24px'; subEl.style.top='60px'; }
+    if (prEl)  { prEl.style.left='24px'; prEl.style.top='396px'; }
+    saveHidden();
+  });
+}
+
+renderStickers();
 </script>
 </body>
 </html>

@@ -7,6 +7,7 @@ require_once __DIR__.'/../includes/auth.php';
 require_once __DIR__.'/partials/ui.php';
 
 require_admin();
+require_admin_permission('campaigns');
 install_schema();
 
 $venue = require_current_venue_or_redirect();

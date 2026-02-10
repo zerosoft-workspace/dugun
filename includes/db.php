@@ -2,7 +2,7 @@
 require_once __DIR__.'/../config.php';
 
 if (!defined('APP_SCHEMA_VERSION')) {
-  define('APP_SCHEMA_VERSION', '20240705_01');
+  define('APP_SCHEMA_VERSION', '20240709_02');
 }
 
 function pdo(): PDO {
@@ -224,14 +224,42 @@ function install_schema(){
     id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(190) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    password_set_at DATETIME NULL,
     name VARCHAR(190) NOT NULL,
     role ENUM('superadmin','admin') NOT NULL DEFAULT 'admin',
+    admin_role_id INT NULL,
     reset_code VARCHAR(64) NULL,
     reset_expires DATETIME NULL,
+    force_password_reset TINYINT(1) NOT NULL DEFAULT 0,
     last_login_at DATETIME NULL,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS admin_roles(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(190) NOT NULL,
+    slug VARCHAR(190) NOT NULL UNIQUE,
+    permissions_json TEXT NULL,
+    is_default TINYINT(1) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (!column_exists('users', 'admin_role_id')) {
+    pdo()->exec("ALTER TABLE users ADD admin_role_id INT NULL AFTER role");
+  }
+  if (!column_exists('users', 'password_set_at')) {
+    pdo()->exec("ALTER TABLE users ADD password_set_at DATETIME NULL AFTER password_hash");
+  }
+  if (!column_exists('users', 'force_password_reset')) {
+    pdo()->exec("ALTER TABLE users ADD force_password_reset TINYINT(1) NOT NULL DEFAULT 0 AFTER reset_expires");
+  }
+  try {
+    pdo()->exec("ALTER TABLE users ADD INDEX idx_users_admin_role (admin_role_id)");
+  } catch (Throwable $e) {
+    // index already exists
+  }
 
   /* venues */
   pdo()->exec("CREATE TABLE IF NOT EXISTS venues(
@@ -260,11 +288,14 @@ function install_schema(){
     status VARCHAR(16) NOT NULL DEFAULT 'pending',
     license_expires_at DATETIME NULL,
     password_hash VARCHAR(255) NULL,
+    password_set_at DATETIME NULL,
     approved_at DATETIME NULL,
     last_login_at DATETIME NULL,
+    login_count INT NOT NULL DEFAULT 0,
     balance_cents INT NOT NULL DEFAULT 0,
     reset_code VARCHAR(64) NULL,
     reset_expires DATETIME NULL,
+    force_password_reset TINYINT(1) NOT NULL DEFAULT 0,
     created_at DATETIME NOT NULL,
     updated_at DATETIME NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -303,6 +334,15 @@ function install_schema(){
   }
   if (!column_exists('dealers', 'tax_document_path')) {
     pdo()->exec("ALTER TABLE dealers ADD tax_document_path VARCHAR(255) NULL AFTER invoice_email");
+  }
+  if (!column_exists('dealers', 'password_set_at')) {
+    pdo()->exec("ALTER TABLE dealers ADD password_set_at DATETIME NULL AFTER password_hash");
+  }
+  if (!column_exists('dealers', 'login_count')) {
+    pdo()->exec("ALTER TABLE dealers ADD login_count INT NOT NULL DEFAULT 0 AFTER last_login_at");
+  }
+  if (!column_exists('dealers', 'force_password_reset')) {
+    pdo()->exec("ALTER TABLE dealers ADD force_password_reset TINYINT(1) NOT NULL DEFAULT 0 AFTER reset_expires");
   }
   try {
     pdo()->exec("ALTER TABLE dealers ADD UNIQUE KEY uniq_dealer_code (code)");
@@ -626,8 +666,10 @@ function install_schema(){
     email VARCHAR(190) NOT NULL UNIQUE,
     phone VARCHAR(64) NULL,
     password_hash VARCHAR(255) NOT NULL,
+    password_set_at DATETIME NULL,
     reset_code VARCHAR(64) NULL,
     reset_expires DATETIME NULL,
+    force_password_reset TINYINT(1) NOT NULL DEFAULT 0,
     commission_rate DECIMAL(5,2) NOT NULL DEFAULT 10.00,
     status VARCHAR(16) NOT NULL DEFAULT 'active',
     last_login_at DATETIME NULL,
@@ -643,6 +685,12 @@ function install_schema(){
   }
   if (!column_exists('dealer_representatives', 'reset_expires')) {
     pdo()->exec("ALTER TABLE dealer_representatives ADD reset_expires DATETIME NULL AFTER reset_code");
+  }
+  if (!column_exists('dealer_representatives', 'password_set_at')) {
+    pdo()->exec("ALTER TABLE dealer_representatives ADD password_set_at DATETIME NULL AFTER password_hash");
+  }
+  if (!column_exists('dealer_representatives', 'force_password_reset')) {
+    pdo()->exec("ALTER TABLE dealer_representatives ADD force_password_reset TINYINT(1) NOT NULL DEFAULT 0 AFTER reset_expires");
   }
   try {
     pdo()->exec("ALTER TABLE dealer_representatives MODIFY reset_code VARCHAR(64) NULL");
@@ -1342,6 +1390,62 @@ function install_schema(){
     FOREIGN KEY (recipient_upload_id) REFERENCES uploads(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+  /* marketing broadcasts */
+  $broadcastJson = supports_json() ? 'JSON' : 'LONGTEXT';
+  pdo()->exec("CREATE TABLE IF NOT EXISTS marketing_broadcasts(
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    channel VARCHAR(32) NOT NULL,
+    audience_key VARCHAR(64) NULL,
+    title VARCHAR(255) NOT NULL,
+    body MEDIUMTEXT NULL,
+    attachments $broadcastJson NULL,
+    created_by_admin_id INT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_marketing_channel (channel, created_at),
+    INDEX idx_marketing_audience (audience_key),
+    FOREIGN KEY (created_by_admin_id) REFERENCES users(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  pdo()->exec("CREATE TABLE IF NOT EXISTS marketing_broadcast_targets(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    broadcast_id INT NOT NULL,
+    target_name VARCHAR(255) NULL,
+    target_email VARCHAR(190) NULL,
+    target_phone VARCHAR(32) NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending',
+    detail TEXT NULL,
+    sent_at DATETIME NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_marketing_targets_broadcast (broadcast_id),
+    INDEX idx_marketing_targets_status (broadcast_id, status),
+    FOREIGN KEY (broadcast_id) REFERENCES marketing_broadcasts(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+  if (table_exists('marketing_broadcasts')) {
+    if (!column_exists('marketing_broadcasts', 'audience_key')) {
+      try { pdo()->exec("ALTER TABLE marketing_broadcasts ADD audience_key VARCHAR(64) NULL AFTER channel"); } catch (Throwable $e) {}
+    }
+    if (!column_exists('marketing_broadcasts', 'attachments')) {
+      try {
+        $broadcastJson = supports_json() ? 'JSON' : 'LONGTEXT';
+        pdo()->exec("ALTER TABLE marketing_broadcasts ADD attachments $broadcastJson NULL AFTER body");
+      } catch (Throwable $e) {}
+    }
+    if (!column_exists('marketing_broadcasts', 'created_by_admin_id')) {
+      try { pdo()->exec("ALTER TABLE marketing_broadcasts ADD created_by_admin_id INT NULL AFTER attachments"); } catch (Throwable $e) {}
+      try { pdo()->exec("ALTER TABLE marketing_broadcasts ADD CONSTRAINT fk_marketing_broadcast_admin FOREIGN KEY (created_by_admin_id) REFERENCES users(id) ON DELETE SET NULL"); } catch (Throwable $e) {}
+    }
+  }
+
+  if (table_exists('marketing_broadcast_targets')) {
+    if (!column_exists('marketing_broadcast_targets', 'detail')) {
+      try { pdo()->exec("ALTER TABLE marketing_broadcast_targets ADD detail TEXT NULL AFTER status"); } catch (Throwable $e) {}
+    }
+    if (!column_exists('marketing_broadcast_targets', 'sent_at')) {
+      try { pdo()->exec("ALTER TABLE marketing_broadcast_targets ADD sent_at DATETIME NULL AFTER detail"); } catch (Throwable $e) {}
+    }
+  }
+
   /* qr_codes */
   pdo()->exec("CREATE TABLE IF NOT EXISTS qr_codes(
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -1434,10 +1538,16 @@ function install_schema(){
   }
   if (!column_exists('events','guest_title'))         pdo()->exec("ALTER TABLE events ADD guest_title VARCHAR(190) NULL");
   if (!column_exists('events','guest_subtitle'))      pdo()->exec("ALTER TABLE events ADD guest_subtitle VARCHAR(255) NULL");
+  if (!column_exists('events','guest_title_font'))    pdo()->exec("ALTER TABLE events ADD guest_title_font VARCHAR(60) NULL AFTER guest_prompt");
+  if (!column_exists('events','guest_subtitle_font')) pdo()->exec("ALTER TABLE events ADD guest_subtitle_font VARCHAR(60) NULL AFTER guest_title_font");
+  if (!column_exists('events','guest_prompt_font'))   pdo()->exec("ALTER TABLE events ADD guest_prompt_font VARCHAR(60) NULL AFTER guest_subtitle_font");
   if (!column_exists('events','allow_guest_view'))    pdo()->exec("ALTER TABLE events ADD allow_guest_view TINYINT(1) NOT NULL DEFAULT 1");
   if (!column_exists('events','allow_guest_download'))pdo()->exec("ALTER TABLE events ADD allow_guest_download TINYINT(1) NOT NULL DEFAULT 1");
   if (!column_exists('events','allow_guest_delete'))  pdo()->exec("ALTER TABLE events ADD allow_guest_delete TINYINT(1) NOT NULL DEFAULT 0");
   if (!column_exists('events','layout_json'))         pdo()->exec("ALTER TABLE events ADD layout_json ".($json==='JSON'?'JSON':'LONGTEXT')." NULL");
+  if (!column_exists('events','guest_background_path')){
+    pdo()->exec("ALTER TABLE events ADD guest_background_path VARCHAR(255) NULL AFTER layout_json");
+  }
   if (!column_exists('events','stickers_json'))       pdo()->exec("ALTER TABLE events ADD stickers_json ".($json==='JSON'?'JSON':'LONGTEXT')." NULL");
   if (!column_exists('events','updated_at'))          pdo()->exec("ALTER TABLE events ADD updated_at DATETIME NULL");
   if (!column_exists('events','contact_email'))       pdo()->exec("ALTER TABLE events ADD contact_email VARCHAR(190) NULL");
@@ -1487,3 +1597,14 @@ try {
     }
   }
 
+  pdo()->exec("CREATE TABLE IF NOT EXISTS dealer_login_logs(
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    dealer_id INT NOT NULL,
+    logged_at DATETIME NOT NULL,
+    ip_address VARCHAR(45) NULL,
+    user_agent VARCHAR(255) NULL,
+    created_at DATETIME NOT NULL,
+    INDEX idx_dealer_login_logs_dealer (dealer_id),
+    INDEX idx_dealer_login_logs_logged_at (logged_at),
+    FOREIGN KEY (dealer_id) REFERENCES dealers(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");

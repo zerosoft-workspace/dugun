@@ -80,9 +80,77 @@ function site_content_defaults(): array {
   return [
     'default_dealer_referral_code' => '',
     'site_logo' => '',
+    'hero_badge' => 'Yeni nesil misafir paylaşımı',
+    'hero_title' => 'Tek QR kodla tüm fotoğraf ve videoları toplayın',
+    'hero_text' => 'BİKARE, davetlilerinizin çektikleri anıları saniyeler içinde toplayarak etkinlik panelinizi, misafir galerilerini ve paylaşılabilir QR kodlarını otomatik olarak hazırlar.',
+    'hero_primary_label' => 'Paketleri İncele',
+    'hero_primary_url' => '#paketler',
+    'hero_secondary_label' => 'Hemen Başlayın',
+    'hero_secondary_url' => '#lead-form',
+    'hero_metrics' => [
+      ['value' => '12.500+', 'label' => 'Toplanan fotoğraf ve videolar'],
+      ['value' => '%98', 'label' => 'Misafir memnuniyeti'],
+      ['value' => '5 dk', 'label' => 'Ödeme sonrası panel hazır olma süresi'],
+    ],
     'hero_image_main' => 'https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=820&q=80',
     'hero_image_secondary' => 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=compress&cs=tinysrgb&fit=crop&w=520&q=80',
     'about_image' => 'https://images.unsplash.com/photo-1511288590-34b0471af9b4?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
+    'about_badge' => 'BİKARE Hakkında',
+    'about_title' => 'Her anınızı dijital sahneye taşıyan çözüm ortağınız',
+    'about_text' => 'Zerosoft olarak düğün, nişan, kurumsal davet ve tüm özel etkinliklerinizde misafirlerinizle aynı anda nefes alan bir platform geliştirdik. BİKARE; yüksek yükleme kapasitesi, güçlü misafir etkileşim araçları ve otomatik QR kod altyapısıyla sizi teknik detaylardan kurtarır.',
+    'about_features' => [
+      ['title' => 'Profesyonel destek', 'text' => 'Kurulumdan canlı yayına kadar deneyimli ekibimizle yanınızdayız.'],
+      ['title' => 'Tamamen yerli altyapı', 'text' => 'Verileriniz Türkiye lokasyonlu sunucularda güvenle saklanır.'],
+    ],
+    'feature_blocks' => [
+      ['icon' => '📸', 'title' => 'Anında QR Toplama', 'text' => 'Misafirleriniz QR kodu okutup doğrudan galerinize fotoğraf ve videoları yükler. Her yükleme etkinlik panelinizde otomatik görünür.'],
+      ['icon' => '✨', 'title' => 'Sosyal Galeri Deneyimi', 'text' => 'Beğeniler, yıldızlar ve yorumlarla misafir galerisi sosyal medya tadında. Albümünüzü dilediğiniz gibi düzenleyin.'],
+      ['icon' => '🔒', 'title' => 'Güvenli Online Ödeme', 'text' => 'PayTR altyapısıyla kart bilgileriniz güvende. Ödeme tamamlandığında paneliniz ve QR kodlarınız otomatik hazırlanır.'],
+    ],
+    'timeline_title' => 'BİKARE nasıl çalışır?',
+    'timeline_text' => 'Basit 3 adımda etkinliğinizi dijitalleştiriyoruz. Kurulum ve teknik detaylarla vakit kaybetmenize gerek yok.',
+    'timeline_steps' => [
+      ['title' => 'Paketi seçin & ödeme yapın', 'text' => 'Formu doldurup güvenli ödeme adımında işlemi tamamlayın.'],
+      ['title' => 'Panel otomatik kurulsun', 'text' => 'Etkinlik paneliniz, QR kodlarınız ve misafir galeriniz dakikalar içinde hazırlanır.'],
+      ['title' => 'Misafirlerinizi davet edin', 'text' => 'QR kodu paylaşın, fotoğraflar ve videolar gerçek zamanlı olarak panelinize düşsün.'],
+    ],
+    'packages_title' => 'İhtiyacınıza uygun paketleri seçin',
+    'packages_text' => 'Her paket güvenli online ödeme, otomatik panel kurulumu ve sınırsız misafir yüklemesi içerir.',
+    'packages_highlights' => [
+      'Kalıcı ve etkinliğe özel QR kodlar',
+      'Etkinlik paneli otomatik kurulum ve e-posta bildirimi',
+      'Sosyal medya tarzı misafir galerisi',
+      'HD fotoğraf & video yükleme desteği',
+    ],
+    'dealer_badge' => 'Bayi Ağı',
+    'dealer_title' => 'Etkinlik sektöründeki iş ortaklarımız için kazandıran sistem',
+    'dealer_text' => 'Bayi panelinizden bakiye yönetebilir, PayTR entegrasyonlu paketler satın alabilir, etkinliklerinizi tek ekrandan yönetebilirsiniz. Referans kodu ile gerçekleştirdiğiniz satışlardan onay sonrası cashback kazanırsınız.',
+    'dealer_highlights' => [
+      'Salon bazlı etkinlik yönetimi ve QR kod üretimi',
+      'Detaylı raporlama, bakiye ve cashback geçmişi',
+      'PayTR ile güvenli tahsilat ve hızlı aktivasyon',
+    ],
+    'dealer_button_label' => 'Bayi Ağına Katıl',
+    'dealer_button_url' => 'dealer/apply.php',
+    'gallery_title' => 'Gerçek hikayelerden ilham alın',
+    'gallery_text' => 'Misafirleriniz sadece düğünlerde değil; nişan, kına, doğum günü ve kurumsal etkinliklerde de QR kodunuzla içerik paylaşabilir.',
+    'testimonials' => [
+      ['quote' => '"Misafirlerimiz tüm fotoğrafları bir araya getirirken inanılmaz eğlendi. Panellerin otomatik kurulması bizim için büyük kolaylık sağladı."', 'author' => 'İpek & Cem', 'role' => 'İstanbul Boğazı Düğünü'],
+      ['quote' => '"Kurumsal lansmanımızda katılımcıların videolarını toplamak bu kadar kolay olmamıştı. BİKARE ekibi her detayla ilgilendi."', 'author' => 'Berna U.', 'role' => 'Etkinlik Ajansı Sahibi'],
+    ],
+    'cta_banner_title' => 'Etkinliğiniz için hazırız',
+    'cta_banner_text' => 'Formu doldurup güvenli ödeme adımını tamamlayın, paneliniz birkaç dakika içinde aktif olsun. Anılarınızı kaybetmeyin, değerini artırın.',
+    'cta_banner_button_label' => 'Paket Seç & Ödeme Yap',
+    'cta_banner_button_url' => '#lead-form',
+    'lead_form_title' => 'Sipariş Formu',
+    'lead_form_text' => 'Paketinizi seçin, bilgilerinizi girin ve PayTR ile güvenli ödeme adımına yönlendirilin. Ödeme onaylandığında giriş bilgilerinizi otomatik olarak e-posta ile alacaksınız.',
+    'lead_form_bullets' => [
+      'Misafir galerisi, QR kodlar ve etkinlik paneli otomatik hazırlanır.',
+      'Referans kodu alanı isteğe bağlıdır. Kod kullanırsanız ilgili bayi cashback kazanır.',
+      'Dilediğiniz zaman destek ekibimizle iletişime geçebilirsiniz.',
+    ],
+    'lead_form_notice' => 'Formu gönderdiğinizde PayTR güvenli ödeme sayfasına yönlendirileceksiniz.',
+    'lead_form_submit_label' => 'Ödeme Adımına Geç',
     'gallery_images' => [
       'https://images.unsplash.com/photo-1520854221050-0f4caff449fb?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
       'https://images.unsplash.com/photo-1519741497674-611481863552?auto=compress&cs=tinysrgb&fit=crop&w=900&q=80',
@@ -112,6 +180,60 @@ function site_content_defaults(): array {
     'footer_company' => 'Zerosoft Teknoloji',
     'footer_disclaimer_left' => '© '.$year.' Zerosoft Teknoloji',
     'footer_disclaimer_right' => 'Developed by Zerosoft — BİKARE Dijital Etkinlik Platformu',
+    'seo_meta_title' => 'BİKARE — Dijital Etkinlik Platformu ve QR Kod Çözümleri',
+    'seo_meta_description' => 'BİKARE; düğün, nişan, kurumsal etkinlik ve tüm özel davetlerinizde QR kodla fotoğraf ve videoları anında toplayan dijital etkinlik platformudur.',
+    'seo_meta_keywords' => 'bikare, qr kod, dijital etkinlik, fotoğraf toplama, düğün teknolojileri',
+    'seo_favicon' => '',
+    'blog_section_badge' => 'Blog',
+    'blog_section_title' => 'BİKARE Blog & Kaynaklar',
+    'blog_section_text' => 'Etkinliklerinizi daha verimli yönetmeniz için ipuçları, başarı hikayeleri ve dijital trendleri sizinle paylaşıyoruz.',
+    'blog_posts' => [
+      [
+        'slug' => 'etkinliklerde-qr-kod',
+        'title' => 'Etkinliklerde QR Kod Kullanmanın 5 Stratejisi',
+        'description' => 'Misafir deneyimini artırmak için QR kodlarını nasıl kurgulayabileceğinizi adım adım anlattık.',
+        'image' => 'https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=compress&cs=tinysrgb&fit=crop&w=1200&q=80',
+        'content' => "BİKARE ile QR kodları etkinlik deneyiminin merkezine taşıyabilirsiniz. Misafirlerinizi saniyeler içinde dijital alanlara yönlendirerek kayıt, yükleme ve etkileşim süreçlerini kolaylaştırın.\n\nQR kod senaryolarını planlarken yerleşim, içerik ve yönlendirme mesajlarını stratejik şekilde kurgulamak kritik öneme sahiptir. Bu rehberde etkinlik girişlerinden canlı anketlere kadar her adımı adım adım paylaşıyoruz.",
+        'published_at' => date('Y-m-d', strtotime('-21 days')),
+        'gallery' => [
+          'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=compress&cs=tinysrgb&fit=crop&w=1000&q=80',
+          'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=1000&q=80',
+        ],
+      ],
+      [
+        'slug' => 'bayi-aginda-basari-formulleri',
+        'title' => 'Bayi Ağımızla Satışları Nasıl Artırıyoruz?',
+        'description' => 'Bayi paneli özelliklerimizi ve kazandıran satış otomasyonlarımızı keşfedin.',
+        'image' => 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=1200&q=80',
+        'content' => "Bayi paneli ile stok, bakiye ve kampanya yönetimini tek bir yerden takip edebilirsiniz. Otomatik bildirimler ve PayTR entegrasyonu sayesinde satış süreçleri hızlanır, müşteri memnuniyeti artar.\n\nMakalenin devamında temsilci görev atamalarından hızlı teklif oluşturma akışlarına kadar farklı başarı hikayelerini paylaşıyoruz.",
+        'published_at' => date('Y-m-d', strtotime('-14 days')),
+        'gallery' => [
+          'https://images.unsplash.com/photo-1483478550801-ceba5fe50e8e?auto=compress&cs=tinysrgb&fit=crop&w=1000&q=80',
+        ],
+      ],
+      [
+        'slug' => 'dijital-deneyim-trendleri',
+        'title' => 'Dijital Misafir Deneyiminde 2024 Trendleri',
+        'description' => 'Yeni nesil davetlerde öne çıkan dijitalleşme başlıklarını derledik.',
+        'image' => 'https://images.unsplash.com/photo-1521737604893-d14cc237f11d?auto=compress&cs=tinysrgb&fit=crop&w=1200&q=80',
+        'content' => "Etkileşimli oyunlar, canlı yayın stüdyoları ve gerçek zamanlı fotoğraf galerileri 2024 etkinliklerinin vazgeçilmezleri arasında. Bu trendlerin her biri için BİKARE altyapısının sunduğu araçları anlatıyoruz.\n\nMisafirleriniz için unutulmaz deneyimler tasarlarken hangi analitik verileri takip etmeniz gerektiğini ve sürdürülebilir içerik akışlarını nasıl kuracağınızı öğrenin.",
+        'published_at' => date('Y-m-d', strtotime('-7 days')),
+        'gallery' => [],
+      ],
+    ],
+    'paytr_enabled' => (
+      defined('PAYTR_MERCHANT_ID') && PAYTR_MERCHANT_ID !== '' &&
+      defined('PAYTR_MERCHANT_KEY') && PAYTR_MERCHANT_KEY !== '' &&
+      defined('PAYTR_MERCHANT_SALT') && PAYTR_MERCHANT_SALT !== ''
+    ) ? '1' : '0',
+    'paytr_merchant_id' => defined('PAYTR_MERCHANT_ID') ? (string)PAYTR_MERCHANT_ID : '',
+    'paytr_merchant_key' => defined('PAYTR_MERCHANT_KEY') ? (string)PAYTR_MERCHANT_KEY : '',
+    'paytr_merchant_salt' => defined('PAYTR_MERCHANT_SALT') ? (string)PAYTR_MERCHANT_SALT : '',
+    'paytr_test_mode' => defined('PAYTR_TEST_MODE') ? ((int)PAYTR_TEST_MODE === 1 ? '1' : '0') : '1',
+    'whatsapp_api_enabled' => whatsapp_is_enabled() ? '1' : '0',
+    'whatsapp_api_url' => defined('WHATSAPP_API_URL') ? (string)WHATSAPP_API_URL : '',
+    'whatsapp_api_token' => defined('WHATSAPP_API_TOKEN') ? (string)WHATSAPP_API_TOKEN : '',
+    'whatsapp_api_sender' => defined('WHATSAPP_API_SENDER') ? (string)WHATSAPP_API_SENDER : '',
     'smtp_host' => '',
     'smtp_port' => '',
     'smtp_user' => '',
@@ -187,6 +309,43 @@ function site_settings_update(array $data): void {
   }
 }
 
+function site_content_asset_exists(?string $path): bool {
+  $path = trim((string)$path);
+  if ($path === '') {
+    return false;
+  }
+  if (strncasecmp($path, 'data:', 5) === 0) {
+    return true;
+  }
+  if (preg_match('~^(?:https?:)?//~i', $path)) {
+    return true;
+  }
+
+  $normalized = ltrim($path, '/');
+  if ($normalized === '') {
+    return false;
+  }
+
+  $normalized = explode('?', $normalized, 2)[0];
+  $normalized = str_replace('\\', '/', $normalized);
+  if (strpos($normalized, '..') !== false) {
+    return false;
+  }
+
+  $root = realpath(__DIR__.'/..');
+  if (!$root) {
+    return false;
+  }
+
+  $full = realpath($root.'/'.$normalized);
+  if ($full !== false && strpos($full, $root) === 0 && is_file($full)) {
+    return true;
+  }
+
+  $candidate = $root.'/'.$normalized;
+  return is_file($candidate);
+}
+
 function site_public_content(): array {
   $defaults = site_content_defaults();
   $content = site_settings_all();
@@ -198,33 +357,44 @@ function site_public_content(): array {
   }
 
   unset($content['default_dealer_referral_code']);
+  unset($content['paytr_enabled'], $content['paytr_merchant_id'], $content['paytr_merchant_key'], $content['paytr_merchant_salt'], $content['paytr_test_mode']);
+  unset($content['whatsapp_api_enabled'], $content['whatsapp_api_url'], $content['whatsapp_api_token'], $content['whatsapp_api_sender']);
 
   $logo = trim((string)($content['site_logo'] ?? ''));
-  if ($logo === '') {
+  if ($logo === '' || !site_content_asset_exists($logo)) {
     $logo = $defaults['site_logo'];
   }
   $content['site_logo'] = $logo;
 
+  $favicon = trim((string)($content['seo_favicon'] ?? ''));
+  if ($favicon !== '' && !site_content_asset_exists($favicon)) {
+    $favicon = '';
+  }
+  if ($favicon === '' && !empty($defaults['seo_favicon'])) {
+    $favicon = $defaults['seo_favicon'];
+  }
+  $content['seo_favicon'] = $favicon;
+
   $heroMain = trim((string)($content['hero_image_main'] ?? ''));
-  if ($heroMain === '') {
+  if ($heroMain === '' || !site_content_asset_exists($heroMain)) {
     $heroMain = $defaults['hero_image_main'];
   }
   $content['hero_image_main'] = $heroMain;
 
   $heroSecondary = trim((string)($content['hero_image_secondary'] ?? ''));
-  if ($heroSecondary === '') {
+  if ($heroSecondary === '' || !site_content_asset_exists($heroSecondary)) {
     $heroSecondary = $defaults['hero_image_secondary'];
   }
   $content['hero_image_secondary'] = $heroSecondary;
 
   $aboutImage = trim((string)($content['about_image'] ?? ''));
-  if ($aboutImage === '') {
+  if ($aboutImage === '' || !site_content_asset_exists($aboutImage)) {
     $aboutImage = $defaults['about_image'];
   }
   $content['about_image'] = $aboutImage;
 
   $dealerShowcase = trim((string)($content['dealer_showcase_image'] ?? ''));
-  if ($dealerShowcase === '') {
+  if ($dealerShowcase === '' || !site_content_asset_exists($dealerShowcase)) {
     $dealerShowcase = $defaults['dealer_showcase_image'];
   }
   $content['dealer_showcase_image'] = $dealerShowcase;
@@ -253,7 +423,10 @@ function site_public_content(): array {
       return false;
     }
     $val = trim($item);
-    return $val !== '';
+    if ($val === '') {
+      return false;
+    }
+    return site_content_asset_exists($val);
   }));
   if (!$content['gallery_images']) {
     $content['gallery_images'] = $defaults['gallery_images'];
@@ -271,7 +444,401 @@ function site_public_content(): array {
     return $label !== '' && $url !== '';
   }));
 
+  $content['seo_meta_title'] = trim((string)($content['seo_meta_title'] ?? '')) ?: $defaults['seo_meta_title'];
+  $content['seo_meta_description'] = trim((string)($content['seo_meta_description'] ?? '')) ?: $defaults['seo_meta_description'];
+  $content['seo_meta_keywords'] = trim((string)($content['seo_meta_keywords'] ?? '')) ?: $defaults['seo_meta_keywords'];
+
+  $content['blog_section_badge'] = trim((string)($content['blog_section_badge'] ?? '')) ?: $defaults['blog_section_badge'];
+  $content['blog_section_title'] = trim((string)($content['blog_section_title'] ?? '')) ?: $defaults['blog_section_title'];
+  $content['blog_section_text'] = trim((string)($content['blog_section_text'] ?? '')) ?: $defaults['blog_section_text'];
+
+  if (!isset($content['blog_posts']) || !is_array($content['blog_posts'])) {
+    $content['blog_posts'] = $defaults['blog_posts'];
+  }
+  $seenSlugs = [];
+  $content['blog_posts'] = array_values(array_filter(array_map(function ($item) use (&$seenSlugs, $defaults) {
+    if (!is_array($item)) {
+      return null;
+    }
+    $title = trim((string)($item['title'] ?? ''));
+    if ($title === '') {
+      return null;
+    }
+    $description = trim((string)($item['description'] ?? ''));
+    $slug = slugify_allow_empty($item['slug'] ?? '');
+    if ($slug === '') {
+      $legacyUrl = trim((string)($item['url'] ?? ''));
+      if ($legacyUrl !== '') {
+        $path = parse_url($legacyUrl, PHP_URL_PATH) ?: '';
+        if ($path !== '') {
+          $slug = slugify_allow_empty(basename($path));
+        }
+      }
+    }
+    if ($slug === '') {
+      $slug = slugify_allow_empty($title);
+    }
+    if ($slug === '') {
+      return null;
+    }
+    $baseSlug = $slug;
+    $i = 2;
+    while (in_array($slug, $seenSlugs, true)) {
+      $slug = $baseSlug.'-'.$i++;
+    }
+    $seenSlugs[] = $slug;
+
+    $image = trim((string)($item['image'] ?? $item['hero_image'] ?? ''));
+    if ($image !== '' && !site_content_asset_exists($image)) {
+      $image = '';
+    }
+    if ($image === '') {
+      foreach ($defaults['blog_posts'] as $defaultPost) {
+        if (!empty($defaultPost['image']) && site_content_asset_exists($defaultPost['image'])) {
+          $image = $defaultPost['image'];
+          break;
+        }
+      }
+    }
+
+    $body = trim((string)($item['content'] ?? $item['body'] ?? ''));
+    $body = site_normalize_blog_content($body);
+
+    $publishedAt = site_normalize_blog_date($item['published_at'] ?? null);
+
+    $gallery = [];
+    $rawGallery = $item['gallery'] ?? [];
+    if (is_string($rawGallery)) {
+      $rawGallery = preg_split('~[\r\n]+~', $rawGallery) ?: [];
+    }
+    if (!is_array($rawGallery)) {
+      $rawGallery = [];
+    }
+    foreach ($rawGallery as $src) {
+      $src = trim((string)$src);
+      if ($src === '') {
+        continue;
+      }
+      if (!site_content_asset_exists($src)) {
+        continue;
+      }
+      if (!in_array($src, $gallery, true)) {
+        $gallery[] = $src;
+      }
+    }
+
+    return [
+      'slug' => $slug,
+      'title' => $title,
+      'description' => $description,
+      'image' => $image,
+      'content' => $body,
+      'published_at' => $publishedAt,
+      'url' => site_blog_url($slug),
+      'pretty_url' => site_blog_pretty_url($slug),
+      'gallery' => $gallery,
+    ];
+  }, $content['blog_posts'])));
+  if (!$content['blog_posts']) {
+    $content['blog_posts'] = $defaults['blog_posts'];
+  }
+
   return $content;
+}
+
+function site_normalize_blog_content(string $content): string {
+  if ($content === '') {
+    return '';
+  }
+  $content = preg_replace("~\r\n?~", "\n", $content);
+  $content = preg_replace("~\n{3,}~", "\n\n", $content);
+  return trim($content);
+}
+
+function site_normalize_blog_date($date): ?string {
+  if ($date instanceof DateTimeInterface) {
+    return $date->format('Y-m-d');
+  }
+  if (is_int($date)) {
+    return date('Y-m-d', $date);
+  }
+  if (is_numeric($date) && $date !== '') {
+    return date('Y-m-d', (int)$date);
+  }
+  if (is_string($date)) {
+    $date = trim($date);
+    if ($date === '') {
+      return null;
+    }
+    $normalized = site_normalize_event_date($date);
+    if ($normalized) {
+      return $normalized;
+    }
+    $ts = strtotime($date);
+    if ($ts !== false) {
+      return date('Y-m-d', $ts);
+    }
+  }
+  return null;
+}
+
+function site_blog_url(string $slug): string {
+  $slug = slugify_allow_empty($slug);
+  $base = defined('BASE_URL') ? rtrim((string)BASE_URL, '/') : '';
+  $prefix = ($base !== '' ? $base : '').'/blog/';
+  if ($slug === '') {
+    return $prefix;
+  }
+  return $prefix.'?slug='.rawurlencode($slug);
+}
+
+function site_blog_pretty_url(string $slug): string {
+  $slug = slugify_allow_empty($slug);
+  if ($slug === '') {
+    return site_blog_url($slug);
+  }
+  $base = defined('BASE_URL') ? rtrim((string)BASE_URL, '/') : '';
+  if ($base === '') {
+    return '/blog/'.$slug;
+  }
+  return $base.'/blog/'.$slug;
+}
+
+function site_blog_posts_all(?array $content = null): array {
+  if ($content === null) {
+    $content = site_public_content();
+  }
+  $posts = $content['blog_posts'] ?? [];
+  return is_array($posts) ? $posts : [];
+}
+
+function site_blog_post_by_slug(string $slug, ?array $content = null): ?array {
+  $slug = slugify_allow_empty($slug);
+  if ($slug === '') {
+    return null;
+  }
+  $posts = site_blog_posts_all($content);
+  foreach ($posts as $post) {
+    if (($post['slug'] ?? '') === $slug) {
+      return $post;
+    }
+  }
+  return null;
+}
+
+function site_favicon_url(?array $content = null): string {
+  if ($content === null) {
+    $content = site_public_content();
+  }
+
+  $favicon = trim((string)($content['seo_favicon'] ?? ''));
+  return $favicon;
+}
+
+function site_guess_favicon_mime(string $path): ?string {
+  $urlPath = parse_url($path, PHP_URL_PATH);
+  if (!is_string($urlPath)) {
+    $urlPath = $path;
+  }
+  $ext = strtolower(pathinfo($urlPath, PATHINFO_EXTENSION));
+  return match ($ext) {
+    'png' => 'image/png',
+    'svg' => 'image/svg+xml',
+    'ico' => 'image/x-icon',
+    'gif' => 'image/gif',
+    'jpg', 'jpeg' => 'image/jpeg',
+    'webp' => 'image/webp',
+    default => null,
+  };
+}
+
+function site_head_favicon(?array $content = null): string {
+  $favicon = site_favicon_url($content);
+  if ($favicon === '') {
+    return '';
+  }
+
+  $mime = site_guess_favicon_mime($favicon);
+  $tag = '<link rel="icon"';
+  if ($mime) {
+    $tag .= ' type="'.h($mime).'"';
+  }
+  $tag .= ' href="'.h($favicon).'">';
+
+  return $tag;
+}
+
+function site_generate_sitemap(): array {
+  $baseUrl = defined('BASE_URL') ? rtrim((string)BASE_URL, '/') : '';
+  if ($baseUrl === '') {
+    return [false, 'Sistem ana URL bilgisine erişilemediği için sitemap oluşturulamadı.'];
+  }
+
+  $entries = [];
+  $addEntry = function (string $loc, ?string $changefreq = null, ?string $priority = null, ?string $lastmod = null) use (&$entries): void {
+    $loc = trim($loc);
+    if ($loc === '') {
+      return;
+    }
+    if (!isset($entries[$loc])) {
+      $entries[$loc] = [
+        'loc' => $loc,
+        'changefreq' => $changefreq,
+        'priority' => $priority,
+        'lastmod' => $lastmod,
+      ];
+      return;
+    }
+
+    if ($lastmod) {
+      $current = $entries[$loc]['lastmod'] ?? null;
+      if (!$current || strtotime($lastmod) > strtotime((string)$current)) {
+        $entries[$loc]['lastmod'] = $lastmod;
+      }
+    }
+  };
+
+  $baseHost = parse_url($baseUrl, PHP_URL_HOST) ?: '';
+  $ensureLocal = function (?string $url) use ($baseHost) {
+    if ($url === null) {
+      return null;
+    }
+    $trimmed = trim($url);
+    if ($trimmed === '') {
+      return null;
+    }
+    if (preg_match('~^(?:mailto:|tel:|#)~i', $trimmed)) {
+      return null;
+    }
+    $resolved = site_resolve_button_url($trimmed);
+    if (!$resolved) {
+      return null;
+    }
+    $host = parse_url($resolved, PHP_URL_HOST);
+    if ($host && $baseHost && strcasecmp($host, $baseHost) !== 0) {
+      return null;
+    }
+    return $resolved;
+  };
+
+  $nowIso = date('c');
+  $addEntry($baseUrl.'/', 'daily', '1.0', $nowIso);
+  $addEntry($baseUrl.'/public/partners.php', 'weekly', '0.8');
+
+  $content = site_public_content();
+  $blogIndexUrl = $ensureLocal(site_blog_url(''));
+  if ($blogIndexUrl) {
+    $addEntry($blogIndexUrl, 'weekly', '0.6');
+  }
+  $contentUrls = [];
+  $simpleFields = [
+    'hero_primary_url',
+    'hero_secondary_url',
+    'dealer_button_url',
+    'cta_banner_button_url',
+    'contact_primary_url',
+    'contact_secondary_url',
+    'contact_website',
+  ];
+  foreach ($simpleFields as $field) {
+    if (!empty($content[$field])) {
+      $contentUrls[] = $content[$field];
+    }
+  }
+
+  if (!empty($content['footer_nav_links']) && is_array($content['footer_nav_links'])) {
+    foreach ($content['footer_nav_links'] as $navItem) {
+      if (is_array($navItem) && !empty($navItem['url'])) {
+        $contentUrls[] = $navItem['url'];
+      }
+    }
+  }
+
+  if (!empty($content['blog_posts']) && is_array($content['blog_posts'])) {
+    foreach ($content['blog_posts'] as $post) {
+      if (!is_array($post) || empty($post['url'])) {
+        continue;
+      }
+      $resolved = $ensureLocal($post['url']);
+      if (!$resolved) {
+        continue;
+      }
+      $lastmod = null;
+      if (!empty($post['published_at'])) {
+        $ts = strtotime((string)$post['published_at']);
+        if ($ts) {
+          $lastmod = date('c', $ts);
+        }
+      }
+      $addEntry($resolved, 'monthly', '0.65', $lastmod);
+    }
+  }
+
+  foreach ($contentUrls as $url) {
+    $resolved = $ensureLocal($url);
+    if ($resolved) {
+      $addEntry($resolved, 'monthly', '0.5');
+    }
+  }
+
+  if (table_exists('dealer_listings')) {
+    try {
+      $sql = "SELECT slug, updated_at, published_at, created_at FROM dealer_listings WHERE status='approved' AND slug<>''";
+      $st = pdo()->query($sql);
+      while ($row = $st->fetch()) {
+        $slug = trim((string)($row['slug'] ?? ''));
+        if ($slug === '') {
+          continue;
+        }
+        $loc = $baseUrl.'/public/partner.php?listing='.rawurlencode($slug);
+        $timestamps = [];
+        foreach (['updated_at', 'published_at', 'created_at'] as $col) {
+          if (!empty($row[$col])) {
+            $ts = strtotime((string)$row[$col]);
+            if ($ts) {
+              $timestamps[] = $ts;
+            }
+          }
+        }
+        $lastmod = $timestamps ? date('c', max($timestamps)) : null;
+        $addEntry($loc, 'weekly', '0.7', $lastmod);
+      }
+    } catch (Throwable $e) {
+      // yok say: bayi listeleri olmadan sitemap yine de oluşturulsun
+    }
+  }
+
+  if (!$entries) {
+    return [false, 'Sitemap için adres listesi oluşturulamadı.'];
+  }
+
+  ksort($entries);
+
+  $xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+  $xml .= "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n";
+  foreach ($entries as $entry) {
+    $xml .= "  <url>\n";
+    $xml .= '    <loc>'.htmlspecialchars($entry['loc'], ENT_XML1)."</loc>\n";
+    if (!empty($entry['lastmod'])) {
+      $xml .= '    <lastmod>'.htmlspecialchars($entry['lastmod'], ENT_XML1)."</lastmod>\n";
+    }
+    if (!empty($entry['changefreq'])) {
+      $xml .= '    <changefreq>'.htmlspecialchars($entry['changefreq'], ENT_XML1)."</changefreq>\n";
+    }
+    if (!empty($entry['priority'])) {
+      $xml .= '    <priority>'.htmlspecialchars($entry['priority'], ENT_XML1)."</priority>\n";
+    }
+    $xml .= "  </url>\n";
+  }
+  $xml .= "</urlset>\n";
+
+  $target = __DIR__.'/../sitemap.xml';
+  $result = @file_put_contents($target, $xml, LOCK_EX);
+  if ($result === false) {
+    return [false, 'sitemap.xml dosyası yazılamadı. Lütfen dosya izinlerini kontrol edin.'];
+  }
+
+  return [true, 'Sitemap başarıyla oluşturuldu.'];
 }
 
 function site_content_upload_dir(): string {
@@ -308,7 +875,7 @@ function site_content_store_upload(array $file, ?string $previous = null): ?stri
   }
   $name = $file['name'] ?? 'upload';
   $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-  $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+  $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico'];
   if (!in_array($ext, $allowed, true)) {
     return null;
   }
@@ -357,6 +924,17 @@ function site_resolve_button_url(?string $url): ?string {
   }
   if (preg_match('~^(mailto:|tel:|#)~i', $url)) {
     return $url;
+  }
+  if (preg_match('~^https?://~i', $url)) {
+    return $url;
+  }
+  if (defined('BASE_URL')) {
+    $base = rtrim((string)BASE_URL, '/');
+    $path = ltrim($url, '/');
+    if ($path === '') {
+      return $base;
+    }
+    return $base.'/'.$path;
   }
   return site_normalize_url($url);
 }
@@ -691,6 +1269,19 @@ function site_ensure_order_paytr_token(int $order_id): array {
   }
   $dealer = $order['dealer_id'] ? dealer_get((int)$order['dealer_id']) : null;
 
+  $paytrConfig = site_payment_config();
+  $merchantId = trim((string)($paytrConfig['merchant_id'] ?? ''));
+  $merchantKey = trim((string)($paytrConfig['merchant_key'] ?? ''));
+  $merchantSalt = trim((string)($paytrConfig['merchant_salt'] ?? ''));
+  $testMode = (int)($paytrConfig['test_mode'] ?? 1) === 1;
+
+  if (empty($paytrConfig['enabled'])) {
+    throw new RuntimeException('Online ödeme sistemi geçici olarak pasif durumda. Lütfen bizimle iletişime geçin.');
+  }
+  if ($merchantId === '' || $merchantKey === '' || $merchantSalt === '') {
+    throw new RuntimeException('PAYTR ayarları eksik. Lütfen yönetici panelinden ödeme anahtarlarını kontrol edin.');
+  }
+
   if ($order['status'] === SITE_ORDER_STATUS_COMPLETED && $order['event_id']) {
     return [
       'order' => $order,
@@ -705,8 +1296,6 @@ function site_ensure_order_paytr_token(int $order_id): array {
   $user_name = mb_substr($order['customer_name'], 0, 64, 'UTF-8');
   $user_address = 'Online Sipariş';
   $user_phone = $order['customer_phone'] ?: '—';
-
-  $testMode = paytr_is_test_mode();
 
   $ip = $_SERVER['HTTP_CF_CONNECTING_IP']
      ?? $_SERVER['HTTP_X_FORWARDED_FOR']
@@ -806,12 +1395,12 @@ function site_ensure_order_paytr_token(int $order_id): array {
   $no_installment = 0;
   $max_installment = 0;
   $currency = 'TL';
-  $test = (int)PAYTR_TEST_MODE;
-  $hash_str = PAYTR_MERCHANT_ID . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
-  $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . PAYTR_MERCHANT_SALT, PAYTR_MERCHANT_KEY, true));
+  $test = $testMode ? 1 : 0;
+  $hash_str = $merchantId . $ip . $merchantOid . $email . $amount_cents . $user_basket . $no_installment . $max_installment . $currency . $test;
+  $paytr_token = base64_encode(hash_hmac('sha256', $hash_str . $merchantSalt, $merchantKey, true));
 
   $post = [
-    'merchant_id'          => PAYTR_MERCHANT_ID,
+    'merchant_id'          => $merchantId,
     'user_ip'              => $ip,
     'merchant_oid'         => $merchantOid,
     'email'                => $email,
